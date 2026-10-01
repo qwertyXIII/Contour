@@ -1,5 +1,7 @@
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
+import { LEARNED_FILE } from '../dns/learn.ts';
+import { COMMON_FILE, parseList } from '../dns/lists.ts';
 import { readOverrides, writeOverride, type OverrideMap, type Via } from '../dns/overrides.ts';
 
 /**
@@ -24,7 +26,7 @@ export class Sites {
 
   learned(): Learned[] {
     try {
-      const raw = JSON.parse(readFileSync(path.join(this.dir, 'dns-learned.json'), 'utf8')) as Record<string, { via: Via; why: string; until: number }>;
+      const raw = JSON.parse(readFileSync(path.join(this.dir, LEARNED_FILE), 'utf8')) as Record<string, { via: Via; why: string; until: number }>;
       const now = Date.now();
       return Object.entries(raw)
         .filter(([, e]) => e.until > now)
@@ -34,12 +36,22 @@ export class Sites {
     }
   }
 
-  commonCount(): number {
+  /** Общий список — копией с диска DNS; DNS ещё не скачал — пусто. */
+  commonNames(): string[] {
     try {
-      return readFileSync(path.join(this.dir, 'blocked-domains.lst'), 'utf8').split('\n').filter(Boolean).length;
+      return parseList(readFileSync(path.join(this.dir, COMMON_FILE), 'utf8'));
     } catch {
-      return 0;
+      return [];
     }
+  }
+
+  commonCount(): number {
+    return this.commonNames().length;
+  }
+
+  /** Свой список Contour (`lan.domains`). */
+  ownNames(): string[] {
+    return [...this.own];
   }
 
   overrides(): OverrideMap {

@@ -1,6 +1,7 @@
 import { timingSafeEqual } from 'node:crypto';
 import { readFileSync, statSync } from 'node:fs';
 import type { Logger } from './log.ts';
+import { SHARE_PREFIX } from './share/store.ts';
 
 /**
  * Потребители — те, кому выдан токен.
@@ -9,6 +10,10 @@ import type { Logger } from './log.ts';
  * сам, когда меняется на диске (не чаще раза в 5 с), — отзыв токена не
  * требует перезапуска. Трафик считается по имени и раз в минуту уходит точкой
  * графика: «Alter — 1,2 ГБ за сутки» складывается из них.
+ *
+ * Второй источник — устройства раздачи (`share/store.ts`): за них в прокси
+ * ходит край под именем `share.<id>`. Эти имена — только оттуда: строка с таким
+ * именем в файле не действует.
  */
 
 export type Usage = { up: number; down: number; connections: number };
@@ -25,10 +30,16 @@ export class Consumers {
   private timer: NodeJS.Timeout | null = null;
   private readonly path: string;
   private readonly log: Logger;
+  private extra: () => ReadonlyMap<string, Buffer> = () => new Map();
 
   constructor(path: string, log: Logger) {
     this.path = path;
     this.log = log;
+  }
+
+  /** Пароли устройств раздачи — спрашиваются на каждом входе, отключение действует сразу. */
+  useShare(source: () => ReadonlyMap<string, Buffer>): void {
+    this.extra = source;
   }
 
   load(): void {
@@ -78,7 +89,7 @@ export class Consumers {
     const name = pair.slice(0, colon);
     const given = Buffer.from(pair.slice(colon + 1));
     this.refresh();
-    const expected = this.tokens.get(name);
+    const expected = name.startsWith(SHARE_PREFIX) ? this.extra().get(name) : this.tokens.get(name);
     if (!expected || expected.length !== given.length || !timingSafeEqual(expected, given)) return null;
     return name;
   }

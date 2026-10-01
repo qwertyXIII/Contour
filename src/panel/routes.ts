@@ -1,4 +1,4 @@
-import { Router, type Request, type Response } from 'express';
+import { Router, type Response } from 'express';
 import rateLimit from 'express-rate-limit';
 import { z } from 'zod';
 import type { Logger } from '../log.ts';
@@ -7,11 +7,14 @@ import type { Outlet } from '../outlets/outlet.ts';
 import { portsView, type PortProbe } from '../outlets/ports.ts';
 import type { Rivals } from '../outlets/rivals.ts';
 import { rootCall } from '../root/protocol.ts';
+import type { Share } from '../share/index.ts';
 import type { Meter } from '../stats/meter.ts';
 import { requireAuth, sessionOf, type Auth } from './auth.ts';
 import type { Devices } from './devices.ts';
 import type { Sites } from './sites.ts';
 import { speedTest, type SpeedResult } from './speedtest.ts';
+import { fail, parse } from './respond.ts';
+import { shareRoutes } from './share-routes.ts';
 import type { PanelState } from './state.ts';
 
 /**
@@ -30,6 +33,8 @@ export type RoutesDeps = {
   speeds: Map<string, SpeedResult>;
   ports: PortProbe;
   rivals: Rivals;
+  /** Раздача; null — выключена в настройках. */
+  share: Share | null;
   log: Logger;
 };
 
@@ -54,17 +59,6 @@ const schemas = {
   enable: z.object({ enabled: z.boolean() }),
   priority: z.object({ priority: z.number().int().min(0).max(10_000) }),
 };
-
-function fail(res: Response, status: number, code: string, message: string): void {
-  res.status(status).json({ ok: false, error: { code, message } });
-}
-
-function parse<T>(schema: z.ZodType<T>, req: Request, res: Response): T | null {
-  const r = schema.safeParse(req.body);
-  if (r.success) return r.data;
-  fail(res, 400, 'VALIDATION', r.error.issues[0]?.message ?? 'неверный запрос');
-  return null;
-}
 
 function authRoutes(router: Router, d: RoutesDeps): void {
   const limiter = rateLimit({ windowMs: 15 * 60_000, limit: 10, standardHeaders: 'draft-7', legacyHeaders: false, message: { ok: false, error: { code: 'RATE', message: 'слишком много попыток — подожди 15 минут' } } });
@@ -226,5 +220,6 @@ export function apiRouter(d: RoutesDeps): Router {
   viewRoutes(router, d);
   actionRoutes(router, d);
   outletRoutes(router, d);
+  shareRoutes(router, d);
   return router;
 }

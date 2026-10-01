@@ -15,6 +15,9 @@ import { RemoteList } from './remote-list.ts';
  * (ChatGPT отвечает 403 после нормального соединения) видны только по списку.
  */
 
+/** Копия общего списка в папке DNS — её читают и панель, и правила раздачи. */
+export const COMMON_FILE = 'blocked-domains.lst';
+
 const NAME = /^(?=.{1,253}$)([a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z0-9-]{2,63}$/;
 
 /** Строки файла списка → имена: комментарии, `*.`, пробелы и мусор — прочь. */
@@ -47,7 +50,7 @@ export class Lists {
     this.own = new Set(opts.own);
     this.remote = new RemoteList<string>({
       urls: opts.urls,
-      cacheFile: path.join(opts.cacheDir, 'blocked-domains.lst'),
+      cacheFile: path.join(opts.cacheDir, COMMON_FILE),
       parse: parseList,
       key: (n) => n,
       format: (n) => n,

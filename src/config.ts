@@ -125,6 +125,13 @@ export type Config = {
     /** Подсети, которые из списков выбрасываются (по умолчанию — Cloudflare). */
     subnetSkip: string[];
   };
+  /**
+   * Раздача (`src/share/`): телефоны из любой сети через Shadowrocket. Снаружи —
+   * nginx с сертификатом домена; сюда — только `127.0.0.1`: `port` — край
+   * (VLESS через WebSocket), `listPort` — правила по ссылке. Домен и устройства —
+   * в панели, не здесь: их добавляют без root.
+   */
+  share: { enabled: boolean; listen: string; port: number; listPort: number; controller: string; dir: string };
 };
 
 /**
@@ -219,6 +226,7 @@ export const DEFAULTS: Config = {
     ports: GAME_PORTS,
     hintPort: 18053,
   },
+  share: { enabled: true, listen: '127.0.0.1', port: 18300, listPort: 18091, controller: '127.0.0.1:19091', dir: '/var/lib/contour/share' },
 };
 
 export class ConfigError extends Error {}
@@ -372,7 +380,7 @@ function outlet(raw: unknown, index: number): OutletConfig {
 export function parseConfig(text: string): Config {
   const raw: unknown = parse(text) ?? {};
   if (!isRecord(raw)) throw new ConfigError('в корне должен быть раздел, а не список или строка');
-  onlyKnown(raw, 'корень', ['http', 'tokens', 'outlets', 'mihomo', 'health', 'sticky', 'lan', 'panel']);
+  onlyKnown(raw, 'корень', ['http', 'tokens', 'outlets', 'mihomo', 'health', 'sticky', 'lan', 'panel', 'share']);
 
   const http = section(raw, 'http');
   onlyKnown(http, 'http', ['listen', 'port']);
@@ -384,6 +392,8 @@ export function parseConfig(text: string): Config {
   onlyKnown(sticky, 'sticky', ['hours']);
   const panel = section(raw, 'panel');
   onlyKnown(panel, 'panel', ['enabled', 'listen', 'port', 'name', 'passwordFile', 'dataDir']);
+  const share = section(raw, 'share');
+  onlyKnown(share, 'share', ['enabled', 'listen', 'port', 'listPort', 'controller', 'dir']);
   const lan = section(raw, 'lan');
   onlyKnown(lan, 'lan', ['enabled', 'address', 'allow', 'upstream', 'domains', 'extraDomains', 'tlsPort', 'httpPort', 'lists', 'learn', 'probeBudgetMs', 'dataDir', 'ports', 'hintPort', 'subnetLists', 'subnetSkip']);
 
@@ -450,6 +460,14 @@ export function parseConfig(text: string): Config {
       dataDir: str(lan, 'dataDir', d.lan.dataDir, 'lan'),
       ports: portRules(lan.ports, d.lan.ports),
       hintPort: num(lan, 'hintPort', d.lan.hintPort, 'lan', 1024, 65_535),
+    },
+    share: {
+      enabled: bool(share, 'enabled', d.share.enabled, 'share'),
+      listen: str(share, 'listen', d.share.listen, 'share'),
+      port: num(share, 'port', d.share.port, 'share', 1024, 65_535),
+      listPort: num(share, 'listPort', d.share.listPort, 'share', 1024, 65_535),
+      controller: str(share, 'controller', d.share.controller, 'share'),
+      dir: str(share, 'dir', d.share.dir, 'share'),
     },
   };
 }

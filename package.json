@@ -21,7 +21,8 @@
     "express": "^5.1.0",
     "helmet": "^8.1.0",
     "zod": "^3.25.0",
-    "express-rate-limit": "^7.5.0"
+    "express-rate-limit": "^7.5.0",
+    "qr": "^0.7.2"
   },
   "devDependencies": {
     "@types/node": "^22.10.0",

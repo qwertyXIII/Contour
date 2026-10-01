@@ -24,6 +24,8 @@ type Options = {
   controller: string;
   secret: string;
   log: Logger;
+  /** Имя в журнале: `mihomo` — выходы, `edge` — край раздачи (`share/edge.ts`). */
+  label?: string;
 };
 
 const READY_TIMEOUT_MS = 20_000;
@@ -51,7 +53,7 @@ function levelOf(line: string): 'debug' | 'info' | 'warn' | 'error' {
   return 'info';
 }
 
-async function waitReady(controller: string, secret: string, log: Logger): Promise<void> {
+async function waitReady(controller: string, secret: string, log: Logger, label: string): Promise<void> {
   const deadline = Date.now() + READY_TIMEOUT_MS;
   let lastError = '';
   while (Date.now() < deadline) {
@@ -62,7 +64,7 @@ async function waitReady(controller: string, secret: string, log: Logger): Promi
       });
       if (res.ok) {
         const body = await res.json() as { version?: string };
-        log.info(`mihomo отвечает: ${body.version ?? '?'}`);
+        log.info(`${label} отвечает: ${body.version ?? '?'}`);
         return;
       }
       lastError = `HTTP ${res.status}`;
@@ -71,11 +73,12 @@ async function waitReady(controller: string, secret: string, log: Logger): Promi
     }
     await sleep(300);
   }
-  throw new Error(`mihomo не ответил по API за ${READY_TIMEOUT_MS / 1000} с: ${lastError}`);
+  throw new Error(`${label} не ответил по API за ${READY_TIMEOUT_MS / 1000} с: ${lastError}`);
 }
 
 export function runMihomo(opts: Options): MihomoHandle {
-  const log = opts.log.child({ src: 'mihomo' });
+  const label = opts.label ?? 'mihomo';
+  const log = opts.log.child({ src: label });
   let child: ChildProcess | null = null;
   let stopping = false;
   let crashes = 0;
@@ -83,22 +86,22 @@ export function runMihomo(opts: Options): MihomoHandle {
   const start = (): void => {
     child = spawn(opts.bin, ['-d', opts.dir, '-f', opts.configPath], { stdio: ['ignore', 'pipe', 'pipe'] });
     const pid = child.pid;
-    opts.log.info(`mihomo запущен, pid ${pid}`);
+    opts.log.info(`${label} запущен, pid ${pid}`);
     if (child.stdout) forwardLines(child.stdout, (line) => log[levelOf(line)](line));
     if (child.stderr) forwardLines(child.stderr, (line) => log[levelOf(line)](line));
-    child.on('error', (error) => opts.log.error(`mihomo не запустился: ${error.message}`));
+    child.on('error', (error) => opts.log.error(`${label} не запустился: ${error.message}`));
     child.on('exit', (code, signal) => {
       child = null;
       if (stopping) return;
       const pause = BACKOFF_MS[Math.min(crashes, BACKOFF_MS.length - 1)] as number;
       crashes += 1;
-      opts.log.error(`mihomo завершился (код ${code ?? '—'}, сигнал ${signal ?? '—'}), перезапуск через ${pause / 1000} с`);
+      opts.log.error(`${label} завершился (код ${code ?? '—'}, сигнал ${signal ?? '—'}), перезапуск через ${pause / 1000} с`);
       setTimeout(() => { if (!stopping) start(); }, pause).unref();
     });
   };
 
   start();
-  const ready = waitReady(opts.controller, opts.secret, opts.log).then(() => { crashes = 0; });
+  const ready = waitReady(opts.controller, opts.secret, opts.log, label).then(() => { crashes = 0; });
 
   return {
     ready,
@@ -110,7 +113,7 @@ export function runMihomo(opts: Options): MihomoHandle {
       const exited = once(c, 'exit');
       const timer = sleep(STOP_TIMEOUT_MS).then(() => 'timeout' as const);
       if (await Promise.race([exited.then(() => 'exited' as const), timer]) === 'timeout') {
-        opts.log.warn('mihomo не вышел по SIGTERM — SIGKILL');
+        opts.log.warn(`${label} не вышел по SIGTERM — SIGKILL`);
         c.kill('SIGKILL');
       }
     },

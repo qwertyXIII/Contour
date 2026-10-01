@@ -13,6 +13,8 @@ import { createPanel } from '../src/panel/server.ts';
 import { Sites } from '../src/panel/sites.ts';
 import type { SpeedResult } from '../src/panel/speedtest.ts';
 import { PanelState } from '../src/panel/state.ts';
+import type { Share } from '../src/share/index.ts';
+import { ShareStore } from '../src/share/store.ts';
 import { Meter } from '../src/stats/meter.ts';
 
 /**
@@ -56,10 +58,18 @@ setInterval(() => {
   meter.add('alter', 'ext', 'x.com', 500, 12_000);
 }, 200).unref();
 
+// Раздача: два телефона, один ходит; края в проверке нет — «работает» подставлено.
+const shareStore = new ShareStore(path.join(dir, 'share'));
+shareStore.setDomain('contour.example.ru');
+const iphone = shareStore.add('iPhone Димы');
+shareStore.add('iPad');
+setInterval(() => meter.add(`share.${iphone.id}`, 'ext', 'instagram.com', 3_000, 400_000), 200).unref();
+const share = { store: shareStore, edge: { running: () => true }, ports: { edge: 18300, list: 18091 }, stop: async () => {} } as unknown as Share;
+
 const config = { ...DEFAULTS, lan: { ...DEFAULTS.lan, enabled: true } };
 const speeds = new Map<string, SpeedResult>();
 const devices = new Devices(dir);
-const state = new PanelState({ config, outlets, meter, devices, speeds, addresses: new GatewayAddresses(dir) });
+const state = new PanelState({ config, outlets, meter, devices, speeds, addresses: new GatewayAddresses(dir), share: shareStore });
 // Помощника от root в проверке нет — его ответ подставлен, кэш не истекает.
 const rt = (name: string, protocol: string, priority: number, group: string | null) => ({ name, kind: 'netns' as const, protocol, enabled: true, priority, group, about: protocol });
 (state as unknown as { root: unknown }).root = {
@@ -84,4 +94,5 @@ createPanel({
   dial: noDial,
   ports: new PortProbe(outlets, { dial: noDial, host: 'portquiz.net', intervalMs: 86_400_000, needed: [9339], file: path.join(dir, 'outlet-ports.json'), log }),
   rivals: new Rivals(outlets, [], { log, activate: async () => { throw new Error('в проверке помощника нет'); }, isRunning: async () => true, onActivated: () => {} }),
+  share,
 });

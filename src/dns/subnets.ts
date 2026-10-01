@@ -16,6 +16,8 @@ import { RemoteList } from './remote-list.ts';
  * повтор каждые 5 минут.
  */
 
+/** Копия списков подсетей (до отбора `pickSubnets`) — её читают и правила раздачи. */
+export const SUBNETS_FILE = 'gateway-subnets.lst';
 const MAX_NETS = 4_096;
 const PUSH_RETRY_MS = 5 * 60_000;
 const PRIVATE: Cidr[] = PRIVATE_V4.map(([net, bits]) => parseCidr(`${net}/${bits}`) as Cidr);
@@ -53,7 +55,7 @@ export class Subnets {
     const skip = opts.skip.map((s) => parseCidr(s)).filter((c): c is Cidr => c !== null);
     this.remote = new RemoteList<Cidr>({
       urls: opts.urls,
-      cacheFile: path.join(opts.cacheDir, 'gateway-subnets.lst'),
+      cacheFile: path.join(opts.cacheDir, SUBNETS_FILE),
       parse: parseCidrList,
       key: formatCidr,
       format: formatCidr,

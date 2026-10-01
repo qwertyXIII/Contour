@@ -26,6 +26,7 @@ import { createPanel, type Panel } from './panel/server.ts';
 import { Sites } from './panel/sites.ts';
 import type { SpeedResult } from './panel/speedtest.ts';
 import { PanelState } from './panel/state.ts';
+import { startShare, type Share } from './share/index.ts';
 import { Meter } from './stats/meter.ts';
 
 /**
@@ -141,7 +142,10 @@ async function main(): Promise<void> {
   const meter = new Meter({ dir: STATE_DIR, log });
   meter.start();
   const server = await startHttpInlet({ ...config.http, chooser, consumers, log, meter, ports });
-  const panel = config.panel.enabled ? startPanel(config, { outlets, meter, dial, ports, rivals }) : null;
+  const sites = new Sites({ dnsDir: config.lan.dataDir, own: config.lan.domains });
+  // Раздача — после входа HTTP-прокси: край ходит в него за каждое устройство.
+  const share = startShare(config, { consumers, sites, log });
+  const panel = config.panel.enabled ? startPanel(config, { outlets, meter, dial, ports, rivals, sites, share }) : null;
   const panelHosts = new Set([config.panel.name, config.lan.address]);
   const lanServers = config.lan.enabled
     ? startLanInlet(config.lan, { chooser, consumers, log, meter, ports }, panel ? { hosts: panelHosts, take: panel.take } : null)
@@ -167,25 +171,26 @@ async function main(): Promise<void> {
     server.closeAllConnections();
     for (const s of [...lanServers, ...gameServers]) s.close();
     hintSocket?.close();
-    void (mihomo ? mihomo.stop() : Promise.resolve()).finally(() => process.exit(0));
+    void Promise.allSettled([mihomo?.stop(), share?.stop()]).finally(() => process.exit(0));
     setTimeout(() => process.exit(0), 7_000).unref();
   };
   process.on('SIGTERM', () => shutdown('SIGTERM'));
   process.on('SIGINT', () => shutdown('SIGINT'));
 }
 
-function startPanel(config: ReturnType<typeof loadConfig>, live: { outlets: Outlet[]; meter: Meter; dial: ReturnType<typeof makeDial>; ports: PortProbe; rivals: Rivals }): Panel {
+function startPanel(config: ReturnType<typeof loadConfig>, live: { outlets: Outlet[]; meter: Meter; dial: ReturnType<typeof makeDial>; ports: PortProbe; rivals: Rivals; sites: Sites; share: Share | null }): Panel {
   const speeds = new Map<string, SpeedResult>();
   const devices = new Devices(config.panel.dataDir);
   const auth = new Auth(config.panel.passwordFile, config.panel.dataDir);
   if (!auth.configured()) log.warn(`панель: нет пароля (${config.panel.passwordFile}) — войти нельзя; задать: sudo bash deploy/panel-password.sh`);
-  const state = new PanelState({ config, outlets: live.outlets, meter: live.meter, devices, speeds, addresses: new GatewayAddresses(config.panel.dataDir) });
-  const sites = new Sites({ dnsDir: config.lan.dataDir, own: config.lan.domains });
+  const state = new PanelState({ config, outlets: live.outlets, meter: live.meter, devices, speeds, addresses: new GatewayAddresses(config.panel.dataDir), share: live.share?.store ?? null });
   return createPanel({
     listen: config.panel.listen,
     port: config.panel.port,
     log: log.child({ src: 'panel' }),
-    auth, state, devices, sites, speeds,
+    auth, state, devices, speeds,
+    sites: live.sites,
+    share: live.share,
     meter: live.meter,
     outlets: live.outlets,
     dial: live.dial,

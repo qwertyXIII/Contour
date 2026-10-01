@@ -1,2 +1,3 @@
 /* Панель Contour: только импорты. Дизайн-система — /shared/pages/alter.css, раньше этого файла. */
 @import url('../blocks/console/console.css');
+@import url('../blocks/qr/qr.css');

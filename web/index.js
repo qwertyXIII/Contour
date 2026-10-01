@@ -7,6 +7,7 @@ import { Devices } from './components/devices/devices.js';
 import { Journal } from './components/journal/journal.js';
 import { Outlets } from './components/outlets/outlets.js';
 import { Overview } from './components/overview/overview.js';
+import { Share } from './components/share/share.js';
 import { Sites } from './components/sites/sites.js';
 
 startSystem(document.body);
@@ -16,6 +17,7 @@ const SECTIONS = [
   ['[data-devices]', Devices],
   ['[data-sites]', Sites],
   ['[data-outlets]', Outlets],
+  ['[data-share]', Share],
   ['[data-journal]', Journal],
 ];
 for (const [selector, Section] of SECTIONS) new Section(document.querySelector(selector)).init();

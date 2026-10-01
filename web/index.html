@@ -46,12 +46,14 @@
       <button class="tabs__tab" role="tab" id="tab-devices" aria-controls="panel-devices" aria-selected="false" type="button">Устройства</button>
       <button class="tabs__tab" role="tab" id="tab-sites" aria-controls="panel-sites" aria-selected="false" type="button">Сайты</button>
       <button class="tabs__tab" role="tab" id="tab-outlets" aria-controls="panel-outlets" aria-selected="false" type="button">Выходы</button>
+      <button class="tabs__tab" role="tab" id="tab-share" aria-controls="panel-share" aria-selected="false" type="button">Раздача</button>
       <button class="tabs__tab" role="tab" id="tab-journal" aria-controls="panel-journal" aria-selected="false" type="button">Журнал</button>
     </div>
     <section class="tabs__panel stack stack_gap_l" role="tabpanel" id="panel-overview" aria-labelledby="tab-overview" data-overview></section>
     <section class="tabs__panel stack stack_gap_l" role="tabpanel" id="panel-devices" aria-labelledby="tab-devices" data-devices hidden></section>
     <section class="tabs__panel stack stack_gap_l" role="tabpanel" id="panel-sites" aria-labelledby="tab-sites" data-sites hidden></section>
     <section class="tabs__panel stack stack_gap_l" role="tabpanel" id="panel-outlets" aria-labelledby="tab-outlets" data-outlets hidden></section>
+    <section class="tabs__panel stack stack_gap_l" role="tabpanel" id="panel-share" aria-labelledby="tab-share" data-share hidden></section>
     <section class="tabs__panel stack stack_gap_l" role="tabpanel" id="panel-journal" aria-labelledby="tab-journal" data-journal hidden></section>
   </div>
 </div>
@@ -114,6 +116,37 @@
       <p class="field__error" data-outlet-error hidden></p>
     </div>
     <footer class="dialog__foot cluster cluster_justify_end"><button class="button button_view_primary" type="submit" value="add" data-outlet-submit><span class="button__text">Добавить</span></button></footer>
+  </form>
+</dialog>
+
+<!-- Подключить телефон (раздача): ссылки приходят по запросу, в список их не кладём -->
+<dialog class="dialog" id="dlg-share" aria-labelledby="dlg-share-title">
+  <form method="dialog" class="stack stack_gap_l">
+    <header class="dialog__head bar bar_size_s">
+      <div class="bar__text"><h2 class="bar__title" id="dlg-share-title" data-share-title>Подключить</h2><p class="bar__subtitle">Shadowrocket на iPhone</p></div>
+      <div class="bar__end"><button class="button button_view_ghost button_shape_round button_size_s dialog__close" type="button" aria-label="Закрыть"><svg class="icon button__icon" aria-hidden="true"><use href="/shared/assets/icons/sprite.svg#close"/></svg></button></div>
+    </header>
+    <div class="dialog__body stack stack_gap_l">
+      <section class="stack stack_gap_s">
+        <h3 class="text text_style_title">1. Сервер</h3>
+        <p class="text text_style_small text_tone_muted">В Shadowrocket — сканер слева вверху, наведи на код. Панель открыта на самом телефоне — «Скопировать» и открой Shadowrocket: он сам предложит добавить.</p>
+        <img class="qr" alt="QR сервера Contour" data-share-qr>
+        <div class="cluster cluster_gap_s"><button class="button button_size_s" type="button" data-share-copy="server"><svg class="icon button__icon" aria-hidden="true"><use href="/shared/assets/icons/sprite.svg#copy"/></svg><span class="button__text">Скопировать сервер</span></button></div>
+      </section>
+      <section class="stack stack_gap_s">
+        <h3 class="text text_style_title">2. Правила</h3>
+        <p class="text text_style_small text_tone_muted">«Конфиг» → ⊕ → вставь ссылку → «Загрузить»; потом нажми на загруженный конфиг → «Использовать конфиг». Обновляется сам, раз в 1–7 дней (Настройки → Автообновление), или вручную — «Обновить».</p>
+        <code class="code code_block" data-share-config></code>
+        <div class="cluster cluster_gap_s">
+          <button class="button button_size_s" type="button" data-share-copy="config"><svg class="icon button__icon" aria-hidden="true"><use href="/shared/assets/icons/sprite.svg#copy"/></svg><span class="button__text">Скопировать ссылку</span></button>
+          <a class="button button_size_s button_view_ghost" data-share-open href="#"><svg class="icon button__icon" aria-hidden="true"><use href="/shared/assets/icons/sprite.svg#external"/></svg><span class="button__text">Открыть в Shadowrocket</span></a>
+        </div>
+      </section>
+      <section class="stack stack_gap_s">
+        <h3 class="text text_style_title">3. Включить</h3>
+        <p class="text text_style_small text_tone_muted">На главной: «Глобальная маршрутизация» → «Конфиг», выбери сервер Contour и включи. Заблокированное пойдёт через дом, остальное — напрямую из той сети, где телефон.</p>
+      </section>
+    </div>
   </form>
 </dialog>
 

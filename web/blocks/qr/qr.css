@@ -1,0 +1,14 @@
+/*
+ * Блок qr: код для сканирования с другого экрана. Картинка — SVG с белой
+ * подложкой (src/share/links.ts): в тёмной теме чёрные модули иначе не видны.
+ *
+ *   <img class="qr" src="data:image/svg+xml;…">
+ */
+.qr {
+  display: block;
+  width: min(260px, 72vw);
+  aspect-ratio: 1;
+  border-radius: var(--radius-s);
+  background: #fff;
+  image-rendering: pixelated;
+}

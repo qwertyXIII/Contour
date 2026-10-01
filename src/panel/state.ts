@@ -6,6 +6,7 @@ import { journal, type JournalEntry } from '../log.ts';
 import type { Outlet } from '../outlets/outlet.ts';
 import { portsView } from '../outlets/ports.ts';
 import { rootCall, type OutletRuntime, type RootStatus } from '../root/protocol.ts';
+import { SHARE_PREFIX, type ShareStore } from '../share/store.ts';
 import type { Meter } from '../stats/meter.ts';
 import type { GatewayAddresses } from './addresses.ts';
 import type { Devices } from './devices.ts';
@@ -34,10 +35,12 @@ export type StateDeps = {
   speeds: Map<string, SpeedResult>;
   /** Свой адрес каждому устройству-шлюзу (addresses.ts). */
   addresses: GatewayAddresses;
+  /** Устройства раздачи — их имена для строк `share.<id>`. */
+  share: ShareStore | null;
 };
 
 type ConsumerRow = {
-  who: string; kind: 'device' | 'program'; ip: string | null; mac: string | null; name: string | null;
+  who: string; kind: 'device' | 'program' | 'share'; ip: string | null; mac: string | null; name: string | null;
   gateway: string | null; gatewayActive: boolean | null; gatewayIp: string | null; gatewayConflict: string | null;
   rate: Rate; today: Rate; lastSeen: number | null;
 };
@@ -132,6 +135,7 @@ export class PanelState {
     const own = ownAddresses();
     const lanIps = [...keys].filter((k) => k.startsWith('lan:')).map((k) => k.slice(4)).filter((ip) => !own.has(ip));
     const byIp = new Map(devices.resolve(lanIps).map((d) => [d.ip, d]));
+    const shared = new Map((this.deps.share?.devices() ?? []).map((s) => [`${SHARE_PREFIX}${s.id}`, s.name]));
     const rows = new Map<string, ConsumerRow>();
     for (const who of keys) {
       const ip = who.startsWith('lan:') ? who.slice(4) : null;
@@ -139,10 +143,10 @@ export class PanelState {
       const d = ip ? byIp.get(ip) : undefined;
       const row: ConsumerRow = {
         who,
-        kind: ip ? 'device' : 'program',
+        kind: ip ? 'device' : who.startsWith(SHARE_PREFIX) ? 'share' : 'program',
         ip,
         mac: d?.mac ?? null,
-        name: d?.name ?? null,
+        name: d?.name ?? shared.get(who) ?? null,
         gateway: d?.mac ? gateway[d.mac] ?? null : null,
         // null — помощник не сказал (не обновлён или недоступен).
         gatewayActive: d?.mac && gateway[d.mac] && seen ? seen.includes(d.mac) : null,

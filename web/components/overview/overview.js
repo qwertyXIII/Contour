@@ -16,6 +16,7 @@ export function outletStatus(o) {
 
 export function whoName(c) {
   if (c.kind === 'program') return c.who === 'alter' ? 'Alter' : c.who;
+  if (c.kind === 'share') return c.name ?? 'Телефон снаружи';
   return c.name ?? `Устройство ${c.ip}`;
 }
 

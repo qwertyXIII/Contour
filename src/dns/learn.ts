@@ -29,6 +29,9 @@ import { errorText, type Logger } from '../log.ts';
 export type Via = 'tunnel' | 'direct';
 type Entry = { via: Via; until: number; why: string };
 
+/** Выученное в папке DNS — его читают и панель, и правила раздачи. */
+export const LEARNED_FILE = 'dns-learned.json';
+
 const DIRECT_FOR_MS = 24 * 3_600_000;
 const TUNNEL_FOR_MS = 7 * 24 * 3_600_000;
 const PROBE_TIMEOUT_MS = 4_000;
@@ -83,7 +86,7 @@ export class Learner {
     this.viaTunnel = opts.viaTunnel;
     this.resolver = new Resolver({ timeout: 2_000, tries: 1 });
     this.resolver.setServers(opts.upstream);
-    this.file = path.join(opts.dir, 'dns-learned.json');
+    this.file = path.join(opts.dir, LEARNED_FILE);
     this.log = opts.log;
     this.budgetMs = opts.budgetMs;
     this.load();

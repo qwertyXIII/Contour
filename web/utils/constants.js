@@ -13,6 +13,10 @@ export const API = {
   outlets: '/api/outlets',
   device: (mac) => `/api/devices/${encodeURIComponent(mac)}`,
   outlet: (name) => `/api/outlets/${encodeURIComponent(name)}`,
+  share: '/api/share',
+  shareSettings: '/api/share/settings',
+  shareDevices: '/api/share/devices',
+  shareDevice: (id) => `/api/share/devices/${encodeURIComponent(id)}`,
 };
 
 export const TIMING = {
