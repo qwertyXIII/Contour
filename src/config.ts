@@ -64,8 +64,19 @@ export type Config = {
      */
     tlsPort: number;
     httpPort: number;
+    /** Общие списки заблокированного — по ссылке, раз в сутки. */
+    lists: string[];
+    /** Самообучение: новый сайт проверяется напрямую, не открылся — через VPN. */
+    learn: boolean;
+    /** Сколько DNS-ответ ждёт проверку нового сайта, мс. */
+    probeBudgetMs: number;
+    /** Где DNS держит копию общего списка и выученное. */
+    dataDir: string;
   };
 };
+
+/** itdoginfo/allow-domains, «Russia inside» — заблокированное и недоступное из России. */
+export const DEFAULT_LISTS = ['https://raw.githubusercontent.com/itdoginfo/allow-domains/main/Russia/inside-raw.lst'];
 
 /**
  * YouTube целиком: страницы, API приложения для ТВ, видео (googlevideo),
@@ -105,6 +116,10 @@ export const DEFAULTS: Config = {
     domains: LAN_DOMAINS,
     tlsPort: 18443,
     httpPort: 18080,
+    lists: DEFAULT_LISTS,
+    learn: true,
+    probeBudgetMs: 1_500,
+    dataDir: '/var/lib/contour/dns',
   },
 };
 
@@ -179,6 +194,14 @@ function domainList(value: unknown, where: string, fallback: string[]): string[]
   });
 }
 
+function urlList(value: unknown, fallback: string[]): string[] {
+  if (value === undefined || value === null) return fallback;
+  if (!Array.isArray(value) || !value.every((v) => typeof v === 'string' && /^https:\/\/\S+$/.test(v))) {
+    throw new ConfigError('lan.lists: список ссылок https:// на файлы со списком сайтов (пустой [] — без общего списка)');
+  }
+  return value as string[];
+}
+
 function dnsList(value: unknown, where: string): string[] {
   if (value === undefined || value === null) return [];
   if (!Array.isArray(value) || !value.every((v) => typeof v === 'string' && isIP(v.trim()) !== 0)) {
@@ -231,7 +254,7 @@ export function parseConfig(text: string): Config {
   const sticky = section(raw, 'sticky');
   onlyKnown(sticky, 'sticky', ['hours']);
   const lan = section(raw, 'lan');
-  onlyKnown(lan, 'lan', ['enabled', 'address', 'allow', 'upstream', 'domains', 'extraDomains', 'tlsPort', 'httpPort']);
+  onlyKnown(lan, 'lan', ['enabled', 'address', 'allow', 'upstream', 'domains', 'extraDomains', 'tlsPort', 'httpPort', 'lists', 'learn', 'probeBudgetMs', 'dataDir']);
 
   const outletsRaw = raw.outlets ?? [];
   if (!Array.isArray(outletsRaw)) throw new ConfigError('outlets: нужен список выходов');
@@ -278,6 +301,10 @@ export function parseConfig(text: string): Config {
       domains: [...new Set([...domainList(lan.domains, 'lan.domains', d.lan.domains), ...domainList(lan.extraDomains, 'lan.extraDomains', [])])],
       tlsPort: num(lan, 'tlsPort', d.lan.tlsPort, 'lan', 1024, 65_535),
       httpPort: num(lan, 'httpPort', d.lan.httpPort, 'lan', 1024, 65_535),
+      lists: urlList(lan.lists, d.lan.lists),
+      learn: bool(lan, 'learn', d.lan.learn, 'lan'),
+      probeBudgetMs: num(lan, 'probeBudgetMs', d.lan.probeBudgetMs, 'lan', 100, 5_000),
+      dataDir: str(lan, 'dataDir', d.lan.dataDir, 'lan'),
     },
   };
 }

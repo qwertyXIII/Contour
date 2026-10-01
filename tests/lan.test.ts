@@ -8,7 +8,9 @@ import tls from 'node:tls';
 import dnsPacket from 'dns-packet';
 import { DEFAULTS, LAN_DOMAINS, parseConfig } from '../src/config.ts';
 import { Consumers } from '../src/consumers.ts';
-import { answerOwn } from '../src/dns/server.ts';
+import { classify } from '../src/dns/learn.ts';
+import { inSet, parseList } from '../src/dns/lists.ts';
+import { answerOwn, capTtl, ownQuestion } from '../src/dns/server.ts';
 import { inCidr, matchesDomain } from '../src/inlets/lan-match.ts';
 import { parseHttpHost, parseSni } from '../src/inlets/sni.ts';
 import { newOutlet } from '../src/outlets/outlet.ts';
@@ -68,7 +70,7 @@ test('сеть: адрес из 192.168.0.0/24, v4-mapped тоже', () => {
   assert.equal(inCidr('fe80::1', '192.168.0.0/24'), false);
 });
 
-test('DNS: свой A — адрес сервера, AAAA и HTTPS — пусто, остальное — не наше', () => {
+test('DNS: ответ «через нас» — A адрес сервера, AAAA и HTTPS пусто; другие типы — не наши', () => {
   const lan = { ...DEFAULTS.lan, enabled: true };
   const ask = (name: string, type: string) =>
     dnsPacket.decode(dnsPacket.encode({ id: 7, type: 'query', flags: dnsPacket.RECURSION_DESIRED, questions: [{ name, type: type as 'A', class: 'IN' }] }));
@@ -84,8 +86,35 @@ test('DNS: свой A — адрес сервера, AAAA и HTTPS — пуст�
   assert.equal(dnsPacket.decode(aaaa).answers?.length, 0);
   assert.equal(dnsPacket.decode(answerOwn(ask('youtube.com', 'UNKNOWN_65'), lan) as Buffer).answers?.length, 0);
 
-  assert.equal(answerOwn(ask('ya.ru', 'A'), lan), null, 'чужое — к обычному DNS');
-  assert.equal(answerOwn(ask('youtube.com', 'MX'), lan), null, 'другие типы своего — тоже к обычному');
+  assert.equal(ownQuestion(ask('ya.ru', 'A')), 'ya.ru');
+  assert.equal(ownQuestion(ask('youtube.com', 'MX')), null, 'другие типы — всегда к обычному DNS');
+  assert.equal(answerOwn(ask('youtube.com', 'MX'), lan), null);
+});
+
+test('списки: разбор файла и совпадение по родителю', () => {
+  const names = parseList('# заголовок\ninstagram.com\n*.fbcdn.net\n  X.com  \nне домен\n.discord.com\nlocalhost\n');
+  assert.deepEqual(names, ['instagram.com', 'fbcdn.net', 'x.com', 'discord.com']);
+  const set = new Set(names);
+  assert.equal(inSet('scontent-ams.cdninstagram.com', set), null);
+  assert.equal(inSet('www.instagram.com', set), 'instagram.com');
+  assert.equal(inSet('instagram.com.', set), 'instagram.com');
+  assert.equal(inSet('notx.com', set), null);
+});
+
+test('самообучение: молчание и сброс — проверить через VPN, отказ и TLS-ошибка — напрямую', () => {
+  assert.equal(classify(Object.assign(new Error(''), { code: 'PROBE_TIMEOUT' })).via, 'tunnel');
+  assert.equal(classify(Object.assign(new Error(''), { code: 'ECONNRESET' })).via, 'tunnel');
+  assert.equal(classify(Object.assign(new Error(''), { code: 'ECONNREFUSED' })).via, 'direct');
+  assert.equal(classify(Object.assign(new Error(''), { code: 'ENOTFOUND' })).via, 'direct');
+  assert.equal(classify(Object.assign(new Error('self-signed certificate'), { code: 'DEPTH_ZERO_SELF_SIGNED_CERT' })).via, 'direct');
+  assert.equal(classify(Object.assign(new Error(''), { code: 'ERR_SSL_WRONG_VERSION_NUMBER' })).via, 'direct');
+});
+
+test('ответ напрямую, пока проверка идёт, — со сроком жизни не больше 30 с', () => {
+  const answer = dnsPacket.encode({ id: 1, type: 'response', questions: [{ name: 'a.com', type: 'A', class: 'IN' }], answers: [{ name: 'a.com', type: 'A', class: 'IN', ttl: 3600, data: '1.2.3.4' }] });
+  const capped = dnsPacket.decode(capTtl(answer, 30));
+  assert.equal((capped.answers?.[0] as { ttl: number }).ttl, 30);
+  assert.equal((capped.answers?.[0] as { data: string }).data, '1.2.3.4');
 });
 
 test('настройки lan: умолчания, свои сайты добавляются, мусор — ошибка', () => {
@@ -100,7 +129,7 @@ test('настройки lan: умолчания, свои сайты добав
   assert.throws(() => parseConfig('lan:\n  extraDomains: ["not a domain"]\n'), /не имя сайта/);
 });
 
-test('SNI-вход: имя из списка — поток через выход с проигрыванием, чужое — разрыв', async () => {
+test('SNI-вход: публичное имя — поток через выход с проигрыванием, местное — разрыв', async () => {
   // «Сайт»: эхо первых байт обратно — так видно, что ClientHello дошёл целиком.
   const site = net.createServer((s) => s.once('data', (c: Buffer) => { s.end(`got ${c.length}`); }));
   await new Promise<void>((r) => site.listen(0, '127.0.0.1', r));
@@ -144,8 +173,8 @@ test('SNI-вход: имя из списка — поток через выхо�
   try {
     assert.equal(await viaInlet(hello), `got ${hello.length}`);
     assert.deepEqual(asked, ['www.youtube.com:443']);
-    const foreign = await clientHello('ya.ru');
-    assert.equal(await viaInlet(foreign), '', 'чужой сайт — разрыв без ответа');
+    const local = await clientHello('printer.lan');
+    assert.equal(await viaInlet(local), '', 'местное имя — разрыв без ответа');
     assert.deepEqual(asked, ['www.youtube.com:443'], 'через выход не пошло');
   } finally {
     inlet.close(); site.close();

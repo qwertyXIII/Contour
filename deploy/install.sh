@@ -172,6 +172,12 @@ ensure_owner_token() {
   chown "$OWNER:$OWNER" "$dir/proxy" "$dir/alter-proxy"
   chmod 600 "$dir/proxy" "$dir/alter-proxy"
   note "токены в доме владельца: $dir/proxy (консоль), $dir/alter-proxy (для настроек Alter'а)"
+  # Токен DNS-процесса: самообучение проверяет через прокси, открывается ли сайт через VPN.
+  if ! grep -q '^contour-dns:' "$ETC/tokens"; then
+    token=$(openssl rand -hex 24 2>/dev/null || head -c 48 /dev/urandom | od -An -tx1 | tr -d ' \n' | head -c 48)
+    printf 'contour-dns:%s\n' "$token" >> "$ETC/tokens"
+    note "токен contour-dns добавлен (самообучение DNS)"
+  fi
 }
 
 # --- зависимости кода -------------------------------------------------------
@@ -226,12 +232,12 @@ ensure_sudoers() {
   # Владелец перезапускает сервис после синка без пароля — только эти команды.
   local file=/etc/sudoers.d/contour
   cat > "$file.tmp" <<EOF
-$OWNER ALL=(root) NOPASSWD: /usr/bin/systemctl start contour.service, /usr/bin/systemctl stop contour.service, /usr/bin/systemctl restart contour.service, /usr/bin/systemctl status contour.service
+$OWNER ALL=(root) NOPASSWD: /usr/bin/systemctl start contour.service, /usr/bin/systemctl stop contour.service, /usr/bin/systemctl restart contour.service, /usr/bin/systemctl status contour.service, /usr/bin/systemctl restart contour-dns.service, /usr/bin/systemctl status contour-dns.service
 EOF
   chmod 440 "$file.tmp"
   if visudo -cf "$file.tmp" >/dev/null; then
     mv "$file.tmp" "$file"
-    note "sudoers: $OWNER может start/stop/restart/status contour без пароля"
+    note "sudoers: $OWNER может start/stop/restart/status contour и restart/status contour-dns без пароля"
   else
     rm -f "$file.tmp"
     die "sudoers не прошёл проверку visudo"
@@ -295,6 +301,7 @@ EOF
 # enable-lan.sh — здесь только ставятся.
 ensure_lan_units() {
   install -m 755 -o root -g root "$SRC/deploy/contour-addr.sh" "$PREFIX/sbin/contour-addr"
+  install -d -m 750 -o "$SERVICE_USER" -g "$SERVICE_USER" "$LIB/dns"
   cat > /etc/systemd/system/contour-addr.service <<EOF
 [Unit]
 Description=Contour — второй адрес сервера для устройств домашней сети
@@ -336,7 +343,7 @@ NoNewPrivileges=yes
 PrivateTmp=yes
 ProtectSystem=full
 ProtectHome=read-only
-ReadWritePaths=$LOG
+ReadWritePaths=$LOG $LIB/dns
 
 [Install]
 WantedBy=multi-user.target

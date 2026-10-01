@@ -3,12 +3,13 @@ import net from 'node:net';
 import dnsPacket, { type Packet } from 'dns-packet';
 import type { Config } from '../config.ts';
 import { errorText, type Logger } from '../log.ts';
-import { inCidr, matchesDomain } from '../inlets/lan-match.ts';
+import { inCidr } from '../inlets/lan-match.ts';
 
 /**
  * «Умный DNS» для устройств домашней сети.
  *
- * Имя из списка → `A` = адрес сервера (там SNI-вход Contour), `AAAA` и
+ * Имя, которое решено вести через VPN (`decide`: списки и самообучение —
+ * lists.ts, learn.ts), → `A` = адрес сервера (там SNI-вход Contour), `AAAA` и
  * `HTTPS`/`SVCB` — пусто: иначе устройство ушло бы по IPv6 или взяло адрес из
  * подсказки HTTPS-записи мимо нас. Всё остальное — пакет как есть к обычному
  * DNS (роутер), ответ как есть обратно: остальной трафик устройства идёт мимо
@@ -28,11 +29,38 @@ const TYPE_A = 'A';
 // устройство могло бы уйти по подсказке мимо нас.
 const EMPTY_TYPES = new Set(['AAAA', 'HTTPS', 'SVCB', 'UNKNOWN_65', 'UNKNOWN_64']);
 
-/** Ответ на свой вопрос, или null — этот вопрос не наш, отдать обычному DNS. */
-export function answerOwn(query: Packet, lan: Lan): Buffer | null {
+/** Вопрос, по которому решаем мы: один, и типа A / AAAA / HTTPS / SVCB. Остальное — обычному DNS. */
+export function ownQuestion(query: Packet): string | null {
   const q = query.questions?.[0];
   if (!q || (query.questions?.length ?? 0) !== 1) return null;
-  if (!matchesDomain(q.name, lan.domains)) return null;
+  return q.type === TYPE_A || EMPTY_TYPES.has(q.type) ? q.name : null;
+}
+
+/**
+ * Решение по имени: через VPN или напрямую. `shortTtl` — решение ещё не
+ * окончательное (проверка идёт): ответ напрямую уходит с коротким сроком жизни,
+ * чтобы устройство переспросило, когда вердикт будет.
+ */
+export type Decision = { tunnel: boolean; shortTtl?: boolean };
+export type Decide = (name: string) => Promise<Decision>;
+
+const PENDING_TTL = 30;
+
+/** Срок жизни всех записей ответа — не больше `max`. */
+export function capTtl(answer: Buffer, max: number): Buffer {
+  try {
+    const p = dnsPacket.decode(answer);
+    const cap = <T extends { ttl?: number }>(list: T[] | undefined): T[] | undefined => list?.map((r) => ({ ...r, ttl: Math.min(r.ttl ?? max, max) }));
+    return dnsPacket.encode({ ...p, answers: cap(p.answers as Array<{ ttl?: number }>) as typeof p.answers });
+  } catch {
+    return answer;
+  }
+}
+
+/** Ответ «через нас» на вопрос, уже решённый в пользу VPN. */
+export function answerOwn(query: Packet, lan: Lan): Buffer | null {
+  const q = query.questions?.[0];
+  if (!q || ownQuestion(query) === null) return null;
   const answers = q.type === TYPE_A
     ? [{ type: 'A' as const, name: q.name, class: 'IN' as const, ttl: OUR_TTL, data: lan.address }]
     : EMPTY_TYPES.has(q.type) ? [] : null;
@@ -80,28 +108,33 @@ function servfail(packet: Buffer): Buffer | null {
   }
 }
 
-export async function resolvePacket(packet: Buffer, lan: Lan, log: Logger): Promise<Buffer | null> {
+export async function resolvePacket(packet: Buffer, lan: Lan, decide: Decide, log: Logger): Promise<Buffer | null> {
   let query: Packet;
   try {
     query = dnsPacket.decode(packet);
   } catch {
     return null;
   }
-  const own = answerOwn(query, lan);
-  if (own) return own;
+  const name = ownQuestion(query);
+  const decision: Decision = name !== null ? await decide(name) : { tunnel: false };
+  if (decision.tunnel) {
+    const own = answerOwn(query, lan);
+    if (own) return own;
+  }
   try {
-    return await askUpstream(packet, lan.upstream);
+    const answer = await askUpstream(packet, lan.upstream);
+    return decision.shortTtl ? capTtl(answer, PENDING_TTL) : answer;
   } catch (error) {
     log.warn(`DNS: ${query.questions?.[0]?.name ?? '?'} — ${errorText(error)}`);
     return servfail(packet);
   }
 }
 
-export function startDns(lan: Lan, log: Logger): { udp: dgram.Socket; tcp: net.Server } {
+export function startDns(lan: Lan, decide: Decide, log: Logger): { udp: dgram.Socket; tcp: net.Server } {
   const udp = dgram.createSocket('udp4');
   udp.on('message', (msg, rinfo) => {
     if (!inCidr(rinfo.address, lan.allow)) return;
-    void resolvePacket(msg, lan, log).then((answer) => {
+    void resolvePacket(msg, lan, decide, log).then((answer) => {
       if (answer) udp.send(answer, rinfo.port, rinfo.address);
     });
   });
@@ -119,7 +152,7 @@ export function startDns(lan: Lan, log: Logger): { udp: dgram.Socket; tcp: net.S
         const len = buf.readUInt16BE(0);
         const msg = buf.subarray(2, 2 + len);
         buf = buf.subarray(2 + len);
-        void resolvePacket(Buffer.from(msg), lan, log).then((answer) => {
+        void resolvePacket(Buffer.from(msg), lan, decide, log).then((answer) => {
           if (!answer || socket.destroyed) return;
           const head = Buffer.alloc(2);
           head.writeUInt16BE(answer.length, 0);

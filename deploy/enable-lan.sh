@@ -44,6 +44,7 @@ fi
 # Внутренние порты SNI-входа — умолчания Contour (lan.tlsPort / lan.httpPort);
 # :443/:80 держит nginx, туда переадресует таблица nft сторожа contour-addr.
 printf 'ADDRESS=%s\nTLS_PORT=18443\nHTTP_PORT=18080\n' "$ADDRESS" > "$ETC/lan.env"
+install -d -m 750 -o contour -g contour /var/lib/contour/dns
 
 sudo -u contour env CONTOUR_CONFIG="$ETC/contour.yaml" CONTOUR_LOG_PRETTY=1 \
   /opt/contour/node/bin/node "$SRC/src/main.ts" --check >/dev/null || die "настройки не прошли проверку: sudo -u contour /opt/contour/node/bin/node $SRC/src/main.ts --check"
@@ -87,10 +88,10 @@ gv=$(curl -s --max-time 20 -o /dev/null -w '%{http_code}' --resolve "redirector.
 note "видео-сервер (googlevideo) через SNI-вход: HTTP $gv"
 code=$(curl -s --max-time 10 -o /dev/null -w '%{http_code}' --resolve "www.youtube.com:80:$ADDRESS" http://www.youtube.com/ 2>/dev/null || true)
 note "http://youtube через Host-вход: HTTP $code"
-if curl -s --max-time 10 -o /dev/null --resolve "ya.ru:443:$ADDRESS" https://ya.ru/ 2>/dev/null; then
-  die "чужой сайт (ya.ru) прошёл через SNI-вход — так быть не должно"
-fi
-note "чужой сайт через SNI-вход — отказ (как надо: это не открытый прокси)"
+ig=$(dig +short +time=3 +tries=1 @"$ADDRESS" www.instagram.com A | tail -1)
+note "DNS: www.instagram.com → $ig (общий список заблокированного)"
+code=$(curl -s --max-time 20 -o /dev/null -w '%{http_code}' --resolve "www.instagram.com:443:$ADDRESS" https://www.instagram.com/ 2>/dev/null || true)
+note "Instagram через SNI-вход: HTTP $code"
 
 echo
 echo "Готово. На телевизоре Hisense (VIDAA):"

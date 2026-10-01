@@ -2,7 +2,8 @@ import net, { type Socket } from 'node:net';
 import { setTimeout as sleep } from 'node:timers/promises';
 import type { Config } from '../config.ts';
 import { errorText, type Logger } from '../log.ts';
-import { inCidr, matchesDomain } from './lan-match.ts';
+import { checkDestination } from './fence.ts';
+import { inCidr } from './lan-match.ts';
 import { relay, type RelayDeps } from './relay.ts';
 import { parseHttpHost, parseSni } from './sni.ts';
 
@@ -15,8 +16,8 @@ import { parseHttpHost, parseSni } from './sni.ts';
  * проигрываем прочитанное. **Шифрование не трогаем**: TLS идёт насквозь от
  * устройства до сайта, сертификаты не подменяются.
  *
- * Только из домашней сети и только имена из списка — иначе это открытый
- * прокси для всей сети. Учёт — по адресу устройства (`lan:192.168.0.42`).
+ * Только из домашней сети; какие имена вести — решает DNS (списки и
+ * самообучение), а здесь стоит ограда. Учёт — по адресу устройства (`lan:192.168.0.42`).
  */
 
 type LanConfig = Config['lan'];
@@ -64,10 +65,12 @@ function serve(kind: 'tls' | 'http', port: number, client: Socket, lan: LanConfi
       client.destroy();
       return;
     }
-    if (!matchesDomain(r.name, lan.domains)) {
-      // DNS отдаёт наш адрес только для списка, так что сюда это попадает разве
-      // что по старому кэшу устройства. Чужое не ведём — это не открытый прокси.
-      log.info(`${who}: «${r.name}» не из списка — отказ`);
+    // Какие сайты вести, решает DNS (списки и самообучение меняются на ходу),
+    // поэтому здесь имя не сверяется со списком. Открытым прокси это не
+    // становится: пускаем только домашнюю сеть, и ограда не пускает в частные адреса.
+    const fence = checkDestination(r.name, port);
+    if (!fence.ok) {
+      log.warn(`${who}: отказ ограды — ${fence.reason}`);
       client.destroy();
       return;
     }
