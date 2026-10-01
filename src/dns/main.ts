@@ -54,7 +54,7 @@ try {
   // Устройства-шлюзы (src/gateway.ts): заблокированное — настоящими адресами через туннель, уже в наборе «через VPN».
   const tunnelResolver = proxy ? new TunnelResolver(proxy) : null;
   const gateway = tunnelResolver ? gatewayHook({
-    clients: new GatewayClients(),
+    clients: new GatewayClients(undefined, undefined, () => rootCall<string[]>({ cmd: 'gateway.seen' }, 3_000)),
     resolve: (n) => tunnelResolver.resolve(n),
     allow: async (ips, ttl) => { await rootCall({ cmd: 'gateway.allow', ips, ttl }, 3_000); },
     log: dnsLog,

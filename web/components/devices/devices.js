@@ -18,6 +18,13 @@ const GATEWAY = [
 ];
 const GATEWAY_NOTE = { blocked: 'шлюз: заблокированное через VPN', all: 'шлюз: всё через VPN' };
 
+/** Отметка в панели — ещё не шлюз: пока на устройстве маршрутизатор — роутер, его пакеты идут мимо сервера. */
+function gatewayNote(c) {
+  if (!c.gateway) return null;
+  if (c.gatewayActive === false) return `шлюз ждёт: на устройстве маршрутизатор — ${c.router}`;
+  return GATEWAY_NOTE[c.gateway];
+}
+
 function itemRow(first) {
   const device = first.kind === 'device';
   const rename = device ? button('Имя', { icon: 'edit', view: 'ghost' }) : null;
@@ -30,7 +37,7 @@ function itemRow(first) {
     update(c) {
       row.set({
         title: whoName(c),
-        note: device ? [c.ip, c.mac ?? 'MAC не виден', GATEWAY_NOTE[c.gateway], c.lastSeen ? `был ${ago(c.lastSeen)}` : null].filter(Boolean).join(' · ') : `программа на сервере · была ${ago(c.lastSeen)}`,
+        note: device ? [c.ip, c.mac ?? 'MAC не виден', gatewayNote(c), c.lastSeen ? `был ${ago(c.lastSeen)}` : null].filter(Boolean).join(' · ') : `программа на сервере · была ${ago(c.lastSeen)}`,
         meta: `↓ ${speed(c.rate.down)} · сегодня ${bytes(c.today.down + c.today.up)}`,
         tone: c.rate.down + c.rate.up > 0 ? 'accent' : undefined,
       });
@@ -112,7 +119,7 @@ export class Devices {
     this.#address = state.lan.address;
     setText(this.#note, `ходят через VPN, когда DNS — ${state.lan.address}`);
     setText(this.#help, `Включи шлюз у устройства и на нём в настройках Wi-Fi поставь: IP — вручную${state.lan.freeIp ? `, например ${state.lan.freeIp}` : ''}, маска 255.255.255.0, маршрутизатор и DNS — ${state.lan.address}. Заблокированное (или всё — в режиме «всё через VPN») пойдёт через VPN любым протоколом. Сервер выключен — у такого устройства дома нет интернета; вернуть — «IP автоматически».`);
-    this.#devices.render(state.consumers.filter((c) => c.kind === 'device'));
+    this.#devices.render(state.consumers.filter((c) => c.kind === 'device').map((c) => ({ ...c, router: state.lan.address })));
     this.#programs.render(state.consumers.filter((c) => c.kind === 'program'));
   }
 }

@@ -79,6 +79,28 @@ test('DNS шлюза: устройство — по MAC; заблокирова�
   assert.equal((down.answers?.[0] as { data: string }).data, lan.address, 'туннель не ответил — наш адрес: сайт откроется по SNI');
 });
 
+test('отметка в панели — ещё не шлюз: настоящие адреса — только тому, кто на деле ходит через сервер', async () => {
+  const dir = mkdtempSync(path.join(tmpdir(), 'contour-gw-'));
+  const file = path.join(dir, 'gateway.json');
+  const arp = path.join(dir, 'arp');
+  writeFileSync(file, '{"devices":{"aa:bb:cc:dd:ee:01":"blocked"}}');
+  writeFileSync(arp, ARP);
+  let seen: string[] = [];
+  const clients = new GatewayClients(file, arp, async () => seen);
+  assert.equal(clients.isGateway('192.168.0.21'), false, 'до ответа помощника — не шлюз');
+  await new Promise((r) => setImmediate(r));
+  assert.equal(clients.isGateway('192.168.0.21'), false, 'отмечен, но маршрутизатор на нём — роутер');
+  seen = ['aa:bb:cc:dd:ee:01'];
+  const later = Date.now() + 11_000;
+  clients.isGateway('192.168.0.21', later);
+  await new Promise((r) => setImmediate(r));
+  assert.equal(clients.isGateway('192.168.0.21', later + 1), true);
+  const broken = new GatewayClients(file, arp, async () => { throw new Error('неизвестная команда'); });
+  broken.isGateway('192.168.0.21');
+  await new Promise((r) => setImmediate(r));
+  assert.equal(broken.isGateway('192.168.0.21'), false, 'помощник старый или молчит — как раньше, наш адрес');
+});
+
 test('подсказка адреса для шлюза: вне пула DHCP, не занятый', () => {
   const arp = new Map([['192.168.0.20', 'x'], ['192.168.0.21', 'y']]);
   assert.equal(freeAddress('192.168.0.50', arp), '192.168.0.22');

@@ -53,9 +53,12 @@ export function gatewayRuleset(iface: string): string {
   set gw_blocked { type ether_addr; }
   set gw_all { type ether_addr; }
   set vpn_dst { type ipv4_addr; flags timeout; }
+  set gw_seen { type ether_addr; flags dynamic, timeout; timeout 10m; }
   set local_dst { type ipv4_addr; flags interval; elements = { ${LOCAL.join(', ')} } }
   chain gw_pre {
     type filter hook prerouting priority mangle; policy accept;
+    iifname "${iface}" ether saddr @gw_blocked ip daddr != @local_dst update @gw_seen { ether saddr }
+    iifname "${iface}" ether saddr @gw_all ip daddr != @local_dst update @gw_seen { ether saddr }
     ${at} ether saddr @gw_all ip daddr != @local_dst ct mark set ${vpn}
     ${at} ether saddr @gw_blocked ip daddr @vpn_dst ct mark set ${vpn}
     ${at} ct mark != ${vpn} ether saddr @gw_blocked ip daddr != @local_dst ct mark set ${direct}
@@ -176,6 +179,24 @@ export async function setDeviceMode(mac: unknown, mode: unknown): Promise<Gatewa
   writeState(state);
   await applyGateway(state);
   return state;
+}
+
+/**
+ * Кто из устройств-шлюзов на деле шлёт пакеты через сервер (набор `gw_seen`,
+ * 10 минут после последнего пакета в чужую сеть). Отметка в панели — ещё не
+ * шлюз: пока на устройстве маршрутизатор — роутер, настоящие адреса
+ * заблокированного ему отдавать нельзя — пакеты уйдут мимо нас, прямо в блокировку.
+ */
+export async function seenDevices(): Promise<string[]> {
+  const r = await run('nft', ['-j', 'list', 'set', 'ip', TABLE, 'gw_seen']);
+  if (r.code !== 0) return [];
+  try {
+    const items = (JSON.parse(r.out) as { nftables?: Array<{ set?: { elem?: unknown[] } }> }).nftables ?? [];
+    const elems = items.flatMap((i) => i.set?.elem ?? []);
+    return elems.map((e) => (typeof e === 'string' ? e : (e as { elem?: { val?: unknown } }).elem?.val)).filter((m): m is string => typeof m === 'string' && MAC.test(m));
+  } catch {
+    return [];
+  }
 }
 
 /** Адреса заблокированного имени — в набор «через VPN» (зовёт contour-dns перед ответом устройству). */

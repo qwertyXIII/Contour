@@ -28,6 +28,7 @@ export type RootRequest =
   | { cmd: 'outlet.group'; name: string; with: string | null }
   | { cmd: 'gateway.set'; mac: string; mode: 'blocked' | 'all' | null }
   | { cmd: 'gateway.allow'; ips: string[]; ttl: number }
+  | { cmd: 'gateway.seen' }
   | { cmd: 'contour.restart' };
 
 export type OutletRuntime = {
@@ -50,6 +51,8 @@ export type OutletRuntime = {
 export type RootStatus = {
   units: Record<string, string>;
   outlets: OutletRuntime[];
+  /** MAC устройств-шлюзов, которые на деле шлют пакеты через сервер (root/gateway.ts → seenDevices). */
+  gatewaySeen?: string[];
 };
 
 export type RootResponse = { ok: true; data?: unknown } | { ok: false; error: string };

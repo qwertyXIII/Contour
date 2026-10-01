@@ -114,6 +114,13 @@ check "dev1 → обычный сайт — напрямую" 192.168.0.50 "$(tc
 check "dev1 → обычный, UDP — напрямую" 192.168.0.50 "$(udp dev1 198.51.100.20 50000)"
 check "dev2 («всё через VPN») → обычный сайт — через выход" 172.31.0.2 "$(tcp dev2 198.51.100.20 80)"
 
+cat > .gw-sandbox.ts <<'TS'
+import { seenDevices } from './src/root/gateway.ts';
+console.log((await seenDevices()).sort().join(','));
+TS
+check "кто на деле ходит через сервер — оба устройства" "$(printf '%s\n%s\n' "$MAC1" "$MAC2" | sort | paste -sd,)" "$(node .gw-sandbox.ts)"
+rm -f .gw-sandbox.ts
+
 ip route del default via 10.201.9.2 dev ctv9 table 2701
 check "выход лежит: dev2 — никуда, не напрямую" "нет связи" "$(tcp dev2 198.51.100.20 80)"
 check "выход лежит: dev1 → обычный — всё так же напрямую" 192.168.0.50 "$(tcp dev1 198.51.100.20 80)"

@@ -6,6 +6,7 @@ import { decodeVpnLink, describeProfile, parseWgConf } from '../outlets/profile.
 import { addOutlet, freeBridge, readOutlets, removeOutlet, setOutletField } from './config-edit.ts';
 import type { AddSource, OutletRuntime, OvpnAuth, RootStatus } from './protocol.ts';
 import { GW_TABLE } from '../gateway.ts';
+import { seenDevices } from './gateway.ts';
 import { activate, isRunning, setGroup, settle } from './groups.ts';
 import { groupId, netnsRuntime, run, systemctl, unitState } from './sys.ts';
 import { checkOvpn } from './ovpn-check.ts';
@@ -250,5 +251,5 @@ export async function statusCmd(): Promise<RootStatus> {
     }
     outlets.push(base);
   }
-  return { units, outlets };
+  return { units, outlets, gatewaySeen: await seenDevices() };
 }

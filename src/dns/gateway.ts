@@ -10,7 +10,12 @@ import { respond, type GatewayHook } from './server.ts';
  * DNS для устройств-шлюзов (`src/gateway.ts`).
  *
  * Шлюз узнаём по MAC из таблицы соседей: адрес у такого устройства задан
- * вручную, но список режимов — по MAC. На заблокированное имя такому
+ * вручную, но список режимов — по MAC. ⚠️ И только если устройство на деле
+ * шлёт пакеты через сервер (`gateway.seen` у помощника): отметка в панели без
+ * маршрутизатора `.50` на самом устройстве — не шлюз. Отдай мы такому настоящие
+ * адреса, его пакеты ушли бы мимо нас прямо в блокировку (живьём 2026-10-02:
+ * телефон с отметкой, но на DHCP, потерял бы и сайты, и игру). Помощник
+ * не ответил — значит, не шлюз: наш адрес, как раньше. На заблокированное имя такому
  * устройству — не наш адрес, а настоящие, разрешённые через туннель, и
  * ответ уходит только после того, как помощник положил их в набор «через VPN»:
  * иначе первые пакеты успели бы уйти напрямую, и соединение так бы и осталось
@@ -21,6 +26,8 @@ import { respond, type GatewayHook } from './server.ts';
  */
 
 const RECHECK_MS = 5_000;
+/** Кто на деле ходит через сервер — спрашиваем помощника не чаще. */
+const SEEN_MS = 10_000;
 /** Тот же адрес в набор не чаще: срок в наборе — от часа (`root/gateway.ts`). */
 const ALLOW_AGAIN_MS = 10 * 60_000;
 const ANSWER_TTL_MAX_S = 300;
@@ -34,10 +41,29 @@ export class GatewayClients {
   private checkedAt = 0;
   private arp = new Map<string, string>();
   private arpAt = 0;
+  private readonly seenSource: (() => Promise<string[]>) | null;
+  private seen = new Set<string>();
+  private seenAt = 0;
+  private seenBusy = false;
 
-  constructor(file = GATEWAY_FILE, arpFile?: string) {
+  /** `seenSource` — кто из устройств на деле шлёт пакеты через сервер; null — не проверять (тесты). */
+  constructor(file = GATEWAY_FILE, arpFile?: string, seenSource: (() => Promise<string[]>) | null = null) {
     this.file = file;
     this.arpFile = arpFile;
+    this.seenSource = seenSource;
+  }
+
+  /** Спросить помощника в фоне; до ответа — «не шлюз» (наш адрес), это безопасно. */
+  private isSeen(mac: string, now: number): boolean {
+    if (!this.seenSource) return true;
+    if (!this.seenBusy && now - this.seenAt >= SEEN_MS) {
+      this.seenBusy = true;
+      this.seenSource()
+        .then((list) => { this.seen = new Set(list); })
+        .catch(() => { this.seen = new Set(); })
+        .finally(() => { this.seenAt = Date.now(); this.seenBusy = false; });
+    }
+    return this.seen.has(mac);
   }
 
   private refresh(now: number): void {
@@ -59,7 +85,7 @@ export class GatewayClients {
       this.arpAt = now;
     }
     const mac = this.arp.get(ip);
-    return mac !== undefined && mac in this.state.devices;
+    return mac !== undefined && mac in this.state.devices && this.isSeen(mac, now);
   }
 }
 

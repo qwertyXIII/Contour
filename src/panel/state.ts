@@ -1,3 +1,4 @@
+import { networkInterfaces } from 'node:os';
 import { arpTable } from '../arp.ts';
 import type { Config } from '../config.ts';
 import { readGateway } from '../gateway.ts';
@@ -36,6 +37,27 @@ export type StateDeps = {
  * Свободный адрес для устройства-шлюза — подсказка в панели: вне пула DHCP
  * роутера (100–199), не занятый в таблице соседей, в той же /24, что сервер.
  */
+type ConsumerRow = {
+  who: string; kind: 'device' | 'program'; ip: string | null; mac: string | null; name: string | null;
+  gateway: string | null; gatewayActive: boolean | null; rate: Rate; today: Rate; lastSeen: number | null;
+};
+
+/** Одно устройство под двумя адресами: счётчики — вместе, адрес и ключ — у того, что был виден позже. */
+function mergeRows(a: ConsumerRow, b: ConsumerRow): ConsumerRow {
+  const newer = (b.lastSeen ?? 0) > (a.lastSeen ?? 0) ? b : a;
+  return {
+    ...newer,
+    rate: { up: a.rate.up + b.rate.up, down: a.rate.down + b.rate.down },
+    today: { up: a.today.up + b.today.up, down: a.today.down + b.today.down },
+    lastSeen: Math.max(a.lastSeen ?? 0, b.lastSeen ?? 0) || null,
+  };
+}
+
+/** Адреса самого сервера (.113, .50) — в списке устройств им не место: это проверки с сервера. */
+function ownAddresses(): Set<string> {
+  return new Set(Object.values(networkInterfaces()).flatMap((list) => (list ?? []).map((i) => i.address)));
+}
+
 export function freeAddress(serverIp: string, arp: Map<string, string> = arpTable()): string | null {
   const base = serverIp.split('.').slice(0, 3).join('.');
   for (let n = 20; n < 50; n++) {
@@ -99,32 +121,48 @@ export class PanelState {
     });
   }
 
-  private consumersView() {
+  /**
+   * Кто ходит через Contour. Устройство — одна строка на MAC: телефон, сменив
+   * адрес (DHCP, ручной адрес шлюза), остаётся в таблице соседей и под старыми —
+   * их счётчики складываются, адрес — самый свежий. Свои адреса сервера — не устройства.
+   */
+  private consumersView(seen: string[] | null) {
     const { meter, devices } = this.deps;
     const rates = meter.rates().who;
     const today = meter.todayTotals().who;
-    const seen = meter.lastSeen();
-    const keys = new Set([...Object.keys(today), ...Object.keys(rates), ...Object.keys(seen)]);
+    const lastSeen = meter.lastSeen();
+    const keys = new Set([...Object.keys(today), ...Object.keys(rates), ...Object.keys(lastSeen)]);
     // Устройство-шлюз ходит мимо Contour — в счётчиках его нет; показываем по MAC из таблицы соседей.
     const gateway = readGateway().devices;
-    for (const [ip, mac] of arpTable()) if (mac in gateway) keys.add(`lan:${ip}`);
-    const lanIps = [...keys].filter((k) => k.startsWith('lan:')).map((k) => k.slice(4));
+    const arp = arpTable();
+    for (const [ip, mac] of arp) if (mac in gateway) keys.add(`lan:${ip}`);
+    const own = ownAddresses();
+    const lanIps = [...keys].filter((k) => k.startsWith('lan:')).map((k) => k.slice(4)).filter((ip) => !own.has(ip));
     const byIp = new Map(devices.resolve(lanIps).map((d) => [d.ip, d]));
-    return [...keys].map((who) => {
+    const rows = new Map<string, ConsumerRow>();
+    for (const who of keys) {
       const ip = who.startsWith('lan:') ? who.slice(4) : null;
+      if (ip && own.has(ip)) continue;
       const d = ip ? byIp.get(ip) : undefined;
-      return {
+      const row: ConsumerRow = {
         who,
         kind: ip ? 'device' : 'program',
         ip,
         mac: d?.mac ?? null,
         name: d?.name ?? null,
         gateway: d?.mac ? gateway[d.mac] ?? null : null,
+        // null — помощник не сказал (не обновлён или недоступен).
+        gatewayActive: d?.mac && gateway[d.mac] && seen ? seen.includes(d.mac) : null,
         rate: rates[who] ?? ZERO,
         today: today[who] ?? ZERO,
-        lastSeen: seen[who] ?? null,
+        lastSeen: lastSeen[who] ?? null,
       };
-    }).sort((a, b) => (b.today.down + b.today.up) - (a.today.down + a.today.up));
+      // Ключ строки — MAC: адрес меняется, а строка в панели должна остаться той же.
+      const key = row.mac ? `dev:${row.mac}` : who;
+      const was = rows.get(key);
+      rows.set(key, { ...(was ? mergeRows(was, row) : row), who: key });
+    }
+    return [...rows.values()].sort((a, b) => (b.today.down + b.today.up) - (a.today.down + a.today.up));
   }
 
   async overview() {
@@ -133,7 +171,7 @@ export class PanelState {
     return {
       now: Date.now(),
       outlets: this.outletsView(root.data?.outlets ?? []),
-      consumers: this.consumersView(),
+      consumers: this.consumersView(root.data?.gatewaySeen ?? null),
       units: root.data?.units ?? {},
       rootError: root.error,
       lan: { enabled: config.lan.enabled, address: config.lan.address, panelName: config.panel.name, freeIp: freeAddress(config.lan.address) },
