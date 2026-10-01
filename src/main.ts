@@ -4,6 +4,7 @@ import path from 'node:path';
 import { Consumers } from './consumers.ts';
 import { ConfigError, loadConfig } from './config.ts';
 import { startHttpInlet } from './inlets/http-proxy.ts';
+import { startLanInlet } from './inlets/lan.ts';
 import { errorText, log } from './log.ts';
 import { startHealth } from './outlets/health.ts';
 import { makeDial } from './outlets/connect.ts';
@@ -80,6 +81,7 @@ async function main(): Promise<void> {
   consumers.startFlushing();
 
   const server = await startHttpInlet({ ...config.http, chooser, consumers, log });
+  const lanServers = config.lan.enabled ? startLanInlet(config.lan, { chooser, consumers, log }) : [];
   log.info('Contour готов');
 
   let stopping = false;
@@ -91,6 +93,7 @@ async function main(): Promise<void> {
     consumers.stop();
     server.close();
     server.closeAllConnections();
+    for (const s of lanServers) s.close();
     void (mihomo ? mihomo.stop() : Promise.resolve()).finally(() => process.exit(0));
     setTimeout(() => process.exit(0), 7_000).unref();
   };

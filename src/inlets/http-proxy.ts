@@ -5,6 +5,7 @@ import { errorText, type Logger } from '../log.ts';
 import type { Outlet } from '../outlets/outlet.ts';
 import type { Chooser } from '../select/chooser.ts';
 import { checkDestination } from './fence.ts';
+import { MAX_ATTEMPTS, relay, type RelayDeps, type Target } from './relay.ts';
 
 /**
  * Вход для программ машины: HTTP-прокси с токенами.
@@ -30,13 +31,7 @@ export type HttpInletOptions = {
   log: Logger;
 };
 
-type Target = { host: string; port: number };
-type Deps = { chooser: Chooser; consumers: Consumers; log: Logger };
-
-/** Сколько байт клиента держим для проигрывания; больше — повтор уже невозможен. */
-const REPLAY_CAP = 256 * 1024;
-/** Сколько выходов перебираем на одно соединение. */
-const MAX_ATTEMPTS = 4;
+type Deps = RelayDeps;
 
 const STATUS_TEXT: Record<number, string> = {
   400: 'Bad Request',
@@ -68,93 +63,13 @@ export function parseAuthority(value: string | undefined): Target | null {
   return { host: (m[1] ?? m[2]) as string, port: Number(m[3]) };
 }
 
-// ─── CONNECT: туннель с повтором по выходам ────────────────────────────────
+// ─── CONNECT: туннель с повтором по выходам (relay.ts) ──────────────────────
 
 function serveConnect(client: Socket, head: Buffer, who: string, target: Target, deps: Deps): void {
-  const { chooser, consumers, log } = deps;
-  const where = `${who}: ${target.host}:${target.port}`;
-  const exclude = new Set<string>();
-  let buffered: Buffer[] = head.length > 0 ? [head] : [];
-  let bufferedBytes = head.length;
-  let replayable = true;
-  let attempts = 0;
-  let established = false;
-  let finished = false;
-  let upstream: Socket | null = null;
-  let outletName = '';
-  let up = 0;
-  let down = 0;
-
-  const finish = (): void => {
-    if (finished) return;
-    finished = true;
-    client.destroy();
-    upstream?.destroy();
-    consumers.account(who, up, down);
-    log.debug(`${where} через «${outletName}» — ↑${up} ↓${down}`);
-  };
-
-  const attach = (socket: Socket, outlet: Outlet): void => {
-    upstream = socket;
-    outletName = outlet.name;
-    for (const chunk of buffered) socket.write(chunk);
-    socket.on('data', (chunk: Buffer) => {
-      if (replayable) { replayable = false; buffered = []; }
-      down += chunk.length;
-      if (!client.write(chunk)) socket.pause();
-    });
-    socket.on('drain', () => client.resume());
-    socket.on('error', () => { /* закрытие ниже решит, повторять ли */ });
-    socket.on('close', () => {
-      if (finished || socket !== upstream) return;
-      upstream = null;
-      if (replayable && !client.destroyed && attempts < MAX_ATTEMPTS) {
-        void next(outlet, 'закрыл соединение, не ответив');
-      } else {
-        finish();
-      }
-    });
-  };
-
-  const next = async (failed: Outlet | null, why: string): Promise<void> => {
-    if (failed) {
-      exclude.add(failed.name);
-      chooser.noteFailure(failed, why);
-    }
-    attempts += 1;
-    try {
-      const { socket, outlet, failed: skipped } = await chooser.connect(target.host, target.port, exclude);
-      if (client.destroyed) { socket.destroy(); return; }
-      if (failed) log.info(`${where} — «${failed.name}» ${why}, повтор через «${outlet.name}»`);
-      else if (skipped.length > 0) log.info(`${where} через «${outlet.name}» после отказа ${skipped.join(', ')}`);
-      attach(socket, outlet);
-      if (!established) {
-        established = true;
-        client.write('HTTP/1.1 200 Connection Established\r\nProxy-Agent: contour\r\n\r\n');
-      }
-    } catch (error) {
-      const text = errorText(error);
-      log.warn(`${where} — ${text}`);
-      if (!established) refuse(client, 502, text);
-      else finish();
-    }
-  };
-
-  client.setTimeout(0);
-  client.on('data', (chunk: Buffer) => {
-    up += chunk.length;
-    if (replayable) {
-      bufferedBytes += chunk.length;
-      if (bufferedBytes > REPLAY_CAP) { replayable = false; buffered = []; }
-      else buffered.push(chunk);
-    }
-    if (upstream && !upstream.write(chunk)) client.pause();
+  relay(client, head, who, target, deps, {
+    onEstablished: () => { client.write('HTTP/1.1 200 Connection Established\r\nProxy-Agent: contour\r\n\r\n'); },
+    onFail: (text) => refuse(client, 502, text),
   });
-  client.on('drain', () => upstream?.resume());
-  client.on('close', finish);
-  client.on('error', finish);
-
-  void next(null, '');
 }
 
 // ─── Проброс http: запрос целиком, повтор для запросов без тела ────────────

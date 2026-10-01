@@ -46,7 +46,30 @@ export type Config = {
     ipIntervalSec: number;
   };
   sticky: { hours: number };
+  /** Вход для устройств домашней сети: «умный DNS» + SNI на своём адресе. */
+  lan: {
+    enabled: boolean;
+    /** Второй адрес сервера — на нём DNS :53 и SNI :443 / :80. */
+    address: string;
+    /** Откуда пускаем: CIDR домашней сети. */
+    allow: string;
+    /** Обычный DNS для всего, что не из списка. */
+    upstream: string[];
+    /** Сайты (с поддоменами), которые идут через выходы. */
+    domains: string[];
+  };
 };
+
+/**
+ * YouTube целиком: страницы, API приложения для ТВ, видео (googlevideo),
+ * картинки. `googleapis.com` целиком не берём — через него ходит пол-Google,
+ * а замедлен именно YouTube.
+ */
+export const LAN_DOMAINS = [
+  'youtube.com', 'youtu.be', 'yt.be', 'youtube-nocookie.com', 'youtubekids.com',
+  'googlevideo.com', 'ytimg.com', 'ggpht.com',
+  'youtubei.googleapis.com', 'youtube.googleapis.com', 'youtubeembeddedplayer.googleapis.com', 'jnn-pa.googleapis.com',
+];
 
 export const DEFAULTS: Config = {
   http: { listen: '127.0.0.1', port: 3128 },
@@ -67,6 +90,13 @@ export const DEFAULTS: Config = {
     ipIntervalSec: 300,
   },
   sticky: { hours: 24 },
+  lan: {
+    enabled: false,
+    address: '192.168.0.50',
+    allow: '192.168.0.0/24',
+    upstream: ['192.168.0.1', '1.1.1.1'],
+    domains: LAN_DOMAINS,
+  },
 };
 
 export class ConfigError extends Error {}
@@ -115,6 +145,31 @@ function bool(raw: Raw, key: string, fallback: boolean, where: string): boolean 
 
 const NAME = /^[a-z0-9][a-z0-9_-]{0,31}$/;
 
+function ipv4(raw: Raw, key: string, fallback: string): string {
+  const value = str(raw, key, fallback, 'lan');
+  if (isIP(value) !== 4) throw new ConfigError(`lan.${key}: нужен IPv4-адрес`);
+  return value;
+}
+
+function cidr(raw: Raw, key: string, fallback: string): string {
+  const value = str(raw, key, fallback, 'lan');
+  const [net, bits] = value.split('/');
+  if (isIP(net ?? '') !== 4 || !(Number(bits) >= 8 && Number(bits) <= 32)) throw new ConfigError(`lan.${key}: нужна сеть вида 192.168.0.0/24`);
+  return value;
+}
+
+const DOMAIN = /^(?=.{1,253}$)([a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$/;
+
+function domainList(value: unknown, where: string, fallback: string[]): string[] {
+  if (value === undefined || value === null) return fallback;
+  if (!Array.isArray(value)) throw new ConfigError(`${where}: список сайтов, например [youtube.com, googlevideo.com]`);
+  return value.map((v) => {
+    const d = typeof v === 'string' ? v.trim().toLowerCase().replace(/^\*\./, '').replace(/\.$/, '') : '';
+    if (!DOMAIN.test(d)) throw new ConfigError(`${where}: «${String(v)}» — не имя сайта`);
+    return d;
+  });
+}
+
 function dnsList(value: unknown, where: string): string[] {
   if (value === undefined || value === null) return [];
   if (!Array.isArray(value) || !value.every((v) => typeof v === 'string' && isIP(v.trim()) !== 0)) {
@@ -156,7 +211,7 @@ function outlet(raw: unknown, index: number): OutletConfig {
 export function parseConfig(text: string): Config {
   const raw: unknown = parse(text) ?? {};
   if (!isRecord(raw)) throw new ConfigError('в корне должен быть раздел, а не список или строка');
-  onlyKnown(raw, 'корень', ['http', 'tokens', 'outlets', 'mihomo', 'health', 'sticky']);
+  onlyKnown(raw, 'корень', ['http', 'tokens', 'outlets', 'mihomo', 'health', 'sticky', 'lan']);
 
   const http = section(raw, 'http');
   onlyKnown(http, 'http', ['listen', 'port']);
@@ -166,6 +221,8 @@ export function parseConfig(text: string): Config {
   onlyKnown(health, 'health', ['intervalSec', 'connectTimeoutSec', 'probeHost', 'probePath', 'ipHost', 'ipIntervalSec']);
   const sticky = section(raw, 'sticky');
   onlyKnown(sticky, 'sticky', ['hours']);
+  const lan = section(raw, 'lan');
+  onlyKnown(lan, 'lan', ['enabled', 'address', 'allow', 'upstream', 'domains', 'extraDomains']);
 
   const outletsRaw = raw.outlets ?? [];
   if (!Array.isArray(outletsRaw)) throw new ConfigError('outlets: нужен список выходов');
@@ -204,6 +261,13 @@ export function parseConfig(text: string): Config {
       ipIntervalSec: num(health, 'ipIntervalSec', d.health.ipIntervalSec, 'health', 10, 86_400),
     },
     sticky: { hours: num(sticky, 'hours', d.sticky.hours, 'sticky', 0, 24 * 30) },
+    lan: {
+      enabled: bool(lan, 'enabled', d.lan.enabled, 'lan'),
+      address: ipv4(lan, 'address', d.lan.address),
+      allow: cidr(lan, 'allow', d.lan.allow),
+      upstream: lan.upstream === undefined ? d.lan.upstream : dnsList(lan.upstream, 'lan.upstream'),
+      domains: [...new Set([...domainList(lan.domains, 'lan.domains', d.lan.domains), ...domainList(lan.extraDomains, 'lan.extraDomains', [])])],
+    },
   };
 }
 

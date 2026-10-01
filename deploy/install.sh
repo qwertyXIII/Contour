@@ -191,12 +191,15 @@ ensure_unit() {
 [Unit]
 Description=Contour — VPN-выходы для программ сервера и устройств сети
 Documentation=file://$SRC/README.md
-After=network-online.target
+After=network-online.target contour-addr.service
 Wants=network-online.target
 
 [Service]
 Type=simple
 User=$SERVICE_USER
+# :443 и :80 на втором адресе — вход для устройств домашней сети.
+AmbientCapabilities=CAP_NET_BIND_SERVICE
+CapabilityBoundingSet=CAP_NET_BIND_SERVICE
 Group=$SERVICE_USER
 WorkingDirectory=$SRC
 Environment=CONTOUR_CONFIG=$ETC/contour.yaml
@@ -288,9 +291,63 @@ EOF
   note "ядерные выходы: $PREFIX/sbin/contour-netns, unit'ы contour-netns@ и contour-socks@"
 }
 
+# Домашняя сеть: сторож второго адреса (root) и DNS (contour). Включает их
+# enable-lan.sh — здесь только ставятся.
+ensure_lan_units() {
+  install -m 755 -o root -g root "$SRC/deploy/contour-addr.sh" "$PREFIX/sbin/contour-addr"
+  cat > /etc/systemd/system/contour-addr.service <<EOF
+[Unit]
+Description=Contour — второй адрес сервера для устройств домашней сети
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+EnvironmentFile=$ETC/lan.env
+ExecStart=$PREFIX/sbin/contour-addr \${ADDRESS}
+Restart=always
+RestartSec=10s
+StandardOutput=append:$LOG/addr.log
+StandardError=inherit
+
+[Install]
+WantedBy=multi-user.target
+EOF
+  cat > /etc/systemd/system/contour-dns.service <<EOF
+[Unit]
+Description=Contour — «умный DNS» для устройств домашней сети
+After=network-online.target contour-addr.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=$SERVICE_USER
+Group=$SERVICE_USER
+WorkingDirectory=$SRC
+Environment=CONTOUR_CONFIG=$ETC/contour.yaml
+ExecStart=$PREFIX/node/bin/node src/dns/main.ts
+AmbientCapabilities=CAP_NET_BIND_SERVICE
+CapabilityBoundingSet=CAP_NET_BIND_SERVICE
+Restart=always
+RestartSec=2s
+StandardOutput=append:$LOG/dns.log
+StandardError=inherit
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=full
+ProtectHome=read-only
+ReadWritePaths=$LOG
+
+[Install]
+WantedBy=multi-user.target
+EOF
+  systemctl daemon-reload
+  note "домашняя сеть: $PREFIX/sbin/contour-addr, unit'ы contour-addr и contour-dns (включает enable-lan.sh)"
+}
+
 ensure_logrotate() {
   cat > /etc/logrotate.d/contour <<EOF
-$LOG/log.log $LOG/socks.log {
+$LOG/log.log $LOG/socks.log $LOG/dns.log $LOG/addr.log {
   weekly
   rotate 8
   missingok
@@ -325,6 +382,7 @@ ensure_owner_token
 ensure_deps
 ensure_unit
 ensure_netns_units
+ensure_lan_units
 ensure_sudoers
 ensure_logrotate
 verify
@@ -332,6 +390,9 @@ echo
 if grep -qE '^[[:space:]]*kind: mihomo' "$ETC/contour.yaml"; then
   echo "Готово. Выход ext ещё в mihomo (35 КБ/с) — перевести на ядро:"
   echo "  sudo bash $SRC/deploy/switch-to-kernel.sh"
+elif ! grep -qE '^lan:' "$ETC/contour.yaml"; then
+  echo "Готово. Чтобы телевизор и другие устройства сети ходили через туннель:"
+  echo "  sudo bash $SRC/deploy/enable-lan.sh"
 elif systemctl is-active --quiet contour.service; then
   echo "Готово. Contour работает; код изменился — sudo systemctl restart contour. Проверка: bash $SRC/deploy/check.sh"
 else
