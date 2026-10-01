@@ -7,6 +7,7 @@ import { newOutlet } from '../src/outlets/outlet.ts';
 import { PortProbe } from '../src/outlets/ports.ts';
 import { Rivals } from '../src/outlets/rivals.ts';
 import { Auth, hashPassword } from '../src/panel/auth.ts';
+import { GatewayAddresses } from '../src/panel/addresses.ts';
 import { Devices } from '../src/panel/devices.ts';
 import { createPanel } from '../src/panel/server.ts';
 import { Sites } from '../src/panel/sites.ts';
@@ -58,7 +59,7 @@ setInterval(() => {
 const config = { ...DEFAULTS, lan: { ...DEFAULTS.lan, enabled: true } };
 const speeds = new Map<string, SpeedResult>();
 const devices = new Devices(dir);
-const state = new PanelState({ config, outlets, meter, devices, speeds });
+const state = new PanelState({ config, outlets, meter, devices, speeds, addresses: new GatewayAddresses(dir) });
 // Помощника от root в проверке нет — его ответ подставлен, кэш не истекает.
 const rt = (name: string, protocol: string, priority: number, group: string | null) => ({ name, kind: 'netns' as const, protocol, enabled: true, priority, group, about: protocol });
 (state as unknown as { root: unknown }).root = {

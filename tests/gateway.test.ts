@@ -9,7 +9,7 @@ import { GatewayClients, gatewayHook } from '../src/dns/gateway.ts';
 import { resolvePacket } from '../src/dns/server.ts';
 import { parseGateway } from '../src/gateway.ts';
 import { ResolveError } from '../src/outlets/doh.ts';
-import { freeAddress } from '../src/panel/state.ts';
+import { GatewayAddresses } from '../src/panel/addresses.ts';
 import { allowCommands, deviceCommands, gatewayRuleset } from '../src/root/gateway.ts';
 import { createLogger } from '../src/vendor/logger.js';
 
@@ -101,7 +101,14 @@ test('отметка в панели — ещё не шлюз: настоящи�
   assert.equal(broken.isGateway('192.168.0.21'), false, 'помощник старый или молчит — как раньше, наш адрес');
 });
 
-test('подсказка адреса для шлюза: вне пула DHCP, не занятый', () => {
-  const arp = new Map([['192.168.0.20', 'x'], ['192.168.0.21', 'y']]);
-  assert.equal(freeAddress('192.168.0.50', arp), '192.168.0.22');
+test('адрес шлюза: у каждого свой, даже если первый выпал из таблицы соседей; занятый — конфликт', () => {
+  const dir = mkdtempSync(path.join(tmpdir(), 'contour-addr-'));
+  const gw = new Set(['aa:bb:cc:dd:ee:01', 'aa:bb:cc:dd:ee:02']);
+  const book = new GatewayAddresses(dir);
+  book.observe(new Map([['192.168.0.20', 'aa:bb:cc:dd:ee:01'], ['192.168.0.101', 'aa:bb:cc:dd:ee:02']]), gw);
+  assert.equal(book.suggest('aa:bb:cc:dd:ee:01', new Map(), '192.168.0.50'), '192.168.0.20', 'свой — запомнен');
+  // Первый замолчал и выпал из таблицы — второму .20 всё равно не предложим (так и случилось 2026-10-02).
+  assert.equal(new GatewayAddresses(dir).suggest('aa:bb:cc:dd:ee:02', new Map(), '192.168.0.50'), '192.168.0.21');
+  assert.equal(book.conflict('aa:bb:cc:dd:ee:01', new Map([['192.168.0.20', 'aa:bb:cc:dd:ee:02']])), '192.168.0.20');
+  assert.equal(book.conflict('aa:bb:cc:dd:ee:01', new Map([['192.168.0.20', 'aa:bb:cc:dd:ee:01']])), null);
 });

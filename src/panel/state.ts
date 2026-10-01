@@ -7,6 +7,7 @@ import type { Outlet } from '../outlets/outlet.ts';
 import { portsView } from '../outlets/ports.ts';
 import { rootCall, type OutletRuntime, type RootStatus } from '../root/protocol.ts';
 import type { Meter } from '../stats/meter.ts';
+import type { GatewayAddresses } from './addresses.ts';
 import type { Devices } from './devices.ts';
 import type { SpeedResult } from './speedtest.ts';
 
@@ -31,15 +32,14 @@ export type StateDeps = {
   meter: Meter;
   devices: Devices;
   speeds: Map<string, SpeedResult>;
+  /** Свой адрес каждому устройству-шлюзу (addresses.ts). */
+  addresses: GatewayAddresses;
 };
 
-/**
- * Свободный адрес для устройства-шлюза — подсказка в панели: вне пула DHCP
- * роутера (100–199), не занятый в таблице соседей, в той же /24, что сервер.
- */
 type ConsumerRow = {
   who: string; kind: 'device' | 'program'; ip: string | null; mac: string | null; name: string | null;
-  gateway: string | null; gatewayActive: boolean | null; rate: Rate; today: Rate; lastSeen: number | null;
+  gateway: string | null; gatewayActive: boolean | null; gatewayIp: string | null; gatewayConflict: string | null;
+  rate: Rate; today: Rate; lastSeen: number | null;
 };
 
 /** Одно устройство под двумя адресами: счётчики — вместе, адрес и ключ — у того, что был виден позже. */
@@ -56,15 +56,6 @@ function mergeRows(a: ConsumerRow, b: ConsumerRow): ConsumerRow {
 /** Адреса самого сервера (.113, .50) — в списке устройств им не место: это проверки с сервера. */
 function ownAddresses(): Set<string> {
   return new Set(Object.values(networkInterfaces()).flatMap((list) => (list ?? []).map((i) => i.address)));
-}
-
-export function freeAddress(serverIp: string, arp: Map<string, string> = arpTable()): string | null {
-  const base = serverIp.split('.').slice(0, 3).join('.');
-  for (let n = 20; n < 50; n++) {
-    const ip = `${base}.${n}`;
-    if (ip !== serverIp && !arp.has(ip)) return ip;
-  }
-  return null;
 }
 
 export class PanelState {
@@ -136,6 +127,8 @@ export class PanelState {
     const gateway = readGateway().devices;
     const arp = arpTable();
     for (const [ip, mac] of arp) if (mac in gateway) keys.add(`lan:${ip}`);
+    const { addresses, config } = this.deps;
+    addresses.observe(arp, new Set(Object.keys(gateway)));
     const own = ownAddresses();
     const lanIps = [...keys].filter((k) => k.startsWith('lan:')).map((k) => k.slice(4)).filter((ip) => !own.has(ip));
     const byIp = new Map(devices.resolve(lanIps).map((d) => [d.ip, d]));
@@ -153,6 +146,9 @@ export class PanelState {
         gateway: d?.mac ? gateway[d.mac] ?? null : null,
         // null — помощник не сказал (не обновлён или недоступен).
         gatewayActive: d?.mac && gateway[d.mac] && seen ? seen.includes(d.mac) : null,
+        // Адрес, который ставить на устройстве, и чужой ли он сейчас.
+        gatewayIp: d?.mac && gateway[d.mac] ? addresses.suggest(d.mac, arp, config.lan.address) : null,
+        gatewayConflict: d?.mac && gateway[d.mac] ? addresses.conflict(d.mac, arp) : null,
         rate: rates[who] ?? ZERO,
         today: today[who] ?? ZERO,
         lastSeen: lastSeen[who] ?? null,
@@ -174,7 +170,7 @@ export class PanelState {
       consumers: this.consumersView(root.data?.gatewaySeen ?? null),
       units: root.data?.units ?? {},
       rootError: root.error,
-      lan: { enabled: config.lan.enabled, address: config.lan.address, panelName: config.panel.name, freeIp: freeAddress(config.lan.address) },
+      lan: { enabled: config.lan.enabled, address: config.lan.address, panelName: config.panel.name },
     };
   }
 

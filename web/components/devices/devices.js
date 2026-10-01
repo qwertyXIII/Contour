@@ -21,8 +21,9 @@ const GATEWAY_NOTE = { blocked: 'шлюз: заблокированное чер
 /** Отметка в панели — ещё не шлюз: пока на устройстве маршрутизатор — роутер, его пакеты идут мимо сервера. */
 function gatewayNote(c) {
   if (!c.gateway) return null;
-  if (c.gatewayActive === false) return `шлюз ждёт: на устройстве маршрутизатор — ${c.router}`;
-  return GATEWAY_NOTE[c.gateway];
+  if (c.gatewayConflict) return `⚠️ адрес ${c.gatewayConflict} занят другим устройством — у одного из двух нет интернета; поставь этому ${c.gatewayIp === c.gatewayConflict ? 'другой' : c.gatewayIp}`;
+  if (c.gatewayActive === false) return `шлюз ждёт: на устройстве IP ${c.gatewayIp ?? 'вручную'}, маршрутизатор ${c.router}`;
+  return `${GATEWAY_NOTE[c.gateway]}${c.gatewayIp ? ` · адрес ${c.gatewayIp}` : ''}`;
 }
 
 function itemRow(first) {
@@ -109,7 +110,7 @@ export class Devices {
   async #gateway(mac, mode) {
     try {
       await api(`${API.device(mac)}/gateway`, { method: 'POST', body: { mode }, timeout: 30_000 });
-      toast(mode ? `Шлюз включён — теперь на устройстве: IP вручную, маршрутизатор ${this.#address}` : 'Шлюз выключен — на устройстве верни «IP автоматически»', 'ok');
+      toast(mode ? `Шлюз включён — теперь на устройстве: IP вручную (адрес — в строке устройства), маршрутизатор ${this.#address}` : 'Шлюз выключен — на устройстве верни «IP автоматически»', 'ok');
     } catch (error) {
       toast(error.message, 'danger');
     }
@@ -118,7 +119,7 @@ export class Devices {
   #update(state) {
     this.#address = state.lan.address;
     setText(this.#note, `ходят через VPN, когда DNS — ${state.lan.address}`);
-    setText(this.#help, `Включи шлюз у устройства и на нём в настройках Wi-Fi поставь: IP — вручную${state.lan.freeIp ? `, например ${state.lan.freeIp}` : ''}, маска 255.255.255.0, маршрутизатор и DNS — ${state.lan.address}. Заблокированное (или всё — в режиме «всё через VPN») пойдёт через VPN любым протоколом. Сервер выключен — у такого устройства дома нет интернета; вернуть — «IP автоматически».`);
+    setText(this.#help, `Включи шлюз у устройства и на нём в настройках Wi-Fi поставь: IP — вручную, тот, что панель пишет в строке устройства (у каждого свой!), маска 255.255.255.0, маршрутизатор и DNS — ${state.lan.address}. Заблокированное (или всё — в режиме «всё через VPN») пойдёт через VPN любым протоколом. Сервер выключен — у такого устройства дома нет интернета; вернуть — «IP автоматически».`);
     this.#devices.render(state.consumers.filter((c) => c.kind === 'device').map((c) => ({ ...c, router: state.lan.address })));
     this.#programs.render(state.consumers.filter((c) => c.kind === 'program'));
   }

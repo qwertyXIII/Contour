@@ -20,6 +20,7 @@ import { rootCall } from './root/protocol.ts';
 import { Resolver } from './outlets/resolver.ts';
 import { Chooser } from './select/chooser.ts';
 import { Auth } from './panel/auth.ts';
+import { GatewayAddresses } from './panel/addresses.ts';
 import { Devices } from './panel/devices.ts';
 import { createPanel, type Panel } from './panel/server.ts';
 import { Sites } from './panel/sites.ts';
@@ -178,7 +179,7 @@ function startPanel(config: ReturnType<typeof loadConfig>, live: { outlets: Outl
   const devices = new Devices(config.panel.dataDir);
   const auth = new Auth(config.panel.passwordFile, config.panel.dataDir);
   if (!auth.configured()) log.warn(`панель: нет пароля (${config.panel.passwordFile}) — войти нельзя; задать: sudo bash deploy/panel-password.sh`);
-  const state = new PanelState({ config, outlets: live.outlets, meter: live.meter, devices, speeds });
+  const state = new PanelState({ config, outlets: live.outlets, meter: live.meter, devices, speeds, addresses: new GatewayAddresses(config.panel.dataDir) });
   const sites = new Sites({ dnsDir: config.lan.dataDir, own: config.lan.domains });
   return createPanel({
     listen: config.panel.listen,
