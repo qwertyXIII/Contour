@@ -9,6 +9,7 @@ export const API = {
   journal: '/api/journal',
   sites: '/api/sites',
   speedtest: '/api/speedtest',
+  ports: '/api/ports',
   outlets: '/api/outlets',
   device: (mac) => `/api/devices/${encodeURIComponent(mac)}`,
   outlet: (name) => `/api/outlets/${encodeURIComponent(name)}`,
@@ -22,6 +23,8 @@ export const TIMING = {
   requestMs: 15_000,
   /** Замер скорости идёт до 10 с на сервере. */
   speedtestMs: 30_000,
+  /** Проверка портов выхода: ~20 портов по 4 разом, до 6 с на порт. */
+  portsMs: 60_000,
   /** Сколько ждать, пока Contour вернётся после перезапуска. */
   restartWaitMs: 40_000,
 };

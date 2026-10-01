@@ -13,6 +13,7 @@ import { makeDial } from './outlets/connect.ts';
 import { buildMihomoConfig } from './outlets/mihomo-config.ts';
 import { runMihomo, type MihomoHandle } from './outlets/mihomo.ts';
 import { prepareOutlets } from './outlets/outlet.ts';
+import { PortProbe } from './outlets/ports.ts';
 import { Resolver } from './outlets/resolver.ts';
 import { Chooser } from './select/chooser.ts';
 import { Auth } from './panel/auth.ts';
@@ -33,6 +34,8 @@ import { Meter } from './stats/meter.ts';
  */
 
 const CONFIG_PATH = process.env.CONTOUR_CONFIG ?? '/etc/contour/contour.yaml';
+/** Своё состояние Contour: счётчики трафика, карты портов выходов. */
+const STATE_DIR = '/var/lib/contour';
 const checkOnly = process.argv.includes('--check');
 
 async function main(): Promise<void> {
@@ -81,6 +84,16 @@ async function main(): Promise<void> {
     log,
     dial,
   });
+  // Какие порты пропускает каждый выход: при запуске (с диска), раз в сутки и по сигналу с трафика.
+  const ports = new PortProbe(outlets, {
+    dial,
+    host: config.health.portsHost,
+    intervalMs: config.health.portsIntervalSec * 1000,
+    needed: config.lan.enabled ? config.lan.ports.map((r) => r.port) : [],
+    file: path.join(STATE_DIR, 'outlet-ports.json'),
+    log,
+  });
+  ports.start();
   const chooser = new Chooser(outlets, {
     stickyMs: config.sticky.hours * 3_600_000,
     connectTimeoutMs: config.health.connectTimeoutSec * 1000,
@@ -92,18 +105,18 @@ async function main(): Promise<void> {
   consumers.load();
   consumers.startFlushing();
 
-  const meter = new Meter({ dir: '/var/lib/contour', log });
+  const meter = new Meter({ dir: STATE_DIR, log });
   meter.start();
-  const server = await startHttpInlet({ ...config.http, chooser, consumers, log, meter });
-  const panel = config.panel.enabled ? startPanel(config, { outlets, meter, dial }) : null;
+  const server = await startHttpInlet({ ...config.http, chooser, consumers, log, meter, ports });
+  const panel = config.panel.enabled ? startPanel(config, { outlets, meter, dial, ports }) : null;
   const panelHosts = new Set([config.panel.name, config.lan.address]);
   const lanServers = config.lan.enabled
-    ? startLanInlet(config.lan, { chooser, consumers, log, meter }, panel ? { hosts: panelHosts, take: panel.take } : null)
+    ? startLanInlet(config.lan, { chooser, consumers, log, meter, ports }, panel ? { hosts: panelHosts, take: panel.take } : null)
     : [];
   // Порты игр — по подсказкам DNS (inlets/hints.ts, game-ports.ts).
   const hints = new Hints();
   const hintSocket = config.lan.enabled && config.lan.ports.length > 0 ? hints.listen(config.lan.hintPort, log) : null;
-  const gameServers = hintSocket ? startGamePorts(config.lan, hints, { chooser, consumers, log, meter }) : [];
+  const gameServers = hintSocket ? startGamePorts(config.lan, hints, { chooser, consumers, log, meter, ports }) : [];
   log.info('Contour готов');
 
   let stopping = false;
@@ -112,6 +125,7 @@ async function main(): Promise<void> {
     stopping = true;
     log.info(`${signal}: останавливаюсь`);
     health.stop();
+    ports.stop();
     consumers.stop();
     meter.stop();
     panel?.server.close();
@@ -126,7 +140,7 @@ async function main(): Promise<void> {
   process.on('SIGINT', () => shutdown('SIGINT'));
 }
 
-function startPanel(config: ReturnType<typeof loadConfig>, live: { outlets: ReturnType<typeof prepareOutlets>['outlets']; meter: Meter; dial: ReturnType<typeof makeDial> }): Panel {
+function startPanel(config: ReturnType<typeof loadConfig>, live: { outlets: ReturnType<typeof prepareOutlets>['outlets']; meter: Meter; dial: ReturnType<typeof makeDial>; ports: PortProbe }): Panel {
   const speeds = new Map<string, SpeedResult>();
   const devices = new Devices(config.panel.dataDir);
   const auth = new Auth(config.panel.passwordFile, config.panel.dataDir);
@@ -141,6 +155,7 @@ function startPanel(config: ReturnType<typeof loadConfig>, live: { outlets: Retu
     meter: live.meter,
     outlets: live.outlets,
     dial: live.dial,
+    ports: live.ports,
   });
 }
 

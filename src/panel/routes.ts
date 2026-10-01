@@ -4,6 +4,7 @@ import { z } from 'zod';
 import type { Logger } from '../log.ts';
 import type { Dial } from '../outlets/connect.ts';
 import type { Outlet } from '../outlets/outlet.ts';
+import { portsView, type PortProbe } from '../outlets/ports.ts';
 import { rootCall } from '../root/protocol.ts';
 import type { Meter } from '../stats/meter.ts';
 import { requireAuth, sessionOf, type Auth } from './auth.ts';
@@ -26,6 +27,7 @@ export type RoutesDeps = {
   outlets: Outlet[];
   dial: Dial;
   speeds: Map<string, SpeedResult>;
+  ports: PortProbe;
   log: Logger;
 };
 
@@ -36,6 +38,7 @@ const schemas = {
   device: z.object({ name: z.string().max(40) }),
   site: z.object({ name: z.string().min(3).max(253), via: z.enum(['tunnel', 'direct', 'auto']) }),
   speed: z.object({ outlet: NAME }),
+  ports: z.object({ outlet: NAME }),
   add: z.object({
     name: NAME,
     source: z.enum(['conf', 'link', 'subscription', 'ovpn']),
@@ -126,6 +129,15 @@ function actionRoutes(router: Router, d: RoutesDeps): void {
     } catch (error) {
       fail(res, 502, 'SPEEDTEST', (error as Error).message);
     }
+  });
+  router.post('/ports', async (req, res) => {
+    const body = parse(schemas.ports, req, res);
+    if (!body) return;
+    const outlet = d.outlets.find((o) => o.name === body.outlet);
+    if (!outlet) { fail(res, 404, 'NOT_FOUND', 'такого выхода нет или он выключен'); return; }
+    const r = await d.ports.run(outlet);
+    if (!r) { fail(res, 502, 'PORTS', 'не проверить: проверочный сервер не отвечает через выход даже на 80 и 443 (или проверка уже идёт)'); return; }
+    res.json({ ok: true, data: { ...portsView(r), summary: d.ports.summary(outlet) } });
   });
 }
 

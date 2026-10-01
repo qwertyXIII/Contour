@@ -3,13 +3,17 @@ import { dialVia } from '../dial.ts';
 import type { Dial } from '../outlets/connect.ts';
 import { errorText, type Logger } from '../log.ts';
 import type { Outlet } from '../outlets/outlet.ts';
+import { portRank } from '../outlets/ports.ts';
 
 /**
  * Выбор выхода — вся ценность Contour в одном месте.
  *
- * - Порядок: сначала выход, к которому сайт уже прилип, потом живые по
- *   приоритету (при равном — по задержке), мёртвые — в самом конце и только
- *   когда живых нет вовсе: проверка могла отстать от жизни на несколько секунд.
+ * - Порядок: сначала выходы, которые пропускают нужный порт (`outlets/ports.ts`:
+ *   проверенный — раньше непроверенного, «вероятно режет» и «режет» — в конце,
+ *   но не выкинуты: проверка могла ошибиться), внутри — выход, к которому сайт
+ *   уже прилип, потом живые по приоритету (при равном — по задержке), мёртвые —
+ *   в самом конце и только когда живых нет вовсе: проверка могла отстать от
+ *   жизни на несколько секунд.
  * - Повтор: не соединилось через первый — сразу через следующий, и клиент
  *   получает ответ только когда соединение уже есть. Отказ одного выхода он
  *   не видит.
@@ -52,16 +56,19 @@ export class Chooser {
     this.opts = opts;
   }
 
-  order(host: string, now = Date.now()): Outlet[] {
+  /** `port` не задан — порт неважен (проверки, тесты): только приоритет и живость. */
+  order(host: string, port?: number, now = Date.now()): Outlet[] {
+    const rank = (o: Outlet): number => (port === undefined ? 0 : portRank(o, port));
     const byPriority = [...this.outlets].sort((a, b) =>
-      a.priority - b.priority || (a.latencyMs ?? Infinity) - (b.latencyMs ?? Infinity) || a.name.localeCompare(b.name));
+      rank(a) - rank(b) || a.priority - b.priority || (a.latencyMs ?? Infinity) - (b.latencyMs ?? Infinity) || a.name.localeCompare(b.name));
     const usable = byPriority.filter((o) => o.state !== 'dead');
     const list = usable.length > 0 ? usable : byPriority;
 
+    // Прилипание сильнее приоритета, но не сильнее порта: выход, который этот порт режет, вперёд не пойдёт.
     const stuck = this.sticky.get(host);
     if (stuck && stuck.until > now) {
       const index = list.findIndex((o) => o.name === stuck.name);
-      if (index > 0) list.unshift(...list.splice(index, 1));
+      if (index > 0 && rank(list[index] as Outlet) <= rank(list[0] as Outlet)) list.unshift(...list.splice(index, 1));
     } else if (stuck) {
       this.sticky.delete(host);
     }
@@ -75,7 +82,7 @@ export class Chooser {
 
   async connect(host: string, port: number, exclude: ReadonlySet<string> = new Set()): Promise<Connected> {
     const errors: string[] = [];
-    for (const outlet of this.order(host)) {
+    for (const outlet of this.order(host, port)) {
       if (exclude.has(outlet.name)) continue;
       try {
         const socket = this.opts.dial

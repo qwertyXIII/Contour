@@ -41,7 +41,7 @@ test('прилипание: сайт идёт первым через свой �
   b.state = 'dead';
   assert.deepEqual(chooser.order('x.com').map((o) => o.name), ['a']);
   b.state = 'alive';
-  assert.deepEqual(chooser.order('x.com', Date.now() + 5000).map((o) => o.name), ['a', 'b'], 'срок вышел');
+  assert.deepEqual(chooser.order('x.com', undefined, Date.now() + 5000).map((o) => o.name), ['a', 'b'], 'срок вышел');
   assert.equal(chooser.stickyCount(), 0);
 });
 

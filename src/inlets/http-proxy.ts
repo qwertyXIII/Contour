@@ -31,6 +31,7 @@ export type HttpInletOptions = {
   consumers: Consumers;
   log: Logger;
   meter?: Meter;
+  ports?: RelayDeps['ports'];
 };
 
 type Deps = RelayDeps;
@@ -140,7 +141,7 @@ function serveForward(req: http.IncomingMessage, res: http.ServerResponse, who: 
 
 export function startHttpInlet(opts: HttpInletOptions): Promise<http.Server> {
   const { chooser, consumers, log } = opts;
-  const deps: Deps = { chooser, consumers, log, meter: opts.meter };
+  const deps: Deps = { chooser, consumers, log, meter: opts.meter, ports: opts.ports };
   const server = http.createServer();
   // Туннели живут долго (докачка на часы) — таймаут соединения без дела не нужен.
   server.timeout = 0;

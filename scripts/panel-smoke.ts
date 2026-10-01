@@ -4,6 +4,7 @@ import path from 'node:path';
 import { DEFAULTS } from '../src/config.ts';
 import { log } from '../src/log.ts';
 import { newOutlet } from '../src/outlets/outlet.ts';
+import { PortProbe } from '../src/outlets/ports.ts';
 import { Auth, hashPassword } from '../src/panel/auth.ts';
 import { Devices } from '../src/panel/devices.ts';
 import { createPanel } from '../src/panel/server.ts';
@@ -31,7 +32,9 @@ const ext = mk('ext', 10);
 ext.state = 'alive'; ext.latencyMs = 372; ext.externalIp = '198.51.100.30'; ext.checkedAt = Date.now();
 const spare = mk('nl-reality', 50);
 spare.state = 'dead'; spare.lastError = 'молчит';
+ext.ports = { filter: 'filtered', pass: new Set([80, 443, 8443]), cut: new Set([5222, 9339, 25565]), checkedAt: Date.now() - 3_600_000 };
 const outlets = [ext, spare];
+const noDial = async (): Promise<never> => { throw new Error('в проверке выходов нет'); };
 
 const meter = new Meter({ dir, log });
 const now = Date.now();
@@ -60,5 +63,6 @@ createPanel({
   speeds,
   meter,
   outlets,
-  dial: async () => { throw new Error('в проверке выходов нет'); },
+  dial: noDial,
+  ports: new PortProbe(outlets, { dial: noDial, host: 'portquiz.net', intervalMs: 86_400_000, needed: [9339], file: path.join(dir, 'outlet-ports.json'), log }),
 });

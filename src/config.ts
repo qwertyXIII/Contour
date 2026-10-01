@@ -56,6 +56,10 @@ export type Config = {
     probePath: string;
     ipHost: string;
     ipIntervalSec: number;
+    /** Кто отвечает по HTTP на любом TCP-порту — проверка портов выхода (outlets/ports.ts). */
+    portsHost: string;
+    /** Как часто перепроверять порты: провайдер может поменять фильтр. */
+    portsIntervalSec: number;
   };
   sticky: { hours: number };
   /** Веб-панель: дома по паролю — http://vpn.home и http://<lan.address>. */
@@ -149,6 +153,8 @@ export const DEFAULTS: Config = {
     probePath: '/generate_204',
     ipHost: 'api.ipify.org',
     ipIntervalSec: 300,
+    portsHost: 'portquiz.net',
+    portsIntervalSec: 86_400,
   },
   sticky: { hours: 24 },
   panel: {
@@ -321,7 +327,7 @@ export function parseConfig(text: string): Config {
   const mihomo = section(raw, 'mihomo');
   onlyKnown(mihomo, 'mihomo', ['bin', 'dir', 'socksBase', 'controller']);
   const health = section(raw, 'health');
-  onlyKnown(health, 'health', ['intervalSec', 'connectTimeoutSec', 'probeHost', 'probePath', 'ipHost', 'ipIntervalSec']);
+  onlyKnown(health, 'health', ['intervalSec', 'connectTimeoutSec', 'probeHost', 'probePath', 'ipHost', 'ipIntervalSec', 'portsHost', 'portsIntervalSec']);
   const sticky = section(raw, 'sticky');
   onlyKnown(sticky, 'sticky', ['hours']);
   const panel = section(raw, 'panel');
@@ -364,6 +370,8 @@ export function parseConfig(text: string): Config {
       probePath: str(health, 'probePath', d.health.probePath, 'health'),
       ipHost: str(health, 'ipHost', d.health.ipHost, 'health'),
       ipIntervalSec: num(health, 'ipIntervalSec', d.health.ipIntervalSec, 'health', 10, 86_400),
+      portsHost: str(health, 'portsHost', d.health.portsHost, 'health'),
+      portsIntervalSec: num(health, 'portsIntervalSec', d.health.portsIntervalSec, 'health', 3600, 30 * 86_400),
     },
     sticky: { hours: num(sticky, 'hours', d.sticky.hours, 'sticky', 0, 24 * 30) },
     panel: {

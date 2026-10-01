@@ -1,8 +1,9 @@
-import { randomBytes } from 'node:crypto';
+import { createHash, randomBytes } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import type { Config, OutletConfig } from '../config.ts';
 import { describeLink, parseLink, type MihomoProxy } from './links.ts';
+import { unknownPorts, type PortsInfo } from './ports.ts';
 import { describeProfile, readWgProfile, type WgProfile } from './profile.ts';
 
 /**
@@ -28,7 +29,20 @@ export type Outlet = {
   lastError: string | null;
   externalIp: string | null;
   checkedAt: number | null;
+  /** Какие порты выход пропускает (`ports.ts`). */
+  ports: PortsInfo;
+  /** Отпечаток ключа: тот же выход после перезапуска или новый ключ под старым именем. */
+  confHash: string | null;
 };
+
+/** sha256 файла ключа; не прочитать (в тестах — выдуманный путь) — null. */
+function confHash(file: string): string | null {
+  try {
+    return createHash('sha256').update(readFileSync(file)).digest('hex');
+  } catch {
+    return null;
+  }
+}
 
 /** Выход mihomo: что нужно, чтобы вписать его в конфиг ядра. Ровно одно из трёх. */
 export type MihomoOutlet = {
@@ -50,6 +64,8 @@ export function newOutlet(config: OutletConfig, socksPort: number, socks?: Outle
     lastError: null,
     externalIp: null,
     checkedAt: null,
+    ports: unknownPorts(),
+    confHash: confHash(config.conf),
   };
 }
 

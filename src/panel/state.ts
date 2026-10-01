@@ -1,6 +1,7 @@
 import type { Config } from '../config.ts';
 import { journal, type JournalEntry } from '../log.ts';
 import type { Outlet } from '../outlets/outlet.ts';
+import { portsView } from '../outlets/ports.ts';
 import { rootCall, type OutletRuntime, type RootStatus } from '../root/protocol.ts';
 import type { Meter } from '../stats/meter.ts';
 import type { Devices } from './devices.ts';
@@ -75,6 +76,7 @@ export class PanelState {
         rate: rates[name] ?? ZERO,
         today: today[name] ?? ZERO,
         speed: speeds.get(name) ?? null,
+        ports: o ? portsView(o.ports) : null,
       };
     });
   }

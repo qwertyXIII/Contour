@@ -2,6 +2,7 @@ import type { Socket } from 'node:net';
 import type { Consumers } from '../consumers.ts';
 import { errorText, type Logger } from '../log.ts';
 import type { Outlet } from '../outlets/outlet.ts';
+import type { PortLearner } from '../outlets/ports.ts';
 import type { Chooser } from '../select/chooser.ts';
 import type { Meter } from '../stats/meter.ts';
 
@@ -17,10 +18,15 @@ import type { Meter } from '../stats/meter.ts';
  *
  * Общий для входов: HTTP CONNECT отвечает клиенту «200» в `onEstablished`,
  * SNI-вход ничего не отвечает — клиент и так ждёт ответа сайта.
+ *
+ * Заодно — сигналы проверке портов (`outlets/ports.ts`): выход закрыл молча и
+ * быстрее `FAST_CLOSE_MS` — так рвёт фильтр по дороге, не сайт за выходом
+ * (вход AmneziaWG рвал за 26 мс при 88 мс до сервера выхода); пришёл первый
+ * байт сайта — порт этот выход пропускает.
  */
 
 export type Target = { host: string; port: number };
-export type RelayDeps = { chooser: Chooser; consumers: Consumers; log: Logger; meter?: Meter };
+export type RelayDeps = { chooser: Chooser; consumers: Consumers; log: Logger; meter?: Meter; ports?: PortLearner };
 export type RelayHooks = {
   /** Первый выход открылся — один раз. */
   onEstablished: () => void;
@@ -32,6 +38,8 @@ export type RelayHooks = {
 const REPLAY_CAP = 256 * 1024;
 /** Сколько выходов перебираем на одно соединение. */
 export const MAX_ATTEMPTS = 4;
+/** Закрыл молча быстрее — подозрение на фильтр порта: ответ сайта за выходом идёт дольше. */
+export const FAST_CLOSE_MS = 100;
 
 export function relay(client: Socket, head: Buffer, who: string, target: Target, deps: RelayDeps, hooks: RelayHooks): void {
   const { chooser, consumers, log, meter } = deps;
@@ -60,10 +68,13 @@ export function relay(client: Socket, head: Buffer, who: string, target: Target,
   const attach = (socket: Socket, outlet: Outlet): void => {
     upstream = socket;
     outletName = outlet.name;
+    const attachedAt = Date.now();
+    let answered = false;
     for (const chunk of buffered) socket.write(chunk);
     // Проигранное считаем один раз — на первом выходе, не на каждом повторе.
     if (attempts === 1) meter?.add(who, outlet.name, target.host, bufferedBytes, 0);
     socket.on('data', (chunk: Buffer) => {
+      if (!answered) { answered = true; deps.ports?.confirm(outlet, target.port); }
       if (replayable) { replayable = false; buffered = []; }
       down += chunk.length;
       meter?.add(who, outlet.name, target.host, 0, chunk.length);
@@ -74,6 +85,7 @@ export function relay(client: Socket, head: Buffer, who: string, target: Target,
     socket.on('close', () => {
       if (finished || socket !== upstream) return;
       upstream = null;
+      if (!answered && Date.now() - attachedAt < FAST_CLOSE_MS) deps.ports?.suspect(outlet, target.port);
       if (replayable && !client.destroyed && attempts < MAX_ATTEMPTS) {
         void next(outlet, 'закрыл соединение, не ответив');
       } else {
