@@ -1,8 +1,6 @@
-import https from 'node:https';
 import { isIP } from 'node:net';
-import tls from 'node:tls';
 import { dialVia } from '../dial.ts';
-import { errorText } from '../log.ts';
+import { DOH_TIMEOUT_MS, dohLookup } from './doh.ts';
 import type { Outlet } from './outlet.ts';
 
 /**
@@ -19,52 +17,9 @@ import type { Outlet } from './outlet.ts';
  * в полёте сливаются в один.
  */
 
-type Server = { ip: string; servername: string; path: (name: string) => string };
-
-const SERVERS: Server[] = [
-  { ip: '1.1.1.1', servername: 'cloudflare-dns.com', path: (n) => `/dns-query?name=${encodeURIComponent(n)}&type=A` },
-  { ip: '8.8.8.8', servername: 'dns.google', path: (n) => `/resolve?name=${encodeURIComponent(n)}&type=A` },
-];
-
-const TIMEOUT_MS = 4_000;
 const MIN_TTL_S = 30;
 const MAX_TTL_S = 3_600;
 const MAX_ENTRIES = 5_000;
-
-type Answer = { Status?: number; Answer?: Array<{ type?: number; data?: string; TTL?: number }> };
-
-export class ResolveError extends Error {}
-
-/** Один запрос DoH через выход: открыть SOCKS к серверу, TLS поверх, GET. */
-async function ask(outlet: Outlet, server: Server, name: string): Promise<{ ips: string[]; ttl: number }> {
-  const raw = await dialVia(outlet, server.ip, 443, TIMEOUT_MS);
-  return new Promise((resolve, reject) => {
-    const timer = setTimeout(() => { req.destroy(new Error('нет ответа')); }, TIMEOUT_MS);
-    const req = https.request({
-      host: server.ip,
-      path: server.path(name),
-      headers: { accept: 'application/dns-json', connection: 'close' },
-      createConnection: () => tls.connect({ socket: raw, servername: server.servername }),
-    }, (res) => {
-      let body = '';
-      res.setEncoding('utf8');
-      res.on('data', (c: string) => { body += c; if (body.length > 65_536) req.destroy(new Error('ответ слишком большой')); });
-      res.on('end', () => {
-        clearTimeout(timer);
-        if (res.statusCode !== 200) { reject(new Error(`HTTP ${res.statusCode}`)); return; }
-        let parsed: Answer;
-        try { parsed = JSON.parse(body) as Answer; } catch { reject(new Error('ответ не JSON')); return; }
-        if (parsed.Status === 3) { reject(new ResolveError(`имени «${name}» нет`)); return; }
-        const records = (parsed.Answer ?? []).filter((a) => a.type === 1 && typeof a.data === 'string' && isIP(a.data) === 4);
-        if (records.length === 0) { reject(new ResolveError(`у «${name}» нет IPv4-адреса`)); return; }
-        const ttl = Math.min(...records.map((r) => r.TTL ?? MIN_TTL_S));
-        resolve({ ips: records.map((r) => r.data as string), ttl });
-      });
-    });
-    req.on('error', (error) => { clearTimeout(timer); reject(error); });
-    req.end();
-  });
-}
 
 export class Resolver {
   private readonly cache = new Map<string, { ips: string[]; until: number }>();
@@ -90,17 +45,7 @@ export class Resolver {
     return job;
   }
 
-  private async lookup(outlet: Outlet, name: string): Promise<{ ips: string[]; ttl: number }> {
-    const errors: string[] = [];
-    for (const server of SERVERS) {
-      try {
-        return await ask(outlet, server, name);
-      } catch (error) {
-        // «Имени нет» — ответ, а не сбой: второй сервер скажет то же самое.
-        if (error instanceof ResolveError) throw error;
-        errors.push(`${server.ip}: ${errorText(error)}`);
-      }
-    }
-    throw new Error(`имя «${name}» не разрешилось через «${outlet.name}» — ${errors.join('; ')}`);
+  private lookup(outlet: Outlet, name: string): Promise<{ ips: string[]; ttl: number }> {
+    return dohLookup((server) => dialVia(outlet, server.ip, 443, DOH_TIMEOUT_MS), name, `через «${outlet.name}»`);
   }
 }

@@ -5,7 +5,10 @@ import { Lists } from './lists.ts';
 import { Overrides } from './overrides.ts';
 import { startDns, type Decide } from './server.ts';
 import { makeTunnelProbe, readToken } from './tunnel-probe.ts';
+import { TunnelResolver } from './tunnel-resolve.ts';
+import { GatewayClients, gatewayHook } from './gateway.ts';
 import { hintSender } from '../inlets/hints.ts';
+import { rootCall } from '../root/protocol.ts';
 
 /**
  * Точка входа `contour-dns` — отдельный процесс от Contour (см. server.ts).
@@ -27,7 +30,8 @@ try {
   lists.start();
   const token = readToken(config.tokens);
   if (lan.learn && !token) dnsLog.warn(`нет токена contour-dns в ${config.tokens} — самообучение не сможет проверять через VPN и уводить туда не будет`);
-  const viaTunnel = token ? makeTunnelProbe({ host: config.http.listen, port: config.http.port, user: 'contour-dns', token }) : null;
+  const proxy = token ? { host: config.http.listen, port: config.http.port, user: 'contour-dns', token } : null;
+  const viaTunnel = proxy ? makeTunnelProbe(proxy) : null;
   const learner = lan.learn && viaTunnel ? new Learner({ upstream: lan.upstream, dir: lan.dataDir, budgetMs: lan.probeBudgetMs, log: dnsLog, viaTunnel }) : null;
 
   const overrides = new Overrides(lan.dataDir);
@@ -37,7 +41,7 @@ try {
   // сразу через VPN; остальное — самообучение (или напрямую, если выключено).
   const decide: Decide = async (name) => {
     const n = name.toLowerCase().replace(/\.$/, '');
-    if (panelName && n === panelName) return { tunnel: true };
+    if (panelName && n === panelName) return { tunnel: true, local: true };
     const manual = overrides.match(n);
     if (manual) return { tunnel: manual === 'tunnel' };
     if (lists.match(name)) return { tunnel: true };
@@ -47,7 +51,15 @@ try {
   };
   // Подсказки для портов игр: устройство получило наш адрес на имя — Contour узнает, куда вести.
   const hint = hintSender(lan.hintPort);
-  startDns(lan, decide, dnsLog, (client, name) => { if (name !== panelName) hint(client, name); });
+  // Устройства-шлюзы (src/gateway.ts): заблокированное — настоящими адресами через туннель, уже в наборе «через VPN».
+  const tunnelResolver = proxy ? new TunnelResolver(proxy) : null;
+  const gateway = tunnelResolver ? gatewayHook({
+    clients: new GatewayClients(),
+    resolve: (n) => tunnelResolver.resolve(n),
+    allow: async (ips, ttl) => { await rootCall({ cmd: 'gateway.allow', ips, ttl }, 3_000); },
+    log: dnsLog,
+  }) : undefined;
+  startDns({ lan, decide, log: dnsLog, onOwn: (client, name) => { if (name !== panelName) hint(client, name); }, gateway });
   const sizes = lists.size();
   dnsLog.info(`обычный DNS: ${lan.upstream.join(', ')}; свой список — ${sizes.own} сайтов, общий — ${sizes.common}; самообучение ${learner ? 'включено' : 'выключено'}`);
   process.on('SIGTERM', () => process.exit(0));

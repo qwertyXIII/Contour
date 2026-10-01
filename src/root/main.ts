@@ -2,6 +2,7 @@ import { chmodSync, chownSync, mkdirSync, rmSync } from 'node:fs';
 import net from 'node:net';
 import path from 'node:path';
 import { errorText, log } from '../log.ts';
+import { allowAddresses, applyGateway, setDeviceMode } from './gateway.ts';
 import { activateOutletCmd, addOutletCmd, enableOutletCmd, groupOutletCmd, priorityOutletCmd, removeOutletCmd, restartContourCmd, restartOutletCmd, statusCmd } from './outlets.ts';
 import { MAX_REQUEST_BYTES, ROOT_SOCKET, type RootRequest, type RootResponse } from './protocol.ts';
 import { groupId } from './sys.ts';
@@ -37,6 +38,9 @@ async function dispatch(req: RootRequest): Promise<unknown> {
     case 'outlet.priority': return serial(() => priorityOutletCmd(req));
     case 'outlet.activate': return serial(() => activateOutletCmd(req));
     case 'outlet.group': return serial(() => groupOutletCmd(req));
+    case 'gateway.set': return serial(() => setDeviceMode(req.mac, req.mode));
+    // Не в общую очередь: DNS ждёт ответа перед ответом устройству, а очередь может стоять за минутным подъёмом выхода.
+    case 'gateway.allow': return allowAddresses(req.ips, req.ttl);
     case 'contour.restart': return serial(async () => restartContourCmd());
     default: throw new Error('неизвестная команда');
   }
@@ -47,7 +51,8 @@ function describe(req: RootRequest): string {
   const name = 'name' in req ? ` «${String(req.name)}»` : '';
   const extra = req.cmd === 'outlet.add' ? ` (${req.source})`
     : req.cmd === 'outlet.enable' ? ` → ${req.enabled ? 'вкл' : 'выкл'}`
-    : req.cmd === 'outlet.group' ? ` → ${req.with === null ? 'без соперника' : `соперник «${String(req.with)}»`}` : '';
+    : req.cmd === 'outlet.group' ? ` → ${req.with === null ? 'без соперника' : `соперник «${String(req.with)}»`}`
+    : req.cmd === 'gateway.set' ? ` ${String(req.mac)} → ${req.mode ?? 'выкл'}` : '';
   return `${req.cmd}${name}${extra}`;
 }
 
@@ -68,7 +73,8 @@ function handle(socket: net.Socket): void {
       socket.end(`${JSON.stringify({ ok: false, error: 'запрос не JSON' })}\n`);
       return;
     }
-    const mutating = req.cmd !== 'status';
+    // gateway.allow — десятки в минуту от DNS: журналу помощника они не нужны.
+    const mutating = req.cmd !== 'status' && req.cmd !== 'gateway.allow';
     void dispatch(req).then(
       (data) => {
         if (mutating) rlog.info(`сделано: ${describe(req)}`);
@@ -101,8 +107,25 @@ function listen(): void {
   process.on('SIGINT', stop);
 }
 
+/**
+ * Шлюз — из файла, при каждом запуске помощника: так он переживает и перезагрузку
+ * сервера, и перезапуск помощника. При загрузке сети может ещё не быть — повтор.
+ */
+async function restoreGateway(): Promise<void> {
+  for (let attempt = 1; attempt <= 30; attempt++) {
+    try {
+      await applyGateway();
+      return;
+    } catch (error) {
+      if (attempt === 1 || attempt === 30) rlog.warn(`шлюз не поднять (попытка ${attempt}): ${errorText(error)}`);
+      await new Promise((r) => setTimeout(r, 10_000));
+    }
+  }
+}
+
 if (process.getuid?.() !== 0) {
   rlog.error('contour-root должен работать от root');
   process.exit(1);
 }
 listen();
+void restoreGateway();

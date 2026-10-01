@@ -1,4 +1,4 @@
-import { execFile } from 'node:child_process';
+import { execFile, spawn } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 
 /**
@@ -15,6 +15,21 @@ export function run(cmd: string, args: string[], timeoutMs = 60_000): Promise<{ 
       const code = error ? (typeof (error as { code?: unknown }).code === 'number' ? (error as { code: number }).code : 1) : 0;
       resolve({ code, out: String(stdout), err: String(stderr) });
     });
+  });
+}
+
+/** То же, но с текстом на stdin — для `nft -f -`: правила одной транзакцией, без временных файлов. */
+export function runInput(cmd: string, args: string[], input: string, timeoutMs = 20_000): Promise<{ code: number; out: string; err: string }> {
+  return new Promise((resolve) => {
+    const child = spawn(cmd, args, { env: { PATH, LANG: 'C.UTF-8' }, stdio: ['pipe', 'pipe', 'pipe'] });
+    let out = '';
+    let err = '';
+    const timer = setTimeout(() => child.kill('SIGKILL'), timeoutMs);
+    child.stdout.on('data', (c: Buffer) => { out += c.toString(); });
+    child.stderr.on('data', (c: Buffer) => { err += c.toString(); });
+    child.on('error', (e) => { clearTimeout(timer); resolve({ code: 127, out, err: e.message }); });
+    child.on('close', (code) => { clearTimeout(timer); resolve({ code: code ?? 1, out, err }); });
+    child.stdin.end(input);
   });
 }
 

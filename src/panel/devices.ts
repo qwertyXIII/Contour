@@ -1,5 +1,6 @@
 import { mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
+import { arpTable, MAC } from '../arp.ts';
 
 /**
  * Устройства домашней сети — по MAC.
@@ -7,24 +8,10 @@ import path from 'node:path';
  * Contour видит устройство как адрес (`lan:192.168.0.105`), но адрес выдаёт
  * DHCP роутера и он может смениться. MAC сервер видит сам — в таблице соседей
  * ядра (`/proc/net/arp`, читается без root), — поэтому имя («Телевизор»)
- * привязывается к MAC и переживает смену адреса. Роутер TP-Link имён не отдаёт.
- *
- * ⚠️ iPhone и Android в Wi-Fi по умолчанию показывают «частный адрес» — свой
- * MAC на каждую сеть, но постоянный для этой сети; имя держится.
+ * привязывается к MAC и переживает смену адреса (`arp.ts`). Роутер TP-Link имён не отдаёт.
  */
 
 export type Device = { ip: string; mac: string | null; name: string | null };
-
-const MAC = /^([0-9a-f]{2}:){5}[0-9a-f]{2}$/;
-
-export function readArp(text: string): Map<string, string> {
-  const out = new Map<string, string>();
-  for (const line of text.split('\n').slice(1)) {
-    const [ip, , flags, mac] = line.trim().split(/\s+/);
-    if (ip && mac && MAC.test(mac) && flags !== '0x0' && mac !== '00:00:00:00:00:00') out.set(ip, mac);
-  }
-  return out;
-}
 
 export class Devices {
   private names = new Map<string, string>();
@@ -39,17 +26,9 @@ export class Devices {
     }
   }
 
-  private arp(): Map<string, string> {
-    try {
-      return readArp(readFileSync('/proc/net/arp', 'utf8'));
-    } catch {
-      return new Map();
-    }
-  }
-
   /** Потребители вида `lan:IP` → устройство с MAC и именем. */
   resolve(ips: string[]): Device[] {
-    const arp = this.arp();
+    const arp = arpTable();
     return ips.map((ip) => {
       const mac = arp.get(ip) ?? null;
       return { ip, mac, name: mac ? this.names.get(mac) ?? null : null };

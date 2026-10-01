@@ -6,7 +6,7 @@ import test from 'node:test';
 import { Overrides, writeOverride } from '../src/dns/overrides.ts';
 import { describeLink, parseLink } from '../src/outlets/links.ts';
 import { Auth, hashPassword } from '../src/panel/auth.ts';
-import { readArp } from '../src/panel/devices.ts';
+import { readArp } from '../src/arp.ts';
 import { addOutlet, freeBridge, readOutlets, removeOutlet, setOutletField } from '../src/root/config-edit.ts';
 import { checkOvpn } from '../src/root/ovpn-check.ts';
 import { Meter } from '../src/stats/meter.ts';

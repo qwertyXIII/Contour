@@ -1,4 +1,6 @@
+import { arpTable } from '../arp.ts';
 import type { Config } from '../config.ts';
+import { readGateway } from '../gateway.ts';
 import { journal, type JournalEntry } from '../log.ts';
 import type { Outlet } from '../outlets/outlet.ts';
 import { portsView } from '../outlets/ports.ts';
@@ -29,6 +31,19 @@ export type StateDeps = {
   devices: Devices;
   speeds: Map<string, SpeedResult>;
 };
+
+/**
+ * Свободный адрес для устройства-шлюза — подсказка в панели: вне пула DHCP
+ * роутера (100–199), не занятый в таблице соседей, в той же /24, что сервер.
+ */
+export function freeAddress(serverIp: string, arp: Map<string, string> = arpTable()): string | null {
+  const base = serverIp.split('.').slice(0, 3).join('.');
+  for (let n = 20; n < 50; n++) {
+    const ip = `${base}.${n}`;
+    if (ip !== serverIp && !arp.has(ip)) return ip;
+  }
+  return null;
+}
 
 export class PanelState {
   private root: { at: number; data: RootStatus | null; error: string | null } = { at: 0, data: null, error: null };
@@ -90,6 +105,9 @@ export class PanelState {
     const today = meter.todayTotals().who;
     const seen = meter.lastSeen();
     const keys = new Set([...Object.keys(today), ...Object.keys(rates), ...Object.keys(seen)]);
+    // Устройство-шлюз ходит мимо Contour — в счётчиках его нет; показываем по MAC из таблицы соседей.
+    const gateway = readGateway().devices;
+    for (const [ip, mac] of arpTable()) if (mac in gateway) keys.add(`lan:${ip}`);
     const lanIps = [...keys].filter((k) => k.startsWith('lan:')).map((k) => k.slice(4));
     const byIp = new Map(devices.resolve(lanIps).map((d) => [d.ip, d]));
     return [...keys].map((who) => {
@@ -101,6 +119,7 @@ export class PanelState {
         ip,
         mac: d?.mac ?? null,
         name: d?.name ?? null,
+        gateway: d?.mac ? gateway[d.mac] ?? null : null,
         rate: rates[who] ?? ZERO,
         today: today[who] ?? ZERO,
         lastSeen: seen[who] ?? null,
@@ -117,7 +136,7 @@ export class PanelState {
       consumers: this.consumersView(),
       units: root.data?.units ?? {},
       rootError: root.error,
-      lan: { enabled: config.lan.enabled, address: config.lan.address, panelName: config.panel.name },
+      lan: { enabled: config.lan.enabled, address: config.lan.address, panelName: config.panel.name, freeIp: freeAddress(config.lan.address) },
     };
   }
 

@@ -41,6 +41,7 @@ const schemas = {
   site: z.object({ name: z.string().min(3).max(253), via: z.enum(['tunnel', 'direct', 'auto']) }),
   speed: z.object({ outlet: NAME }),
   ports: z.object({ outlet: NAME }),
+  gateway: z.object({ mode: z.enum(['blocked', 'all']).nullable() }),
   group: z.object({ with: NAME.nullable() }),
   add: z.object({
     name: NAME,
@@ -107,6 +108,19 @@ function actionRoutes(router: Router, d: RoutesDeps): void {
       res.json({ ok: true });
     } catch (error) {
       fail(res, 400, 'VALIDATION', (error as Error).message);
+    }
+  });
+  // Режим шлюза — у помощника от root: правила ядра и файл режимов только его.
+  router.post('/devices/:mac/gateway', async (req, res) => {
+    const body = parse(schemas.gateway, req, res);
+    if (!body) return;
+    const mac = String(req.params.mac).toLowerCase();
+    try {
+      await rootCall({ cmd: 'gateway.set', mac, mode: body.mode }, 30_000);
+      d.log.info(`панель: шлюз для ${mac} — ${body.mode === 'blocked' ? 'только заблокированное' : body.mode === 'all' ? 'всё через VPN' : 'выключен'}`);
+      res.json({ ok: true });
+    } catch (error) {
+      fail(res, 400, 'ROOT', (error as Error).message);
     }
   });
   router.post('/sites', (req, res) => {

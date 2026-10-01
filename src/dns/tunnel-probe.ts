@@ -24,15 +24,18 @@ export function readToken(tokensFile: string, name = 'contour-dns'): string | nu
   }
 }
 
-export function makeTunnelProbe(proxy: { host: string; port: number; user: string; token: string }): (name: string) => Promise<void> {
+export type ProxyAuth = { host: string; port: number; user: string; token: string };
+
+/** Сокет к `host:port` через HTTP-прокси Contour (CONNECT с токеном) — то же, что делает любая программа. */
+export function connectVia(proxy: ProxyAuth, host: string, port: number, timeoutMs = TIMEOUT_MS): Promise<net.Socket> {
   const auth = Buffer.from(`${proxy.user}:${proxy.token}`).toString('base64');
-  return (name) => new Promise<void>((resolve, reject) => {
+  return new Promise((resolve, reject) => {
     const raw = net.connect(proxy.port, proxy.host);
-    const timer = setTimeout(() => { raw.destroy(); reject(new Error('через VPN тоже молчит')); }, TIMEOUT_MS);
-    const fail = (e: Error): void => { clearTimeout(timer); raw.destroy(); reject(e); };
+    const timer = setTimeout(() => fail(new Error('через VPN тоже молчит')), timeoutMs);
+    function fail(e: Error): void { clearTimeout(timer); raw.destroy(); reject(e); }
     raw.once('error', fail);
     raw.once('connect', () => {
-      raw.write(`CONNECT ${name}:443 HTTP/1.1\r\nHost: ${name}:443\r\nProxy-Authorization: Basic ${auth}\r\n\r\n`);
+      raw.write(`CONNECT ${host}:${port} HTTP/1.1\r\nHost: ${host}:${port}\r\nProxy-Authorization: Basic ${auth}\r\n\r\n`);
     });
     let head = '';
     const onData = (chunk: Buffer): void => {
@@ -41,10 +44,22 @@ export function makeTunnelProbe(proxy: { host: string; port: number; user: strin
       if (end < 0) { if (head.length > 4096) fail(new Error('прокси ответил непонятно')); return; }
       raw.off('data', onData);
       if (!/^HTTP\/1\.[01] 200/.test(head)) { fail(new Error(`прокси: ${head.split('\r\n')[0]}`)); return; }
-      const secure = tls.connect({ socket: raw, servername: name, rejectUnauthorized: false, ALPNProtocols: ['h2', 'http/1.1'] });
-      secure.once('secureConnect', () => { clearTimeout(timer); secure.destroy(); resolve(); });
-      secure.once('error', (e) => fail(e));
+      clearTimeout(timer);
+      raw.off('error', fail);
+      resolve(raw);
     };
     raw.on('data', onData);
   });
+}
+
+export function makeTunnelProbe(proxy: ProxyAuth): (name: string) => Promise<void> {
+  return async (name) => {
+    const raw = await connectVia(proxy, name, 443);
+    await new Promise<void>((resolve, reject) => {
+      const timer = setTimeout(() => { secure.destroy(); reject(new Error('через VPN тоже молчит')); }, TIMEOUT_MS);
+      const secure = tls.connect({ socket: raw, servername: name, rejectUnauthorized: false, ALPNProtocols: ['h2', 'http/1.1'] });
+      secure.once('secureConnect', () => { clearTimeout(timer); secure.destroy(); resolve(); });
+      secure.once('error', (e) => { clearTimeout(timer); secure.destroy(); reject(e); });
+    });
+  };
 }

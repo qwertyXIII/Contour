@@ -5,6 +5,7 @@ import { describeLink, parseLink } from '../outlets/links.ts';
 import { decodeVpnLink, describeProfile, parseWgConf } from '../outlets/profile.ts';
 import { addOutlet, freeBridge, readOutlets, removeOutlet, setOutletField } from './config-edit.ts';
 import type { AddSource, OutletRuntime, OvpnAuth, RootStatus } from './protocol.ts';
+import { GW_TABLE } from '../gateway.ts';
 import { activate, isRunning, setGroup, settle } from './groups.ts';
 import { groupId, netnsRuntime, run, systemctl, unitState } from './sys.ts';
 import { checkOvpn } from './ovpn-check.ts';
@@ -58,6 +59,11 @@ function writeSecret(file: string, text: string): void {
 }
 
 /** `secrets` — файлы только для root; при откате уезжают вместе с остальными. */
+/** Файл `<имя>.netns` для contour-netns.sh. PRIORITY — метрика маршрута шлюза (меньше — главнее). */
+function netnsMeta(protocol: string, bridge: number, priority: number): string {
+  return `PROTO=${protocol}\nBRIDGE=${bridge}\nPRIORITY=${priority}\n`;
+}
+
 type Planned = { entry: Record<string, unknown>; files: Array<[string, string]>; secrets?: Array<[string, string]>; netns: boolean; about: string };
 
 /** Логин и пароль — по строке в файле: без переводов строк и нулей, иначе openvpn прочтёт не то. */
@@ -78,7 +84,7 @@ function planConf(name: string, raw: string, priority: number, bridge: number): 
   const conf = path.join(KEYS, `${name}.conf`);
   return {
     entry: { name, kind: 'netns', bridge, protocol, conf, priority, enabled: true },
-    files: [[conf, text], [path.join(KEYS, `${name}.netns`), `PROTO=${protocol}\nBRIDGE=${bridge}\n`]],
+    files: [[conf, text], [path.join(KEYS, `${name}.netns`), netnsMeta(protocol, bridge, priority)]],
     netns: true,
     about: describeProfile({ ...profile, addresses: profile.addresses }),
   };
@@ -89,7 +95,7 @@ function planOvpn(name: string, text: string, priority: number, bridge: number, 
   const conf = path.join(KEYS, `${name}.ovpn`);
   return {
     entry: { name, kind: 'netns', bridge, protocol: 'openvpn', conf, priority, enabled: true },
-    files: [[conf, text], [path.join(KEYS, `${name}.netns`), `PROTO=openvpn\nBRIDGE=${bridge}\n`]],
+    files: [[conf, text], [path.join(KEYS, `${name}.netns`), netnsMeta('openvpn', bridge, priority)]],
     secrets: auth ? [[path.join(KEYS, `${name}.auth`), `${auth.user}\n${auth.pass}\n`]] : [],
     netns: true,
     about: auth ? `${about}, с логином` : about,
@@ -209,8 +215,19 @@ export async function priorityOutletCmd(args: { name: unknown; priority: unknown
   const name = checkName(args.name);
   const p = args.priority;
   if (typeof p !== 'number' || !Number.isInteger(p) || p < 0 || p > 10_000) throw new CommandError('приоритет — целое от 0 до 10000');
-  find(name);
+  const o = find(name);
   setOutletField(CONFIG_PATH, name, 'priority', p);
+  if (o.kind === 'netns' && o.bridge !== null) {
+    // Приоритет — ещё и метрика маршрута шлюза: файл выхода и маршрут сразу, без перезапуска туннеля.
+    const meta = path.join(KEYS, `${name}.netns`);
+    if (existsSync(meta)) writeKey(meta, netnsMeta(o.protocol, o.bridge, p));
+    if (await isRunning(name)) {
+      // replace с другой метрикой добавил бы второй маршрут, а не заменил: старый — прочь.
+      const dev = `ctv${o.bridge}`;
+      await run('ip', ['route', 'del', 'default', 'dev', dev, 'table', String(GW_TABLE)]);
+      await run('ip', ['route', 'replace', 'default', 'via', `10.201.${o.bridge}.2`, 'dev', dev, 'metric', String(p), 'table', String(GW_TABLE)]);
+    }
+  }
   restartContourSoon();
 }
 

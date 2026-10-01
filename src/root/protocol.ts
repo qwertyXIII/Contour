@@ -26,6 +26,8 @@ export type RootRequest =
   | { cmd: 'outlet.priority'; name: string; priority: number }
   | { cmd: 'outlet.activate'; name: string }
   | { cmd: 'outlet.group'; name: string; with: string | null }
+  | { cmd: 'gateway.set'; mac: string; mode: 'blocked' | 'all' | null }
+  | { cmd: 'gateway.allow'; ips: string[]; ttl: number }
   | { cmd: 'contour.restart' };
 
 export type OutletRuntime = {

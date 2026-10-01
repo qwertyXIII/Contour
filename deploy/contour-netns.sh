@@ -25,7 +25,8 @@
 #   <имя>.ovpn   — конфиг OpenVPN (вместо .conf)
 #   <имя>.auth   — необязательно: логин и пароль OpenVPN, по строке; root 600
 #   <имя>.env    — необязательно: AWG_ADDRESS, AWG_DNS (формат aiproxy)
-#   <имя>.netns  — PROTO=amneziawg|wireguard, BRIDGE=N (пишет переключение)
+#   <имя>.netns  — PROTO=amneziawg|wireguard|openvpn, BRIDGE=N, PRIORITY=N
+#                  (пишет помощник; PRIORITY — метрика маршрута шлюза, меньше — главнее)
 #   <имя>.socks  — пароль SOCKS; создаётся здесь, если нет
 set -euo pipefail
 export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
@@ -35,6 +36,8 @@ LIB=/var/lib/contour/netns
 SERVICE_USER=contour
 SOCKS_PORT=1080
 DEFAULT_MTU=1420
+# Таблица маршрутов шлюза для устройств — то же число, что GW_TABLE в src/gateway.ts.
+GW_TABLE=2701
 
 die() { echo "ОШИБКА: $*" >&2; exit 1; }
 note() { echo "  $*"; }
@@ -177,6 +180,28 @@ wg_tunnel() {
   note "туннель $WG_IF: адрес $address, MTU $mtu, весь трафик namespace через него"
 }
 
+# Шлюз для устройств (src/gateway.ts, src/root/gateway.ts): их пакеты хост
+# отдаёт в мост, отсюда они уходят в туннель. Внутри — пересылка и подмена
+# адреса на адрес туннеля; MSS — под MTU туннеля, иначе большие TCP-пакеты
+# застревают. На хосте — маршрут в таблицу шлюза с метрикой-приоритетом:
+# ядро берёт поднятый выход с меньшей, а с namespace уходит и маршрут.
+# Нет устройств-шлюзов — в мост ничего не приходит, правила просто ждут.
+gateway_path() {
+  local metric="${PRIORITY:-100}"
+  [[ "$metric" =~ ^[0-9]+$ ]] || metric=100
+  ip netns exec "$NS" sysctl -qw net.ipv4.ip_forward=1
+  ip netns exec "$NS" nft -f - <<EOF
+table ip contour_gw {
+  chain gw_forward { type filter hook forward priority filter; policy accept; tcp flags syn tcp option maxseg size set rt mtu; }
+  chain gw_post { type nat hook postrouting priority srcnat; policy accept; oifname != "$VETH_NS" masquerade; }
+}
+EOF
+  # Ответы приходят из моста с чужим адресом отправителя: строгая проверка обратного пути их бы роняла.
+  sysctl -qw "net.ipv4.conf.$VETH_HOST.rp_filter=2"
+  ip route replace default via "$NS_IP" dev "$VETH_HOST" metric "$metric" table "$GW_TABLE"
+  note "шлюз: маршрут в таблицу $GW_TABLE, метрика $metric"
+}
+
 cmd_up() {
   load_meta
   require_module
@@ -204,6 +229,7 @@ cmd_up() {
   ip -n "$NS" addr add "$NS_IP/30" dev "$VETH_NS"
   ip -n "$NS" link set "$VETH_NS" up
   note "мост $VETH_HOST $HOST_IP ↔ $NS_IP"
+  gateway_path
 
   ensure_password
   write_socks_config

@@ -41,7 +41,12 @@ export function ownQuestion(query: Packet): string | null {
  * окончательное (проверка идёт): ответ напрямую уходит с коротким сроком жизни,
  * чтобы устройство переспросило, когда вердикт будет.
  */
-export type Decision = { tunnel: boolean; shortTtl?: boolean };
+export type Decision = {
+  tunnel: boolean;
+  shortTtl?: boolean;
+  /** Ответить своим адресом всем, и устройствам-шлюзам тоже: это имя панели. */
+  local?: boolean;
+};
 export type Decide = (name: string) => Promise<Decision>;
 
 const PENDING_TTL = 30;
@@ -65,11 +70,16 @@ export function answerOwn(query: Packet, lan: Lan): Buffer | null {
     ? [{ type: 'A' as const, name: q.name, class: 'IN' as const, ttl: OUR_TTL, data: lan.address }]
     : EMPTY_TYPES.has(q.type) ? [] : null;
   if (answers === null) return null;
+  return respond(query, answers);
+}
+
+/** Ответ на вопрос `query` своими записями — и для «через нас», и для шлюза. */
+export function respond(query: Packet, answers: NonNullable<Packet['answers']>): Buffer {
   return dnsPacket.encode({
     id: query.id,
     type: 'response',
     flags: dnsPacket.RECURSION_DESIRED | dnsPacket.RECURSION_AVAILABLE | dnsPacket.AUTHORITATIVE_ANSWER,
-    questions: [q],
+    questions: query.questions?.slice(0, 1) ?? [],
     answers,
   });
 }
@@ -111,7 +121,20 @@ function servfail(packet: Buffer): Buffer | null {
 /** Кому сообщить, что устройство получило наш адрес на имя (подсказка для портов игр). */
 export type OnOwn = (client: string, name: string) => void;
 
-export async function resolvePacket(packet: Buffer, lan: Lan, decide: Decide, log: Logger, client = '', onOwn?: OnOwn): Promise<Buffer | null> {
+/**
+ * Устройства-шлюзы (`dns/gateway.ts`): им на заблокированное имя — настоящие
+ * адреса через туннель, уже положенные в набор «через VPN». `answer` → null —
+ * не вышло, тогда как всем: наш адрес и SNI-вход.
+ */
+export type GatewayHook = {
+  isGateway(client: string): boolean;
+  answer(query: Packet, name: string): Promise<Buffer | null>;
+};
+
+export type DnsDeps = { lan: Lan; decide: Decide; log: Logger; onOwn?: OnOwn; gateway?: GatewayHook };
+
+export async function resolvePacket(packet: Buffer, deps: DnsDeps, client = ''): Promise<Buffer | null> {
+  const { lan, decide, log, onOwn, gateway } = deps;
   let query: Packet;
   try {
     query = dnsPacket.decode(packet);
@@ -120,6 +143,10 @@ export async function resolvePacket(packet: Buffer, lan: Lan, decide: Decide, lo
   }
   const name = ownQuestion(query);
   const decision: Decision = name !== null ? await decide(name) : { tunnel: false };
+  if (decision.tunnel && name && !decision.local && gateway?.isGateway(client)) {
+    const viaGateway = await gateway.answer(query, name);
+    if (viaGateway) return viaGateway;
+  }
   if (decision.tunnel) {
     const own = answerOwn(query, lan);
     if (own) {
@@ -136,11 +163,12 @@ export async function resolvePacket(packet: Buffer, lan: Lan, decide: Decide, lo
   }
 }
 
-export function startDns(lan: Lan, decide: Decide, log: Logger, onOwn?: OnOwn): { udp: dgram.Socket; tcp: net.Server } {
+export function startDns(deps: DnsDeps): { udp: dgram.Socket; tcp: net.Server } {
+  const { lan, log } = deps;
   const udp = dgram.createSocket('udp4');
   udp.on('message', (msg, rinfo) => {
     if (!inCidr(rinfo.address, lan.allow)) return;
-    void resolvePacket(msg, lan, decide, log, rinfo.address, onOwn).then((answer) => {
+    void resolvePacket(msg, deps, rinfo.address).then((answer) => {
       if (answer) udp.send(answer, rinfo.port, rinfo.address);
     });
   });
@@ -158,7 +186,7 @@ export function startDns(lan: Lan, decide: Decide, log: Logger, onOwn?: OnOwn): 
         const len = buf.readUInt16BE(0);
         const msg = buf.subarray(2, 2 + len);
         buf = buf.subarray(2 + len);
-        void resolvePacket(Buffer.from(msg), lan, decide, log, (socket.remoteAddress ?? '').replace(/^::ffff:/, ''), onOwn).then((answer) => {
+        void resolvePacket(Buffer.from(msg), deps, (socket.remoteAddress ?? '').replace(/^::ffff:/, '')).then((answer) => {
           if (!answer || socket.destroyed) return;
           const head = Buffer.alloc(2);
           head.writeUInt16BE(answer.length, 0);

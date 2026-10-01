@@ -9,7 +9,7 @@ import { badgeView, glyphView, Keyed, setHidden, setText } from '../../utils/vie
 import { outletStatus } from '../overview/overview.js';
 import { AddOutlet } from './add-outlet.js';
 import { confirmDialog } from './confirm.js';
-import { rivalSelect } from './rival-select.js';
+import { selectField } from '../../utils/select-field.js';
 
 const KIND = { netns: 'ядро, своё пространство сети', mihomo: 'mihomo' };
 const PROTO = { amneziawg: 'AmneziaWG', wireguard: 'WireGuard', openvpn: 'OpenVPN', link: 'ссылка', subscription: 'подписка' };
@@ -53,7 +53,8 @@ function outletCard() {
   const speedBtn = button('Замерить', { icon: 'activity', data: { act: 'speed' } });
   const portsBtn = button('Проверить порты', { icon: 'scan', view: 'ghost', data: { act: 'ports' } });
   const activateBtn = button('Сделать основным', { icon: 'power', view: 'primary', data: { act: 'activate' } });
-  const rival = rivalSelect();
+  // Соперники — ядерные выходы одного аккаунта, которые выбивают друг друга: в группе работает один.
+  const rival = selectField('Не держать вместе с');
   const restartBtn = button('Перезапустить', { icon: 'refresh', view: 'ghost', data: { act: 'restart' } });
   const toggleBtn = button('', { icon: 'power', view: 'ghost', data: { act: 'toggle' } });
   const removeBtn = button('Удалить', { icon: 'trash', view: 'danger', data: { act: 'remove' } });
@@ -84,7 +85,7 @@ function outletCard() {
       setHidden(portsBtn, !o.enabled || standby);
       setHidden(restartBtn, standby);
       setHidden(rival.el, o.kind !== 'netns' || o.candidates.length === 0);
-      rival.update(o.name, o.candidates, o.rivals?.[0] ?? null);
+      rival.update({ rival: o.name }, [{ value: '', text: '— ни с кем' }, ...o.candidates.map((c) => ({ value: c, text: c }))], o.rivals?.[0] ?? '');
       setText(toggleText, o.enabled ? 'Выключить' : 'Включить');
       for (const b of [activateBtn, speedBtn, portsBtn, restartBtn, toggleBtn, removeBtn]) b.dataset.name = o.name;
     },
@@ -124,7 +125,7 @@ export class Outlets {
       if (b) void this.#act(b.dataset.act, b.dataset.name, b);
     });
     this.#root.addEventListener('change', (e) => {
-      if (e.target.matches('.select__native[data-name]')) void this.#rival(e.target.dataset.name, e.target.value || null, e.target);
+      if (e.target.matches('.select__native[data-rival]')) void this.#rival(e.target.dataset.rival, e.target.value || null, e.target);
     });
     return this;
   }
