@@ -39,6 +39,8 @@ export type Health = {
 };
 
 const DEAD_AFTER = 2;
+/** Функцией, а не сравнением на месте: между await выход могут увести в запасные, а сужение типа этого не знает. */
+const isStandby = (o: Outlet): boolean => o.state === 'standby';
 const RESPONSE_TIMEOUT_MS = 8_000;
 /** Точка графика задержки — не чаще раза в минуту: проверка раз в 10 с дала бы 8,6 тыс. строк в сутки. */
 const GRAPH_EVERY_MS = 60_000;
@@ -70,7 +72,7 @@ export function startHealth(outlets: Outlet[], opts: HealthOptions): Health {
   let stopped = false;
 
   const probe = async (outlet: Outlet): Promise<void> => {
-    if (busy.has(outlet.name) || stopped) return;
+    if (busy.has(outlet.name) || stopped || isStandby(outlet)) return;
     busy.add(outlet.name);
     const started = Date.now();
     try {
@@ -80,7 +82,8 @@ export function startHealth(outlets: Outlet[], opts: HealthOptions): Health {
       outlet.latencyMs = Date.now() - started;
       outlet.failures = 0;
       outlet.lastError = null;
-      if (outlet.state !== 'alive') {
+      // Пока шла проверка, выход могли увести в запасные — его состояние больше не наше.
+      if (outlet.state !== 'alive' && !isStandby(outlet)) {
         opts.log.info(`выход «${outlet.name}» жив, ${outlet.latencyMs} мс`);
         outlet.state = 'alive';
         ipAt.delete(outlet.name);
@@ -92,7 +95,7 @@ export function startHealth(outlets: Outlet[], opts: HealthOptions): Health {
     } catch (error) {
       outlet.failures += 1;
       outlet.lastError = errorText(error);
-      if (outlet.state !== 'dead' && outlet.failures >= DEAD_AFTER) {
+      if (outlet.state !== 'dead' && !isStandby(outlet) && outlet.failures >= DEAD_AFTER) {
         opts.log.warn(`выход «${outlet.name}» не отвечает: ${outlet.lastError}`);
         outlet.state = 'dead';
       }

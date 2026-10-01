@@ -42,6 +42,13 @@ export type OutletConfig = {
   /** Меньше — раньше в очереди. */
   priority: number;
   enabled: boolean;
+  /**
+   * Группа соперников: выходы, которые нельзя держать вместе (один ключ у
+   * провайдера — AmneziaWG и OpenVPN одного аккаунта выбивают друг друга).
+   * В группе работает один, остальные — запасные: Contour поднимает следующий,
+   * когда работающий не отвечает (`outlets/rivals.ts`). Только у ядерных выходов.
+   */
+  group: string | null;
 };
 
 export type Config = {
@@ -289,7 +296,7 @@ function dnsList(value: unknown, where: string): string[] {
 function outlet(raw: unknown, index: number): OutletConfig {
   const where = `outlets[${index}]`;
   if (!isRecord(raw)) throw new ConfigError(`${where}: нужен раздел с полями name, protocol, conf`);
-  onlyKnown(raw, where, ['name', 'kind', 'bridge', 'protocol', 'conf', 'env', 'dns', 'mtu', 'priority', 'enabled']);
+  onlyKnown(raw, where, ['name', 'kind', 'bridge', 'protocol', 'conf', 'env', 'dns', 'mtu', 'priority', 'enabled', 'group']);
   const name = str(raw, 'name', '', where);
   if (!NAME.test(name)) {
     throw new ConfigError(`${where}.name: латиница, цифры, «-» и «_», до 32 знаков — имя идёт в логин потребителя`);
@@ -303,6 +310,10 @@ function outlet(raw: unknown, index: number): OutletConfig {
   if (!allowed.includes(protocol)) {
     throw new ConfigError(`${where}.protocol: для kind ${kind} — ${allowed.join(', ')}`);
   }
+  const group = raw.group === undefined || raw.group === null ? null : str(raw, 'group', '', where);
+  if (group !== null && !NAME.test(group)) throw new ConfigError(`${where}.group: латиница, цифры, «-» и «_», до 32 знаков`);
+  // Выходы mihomo живут в одном процессе — по одному их не погасить, соперниками они быть не могут.
+  if (group !== null && kind !== 'netns') throw new ConfigError(`${where}.group: группа соперников — только у ядерных выходов (kind: netns)`);
   return {
     name,
     kind,
@@ -314,6 +325,7 @@ function outlet(raw: unknown, index: number): OutletConfig {
     mtu: raw.mtu === undefined || raw.mtu === null ? null : num(raw, 'mtu', 0, where, 576, 1500),
     priority: num(raw, 'priority', 100, where, 0, 10_000),
     enabled: bool(raw, 'enabled', true, where),
+    group,
   };
 }
 

@@ -61,8 +61,10 @@ export class Chooser {
     const rank = (o: Outlet): number => (port === undefined ? 0 : portRank(o, port));
     const byPriority = [...this.outlets].sort((a, b) =>
       rank(a) - rank(b) || a.priority - b.priority || (a.latencyMs ?? Infinity) - (b.latencyMs ?? Infinity) || a.name.localeCompare(b.name));
-    const usable = byPriority.filter((o) => o.state !== 'dead');
-    const list = usable.length > 0 ? usable : byPriority;
+    // Запасной (не поднят, ждёт своей очереди в группе соперников) не годится никогда.
+    const up = byPriority.filter((o) => o.state !== 'standby');
+    const usable = up.filter((o) => o.state !== 'dead');
+    const list = usable.length > 0 ? usable : up;
 
     // Прилипание сильнее приоритета, но не сильнее порта: выход, который этот порт режет, вперёд не пойдёт.
     const stuck = this.sticky.get(host);

@@ -2,7 +2,7 @@ import { chmodSync, chownSync, mkdirSync, rmSync } from 'node:fs';
 import net from 'node:net';
 import path from 'node:path';
 import { errorText, log } from '../log.ts';
-import { addOutletCmd, enableOutletCmd, priorityOutletCmd, removeOutletCmd, restartContourCmd, restartOutletCmd, statusCmd } from './outlets.ts';
+import { activateOutletCmd, addOutletCmd, enableOutletCmd, groupOutletCmd, priorityOutletCmd, removeOutletCmd, restartContourCmd, restartOutletCmd, statusCmd } from './outlets.ts';
 import { MAX_REQUEST_BYTES, ROOT_SOCKET, type RootRequest, type RootResponse } from './protocol.ts';
 import { groupId } from './sys.ts';
 
@@ -35,6 +35,8 @@ async function dispatch(req: RootRequest): Promise<unknown> {
     case 'outlet.restart': return serial(() => restartOutletCmd(req));
     case 'outlet.enable': return serial(() => enableOutletCmd(req));
     case 'outlet.priority': return serial(() => priorityOutletCmd(req));
+    case 'outlet.activate': return serial(() => activateOutletCmd(req));
+    case 'outlet.group': return serial(() => groupOutletCmd(req));
     case 'contour.restart': return serial(async () => restartContourCmd());
     default: throw new Error('неизвестная команда');
   }
@@ -43,7 +45,9 @@ async function dispatch(req: RootRequest): Promise<unknown> {
 /** Что сделано — в журнал помощника; ключи и тексты не пишутся. */
 function describe(req: RootRequest): string {
   const name = 'name' in req ? ` «${String(req.name)}»` : '';
-  const extra = req.cmd === 'outlet.add' ? ` (${req.source})` : req.cmd === 'outlet.enable' ? ` → ${req.enabled ? 'вкл' : 'выкл'}` : '';
+  const extra = req.cmd === 'outlet.add' ? ` (${req.source})`
+    : req.cmd === 'outlet.enable' ? ` → ${req.enabled ? 'вкл' : 'выкл'}`
+    : req.cmd === 'outlet.group' ? ` → ${req.with === null ? 'без соперника' : `соперник «${String(req.with)}»`}` : '';
   return `${req.cmd}${name}${extra}`;
 }
 

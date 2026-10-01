@@ -64,6 +64,9 @@ export class PanelState {
         protocol: r?.protocol ?? null,
         enabled: r?.enabled ?? true,
         priority: r?.priority ?? o?.priority ?? null,
+        group: r?.group ?? null,
+        // Соперники — по настройкам, включая выключенных: их тоже можно выбрать в паре.
+        rivals: r?.group ? runtime.filter((x) => x.group === r.group && x.name !== name).map((x) => x.name) : [],
         state: o?.state ?? 'off',
         latencyMs: o?.latencyMs ?? null,
         externalIp: o?.externalIp ?? null,

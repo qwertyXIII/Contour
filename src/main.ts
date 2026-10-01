@@ -1,3 +1,4 @@
+import { execFile } from 'node:child_process';
 import { randomBytes } from 'node:crypto';
 import { chmodSync, mkdirSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
@@ -12,8 +13,10 @@ import { startHealth } from './outlets/health.ts';
 import { makeDial } from './outlets/connect.ts';
 import { buildMihomoConfig } from './outlets/mihomo-config.ts';
 import { runMihomo, type MihomoHandle } from './outlets/mihomo.ts';
-import { prepareOutlets } from './outlets/outlet.ts';
+import { prepareOutlets, reloadNetnsPassword, type Outlet } from './outlets/outlet.ts';
 import { PortProbe } from './outlets/ports.ts';
+import { Rivals } from './outlets/rivals.ts';
+import { rootCall } from './root/protocol.ts';
 import { Resolver } from './outlets/resolver.ts';
 import { Chooser } from './select/chooser.ts';
 import { Auth } from './panel/auth.ts';
@@ -36,6 +39,16 @@ import { Meter } from './stats/meter.ts';
 const CONFIG_PATH = process.env.CONTOUR_CONFIG ?? '/etc/contour/contour.yaml';
 /** Своё состояние Contour: счётчики трафика, карты портов выходов. */
 const STATE_DIR = '/var/lib/contour';
+
+/** Поднят ли unit ядерного выхода — `systemctl is-active` root не нужен. */
+function unitActive(name: string): Promise<boolean> {
+  return new Promise((resolve) => {
+    execFile('systemctl', ['is-active', `contour-netns@${name}.service`], (_error, stdout) => {
+      const s = String(stdout).trim();
+      resolve(s === 'active' || s === 'activating');
+    });
+  });
+}
 const checkOnly = process.argv.includes('--check');
 
 async function main(): Promise<void> {
@@ -74,6 +87,24 @@ async function main(): Promise<void> {
 
   const outlets = prepared.outlets;
   const dial = makeDial(new Resolver(), config.health.connectTimeoutSec * 1000);
+  // Соперники — до проверки живости: запасной не поднят, и проверка его не трогает.
+  let recheck: ((o: Outlet) => void) | null = null;
+  const rivals = new Rivals(outlets, config.outlets, {
+    log,
+    activate: async (name) => { await rootCall({ cmd: 'outlet.activate', name }); },
+    isRunning: unitActive,
+    onActivated: (o) => {
+      const oc = config.outlets.find((c) => c.name === o.name);
+      try {
+        if (oc) reloadNetnsPassword(o, oc);
+      } catch (error) {
+        log.warn(`выход «${o.name}» поднят, но ${errorText(error)}`);
+      }
+      recheck?.(o);
+    },
+  });
+  await rivals.init();
+  rivals.start();
   const health = startHealth(outlets, {
     intervalMs: config.health.intervalSec * 1000,
     connectTimeoutMs: config.health.connectTimeoutSec * 1000,
@@ -84,6 +115,7 @@ async function main(): Promise<void> {
     log,
     dial,
   });
+  recheck = (o) => health.recheck(o);
   // Какие порты пропускает каждый выход: при запуске (с диска), раз в сутки и по сигналу с трафика.
   const ports = new PortProbe(outlets, {
     dial,
@@ -108,7 +140,7 @@ async function main(): Promise<void> {
   const meter = new Meter({ dir: STATE_DIR, log });
   meter.start();
   const server = await startHttpInlet({ ...config.http, chooser, consumers, log, meter, ports });
-  const panel = config.panel.enabled ? startPanel(config, { outlets, meter, dial, ports }) : null;
+  const panel = config.panel.enabled ? startPanel(config, { outlets, meter, dial, ports, rivals }) : null;
   const panelHosts = new Set([config.panel.name, config.lan.address]);
   const lanServers = config.lan.enabled
     ? startLanInlet(config.lan, { chooser, consumers, log, meter, ports }, panel ? { hosts: panelHosts, take: panel.take } : null)
@@ -125,6 +157,7 @@ async function main(): Promise<void> {
     stopping = true;
     log.info(`${signal}: останавливаюсь`);
     health.stop();
+    rivals.stop();
     ports.stop();
     consumers.stop();
     meter.stop();
@@ -140,7 +173,7 @@ async function main(): Promise<void> {
   process.on('SIGINT', () => shutdown('SIGINT'));
 }
 
-function startPanel(config: ReturnType<typeof loadConfig>, live: { outlets: ReturnType<typeof prepareOutlets>['outlets']; meter: Meter; dial: ReturnType<typeof makeDial>; ports: PortProbe }): Panel {
+function startPanel(config: ReturnType<typeof loadConfig>, live: { outlets: Outlet[]; meter: Meter; dial: ReturnType<typeof makeDial>; ports: PortProbe; rivals: Rivals }): Panel {
   const speeds = new Map<string, SpeedResult>();
   const devices = new Devices(config.panel.dataDir);
   const auth = new Auth(config.panel.passwordFile, config.panel.dataDir);
@@ -156,6 +189,7 @@ function startPanel(config: ReturnType<typeof loadConfig>, live: { outlets: Retu
     outlets: live.outlets,
     dial: live.dial,
     ports: live.ports,
+    rivals: live.rivals,
   });
 }
 

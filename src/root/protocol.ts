@@ -24,6 +24,8 @@ export type RootRequest =
   | { cmd: 'outlet.restart'; name: string }
   | { cmd: 'outlet.enable'; name: string; enabled: boolean }
   | { cmd: 'outlet.priority'; name: string; priority: number }
+  | { cmd: 'outlet.activate'; name: string }
+  | { cmd: 'outlet.group'; name: string; with: string | null }
   | { cmd: 'contour.restart' };
 
 export type OutletRuntime = {
@@ -32,6 +34,8 @@ export type OutletRuntime = {
   protocol: string;
   enabled: boolean;
   priority: number;
+  /** Группа соперников (config.ts → OutletConfig.group). */
+  group: string | null;
   /** Что о выходе можно показать: протокол, сервер. Без ключей. */
   about: string;
   /** Для ядерных: поднят ли namespace, рукопожатие, байты туннеля. */

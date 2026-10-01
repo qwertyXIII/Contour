@@ -9,6 +9,7 @@ import { badgeView, glyphView, Keyed, setHidden, setText } from '../../utils/vie
 import { outletStatus } from '../overview/overview.js';
 import { AddOutlet } from './add-outlet.js';
 import { confirmDialog } from './confirm.js';
+import { rivalSelect } from './rival-select.js';
 
 const KIND = { netns: 'ядро, своё пространство сети', mihomo: 'mihomo' };
 const PROTO = { amneziawg: 'AmneziaWG', wireguard: 'WireGuard', openvpn: 'OpenVPN', link: 'ссылка', subscription: 'подписка' };
@@ -35,6 +36,7 @@ const FIELDS = [
   ['priority', 'Приоритет', (o) => String(o.priority ?? '—')],
   ['speed', 'Последний замер', (o) => (o.speed ? `${o.speed.mbps} Мбит/с, ${ago(o.speed.at)}` : null)],
   ['ports', 'Порты', (o) => (o.enabled ? portsText(o.ports) : null)],
+  ['rivals', 'Соперники', (o) => (o.rivals?.length ? `${o.rivals.join(', ')}${o.state === 'standby' ? ' — поднимется сам, если работающий не отвечает' : ''}` : null)],
   ['error', 'Ошибка', (o) => (o.lastError && o.state !== 'alive' ? o.lastError : null)],
 ];
 
@@ -50,6 +52,8 @@ function outletCard() {
   });
   const speedBtn = button('Замерить', { icon: 'activity', data: { act: 'speed' } });
   const portsBtn = button('Проверить порты', { icon: 'scan', view: 'ghost', data: { act: 'ports' } });
+  const activateBtn = button('Сделать основным', { icon: 'power', view: 'primary', data: { act: 'activate' } });
+  const rival = rivalSelect();
   const restartBtn = button('Перезапустить', { icon: 'refresh', view: 'ghost', data: { act: 'restart' } });
   const toggleBtn = button('', { icon: 'power', view: 'ghost', data: { act: 'toggle' } });
   const removeBtn = button('Удалить', { icon: 'trash', view: 'danger', data: { act: 'remove' } });
@@ -58,7 +62,8 @@ function outletCard() {
   const el = h('article', { class: 'card stack stack_gap_m' },
     h('header', { class: 'bar bar_size_s' }, lead.el, h('div', { class: 'bar__text' }, title, subtitle), h('div', { class: 'bar__end' }, status.el)),
     h('dl', { class: 'kv' }, fields.flatMap((f) => [f.dt, f.dd])),
-    h('div', { class: 'cluster cluster_gap_s' }, speedBtn, portsBtn, restartBtn, toggleBtn, removeBtn));
+    rival.el,
+    h('div', { class: 'cluster cluster_gap_s' }, activateBtn, speedBtn, portsBtn, restartBtn, toggleBtn, removeBtn));
   return {
     el,
     update(o) {
@@ -72,10 +77,16 @@ function outletCard() {
         setHidden(f.dd, v === null);
         if (v !== null) setText(f.dd, v);
       }
-      setHidden(speedBtn, !o.enabled);
-      setHidden(portsBtn, !o.enabled);
+      // Запасной не поднят: замерять, проверять и перезапускать нечего — его можно только сделать основным.
+      const standby = o.state === 'standby';
+      setHidden(activateBtn, !(standby && o.enabled));
+      setHidden(speedBtn, !o.enabled || standby);
+      setHidden(portsBtn, !o.enabled || standby);
+      setHidden(restartBtn, standby);
+      setHidden(rival.el, o.kind !== 'netns' || o.candidates.length === 0);
+      rival.update(o.name, o.candidates, o.rivals?.[0] ?? null);
       setText(toggleText, o.enabled ? 'Выключить' : 'Включить');
-      for (const b of [speedBtn, portsBtn, restartBtn, toggleBtn, removeBtn]) b.dataset.name = o.name;
+      for (const b of [activateBtn, speedBtn, portsBtn, restartBtn, toggleBtn, removeBtn]) b.dataset.name = o.name;
     },
   };
 }
@@ -112,6 +123,9 @@ export class Outlets {
       const b = e.target.closest('[data-act]');
       if (b) void this.#act(b.dataset.act, b.dataset.name, b);
     });
+    this.#root.addEventListener('change', (e) => {
+      if (e.target.matches('.select__native[data-name]')) void this.#rival(e.target.dataset.name, e.target.value || null, e.target);
+    });
     return this;
   }
 
@@ -134,7 +148,9 @@ export class Outlets {
   }
 
   #update(state) {
-    this.#cards.render(state.outlets);
+    // Кого можно назначить соперником: другие ядерные выходы (выходы mihomo по одному не гасятся).
+    const netns = state.outlets.filter((o) => o.kind === 'netns').map((o) => o.name);
+    this.#cards.render(state.outlets.map((o) => ({ ...o, candidates: netns.filter((n) => n !== o.name) })));
     setHidden(this.#cardsBox, state.outlets.length === 0);
     setHidden(this.#empty, state.outlets.length > 0);
     this.#units.render(Object.entries(state.units));
@@ -147,6 +163,13 @@ export class Outlets {
     if (act === 'add') { this.#add.open(); return; }
     if (act === 'speed') { await this.#speed(name, el); return; }
     if (act === 'ports') { await this.#ports(name, el); return; }
+    if (act === 'activate') {
+      await this.#busy(el, async () => {
+        await api(`${API.outlet(name)}/activate`, { method: 'POST', body: {}, timeout: 120_000 });
+        toast(`«${name}» теперь работает, соперники — запасные`, 'ok');
+      }, `«${name}»: `);
+      return;
+    }
     const o = this.#last?.outlets.find((x) => x.name === name);
     if (act === 'remove' && !(await confirmDialog(`Удалить выход «${name}»?`, 'Ключ уедет в keys/removed на сервере — вернуть можно руками.', 'Удалить'))) return;
     const req = {
@@ -167,6 +190,19 @@ export class Outlets {
       const r = await api(API.speedtest, { method: 'POST', body: { outlet: name }, timeout: TIMING.speedtestMs });
       toast(`«${name}»: ${r.mbps} Мбит/с (${bytes(r.bytes)} за ${(r.ms / 1000).toFixed(1)} с)`, 'ok');
     }, `Замер «${name}»: `);
+  }
+
+  /** Соперник выбран — помощник ставит обоих в группу (или выводит), Contour перезапускается. */
+  async #rival(name, other, el) {
+    el.disabled = true;
+    try {
+      await api(`${API.outlet(name)}/group`, { method: 'POST', body: { with: other }, timeout: 120_000 });
+      document.dispatchEvent(new CustomEvent(EVENTS.restart, { detail: { text: other ? `«${name}» и «${other}» — соперники: работает один. Contour перезапускается…` : `«${name}» больше ни с кем не соперничает. Contour перезапускается…` } }));
+    } catch (error) {
+      toast(`«${name}»: ${error.message}`, 'danger');
+    } finally {
+      el.disabled = false;
+    }
   }
 
   async #ports(name, el) {

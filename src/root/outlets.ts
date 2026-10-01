@@ -5,6 +5,7 @@ import { describeLink, parseLink } from '../outlets/links.ts';
 import { decodeVpnLink, describeProfile, parseWgConf } from '../outlets/profile.ts';
 import { addOutlet, freeBridge, readOutlets, removeOutlet, setOutletField } from './config-edit.ts';
 import type { AddSource, OutletRuntime, OvpnAuth, RootStatus } from './protocol.ts';
+import { activate, isRunning, setGroup, settle } from './groups.ts';
 import { groupId, netnsRuntime, run, systemctl, unitState } from './sys.ts';
 import { checkOvpn } from './ovpn-check.ts';
 
@@ -158,12 +159,15 @@ export async function removeOutletCmd(args: { name: unknown }): Promise<void> {
   if (o.kind === 'netns') await run('systemctl', ['disable', '--now', `contour-socks@${name}.service`, `contour-netns@${name}.service`]);
   removeOutlet(CONFIG_PATH, name);
   for (const f of readdirSync(KEYS)) if (f.startsWith(`${name}.`)) moveAway(path.join(KEYS, f));
+  // Удалили работавшего соперника — группа поднимает следующего.
+  if (o.group) await settle(CONFIG_PATH, o.group);
   restartContourSoon();
 }
 
 export async function restartOutletCmd(args: { name: unknown }): Promise<void> {
   const name = checkName(args.name);
   const o = find(name);
+  if (o.group && !(await isRunning(name))) throw new CommandError(`«${name}» — запасной: поднять его вместо соперника — «Сделать основным»`);
   if (o.kind === 'netns') {
     await systemctl('restart', `contour-netns@${name}.service`);
     await systemctl('restart', `contour-socks@${name}.service`);
@@ -177,11 +181,27 @@ export async function enableOutletCmd(args: { name: unknown; enabled: unknown })
   if (typeof args.enabled !== 'boolean') throw new CommandError('enabled — true или false');
   const o = find(name);
   setOutletField(CONFIG_PATH, name, 'enabled', args.enabled);
-  if (o.kind === 'netns') {
+  if (o.group) {
+    // В группе соперников включённый становится запасным, если кто-то уже работает;
+    // выключенный работавший уступает место следующему.
+    await settle(CONFIG_PATH, o.group);
+  } else if (o.kind === 'netns') {
     const verb = args.enabled ? 'enable' : 'disable';
     await systemctl(verb, '--now', `contour-netns@${name}.service`);
     await systemctl(verb, '--now', `contour-socks@${name}.service`);
   }
+  restartContourSoon();
+}
+
+/** Поднять выход вместо соперников по группе. Contour не перезапускается: о смене он знает сам — он её и попросил. */
+export async function activateOutletCmd(args: { name: unknown }): Promise<void> {
+  await activate(CONFIG_PATH, checkName(args.name));
+}
+
+export async function groupOutletCmd(args: { name: unknown; with: unknown }): Promise<void> {
+  const name = checkName(args.name);
+  const other = args.with === null ? null : checkName(args.with);
+  await setGroup(CONFIG_PATH, name, other);
   restartContourSoon();
 }
 
@@ -205,7 +225,7 @@ export async function statusCmd(): Promise<RootStatus> {
   for (const u of UNITS) units[u] = await unitState(u);
   const outlets: OutletRuntime[] = [];
   for (const o of readOutlets(CONFIG_PATH)) {
-    const base: OutletRuntime = { name: o.name, kind: o.kind, protocol: o.protocol, enabled: o.enabled, priority: o.priority, about: o.protocol };
+    const base: OutletRuntime = { name: o.name, kind: o.kind, protocol: o.protocol, enabled: o.enabled, priority: o.priority, group: o.group, about: o.protocol };
     if (o.kind === 'netns' && o.bridge !== null) {
       Object.assign(base, await netnsRuntime(o.name, o.bridge, o.protocol));
       units[`contour-netns@${o.name}.service`] = await unitState(`contour-netns@${o.name}.service`);

@@ -16,7 +16,8 @@ import { describeProfile, readWgProfile, type WgProfile } from './profile.ts';
  * любого из них в обход токенов.
  */
 
-export type OutletState = 'unknown' | 'alive' | 'dead';
+/** `standby` — запасной в группе соперников: не поднят, ждёт, пока работающий упадёт (rivals.ts). */
+export type OutletState = 'unknown' | 'alive' | 'dead' | 'standby';
 
 export type Outlet = {
   name: string;
@@ -53,7 +54,8 @@ export type MihomoOutlet = {
   subscription?: string;
 };
 
-export function newOutlet(config: OutletConfig, socksPort: number, socks?: Outlet['socks']): Outlet {
+/** Группа соперников выходу не нужна — её ведёт `rivals.ts`; поэтому необязательна. */
+export function newOutlet(config: Omit<OutletConfig, 'group'> & { group?: string | null }, socksPort: number, socks?: Outlet['socks']): Outlet {
   return {
     name: config.name,
     priority: config.priority,
@@ -95,7 +97,7 @@ export function bridgeAddress(bridge: number): string {
  * Пароль SOCKS выхода netns — файл `<имя>.socks` рядом с ключом. Его создаёт
  * root-часть (contour-netns.sh), когда поднимает выход; Contour только читает.
  */
-function netnsPassword(oc: OutletConfig): string {
+function netnsPassword(oc: Pick<OutletConfig, 'name' | 'conf'>): string {
   const file = path.join(path.dirname(oc.conf), `${oc.name}.socks`);
   let pass: string;
   try {
@@ -121,9 +123,23 @@ function describeOvpn(file: string): string {
   return m ? `OpenVPN, ${m[1]}:${m[2] ?? 1194}` : 'OpenVPN';
 }
 
+/**
+ * Пароль SOCKS запасного выхода появляется, только когда его впервые подняли, —
+ * поэтому у выхода в группе его может не быть при запуске Contour: тогда пусто,
+ * а `reloadNetnsPassword` перечитает после подъёма.
+ */
+export function reloadNetnsPassword(outlet: Outlet, oc: Pick<OutletConfig, 'name' | 'conf'>): void {
+  outlet.socks.pass = netnsPassword(oc);
+}
+
 function prepareNetns(oc: OutletConfig, prepared: Prepared): void {
   const what = oc.protocol === 'openvpn' ? describeOvpn(oc.conf) : describeProfile(readWgProfile(oc.conf, oc.env));
-  const pass = netnsPassword(oc);
+  let pass = '';
+  try {
+    pass = netnsPassword(oc);
+  } catch (error) {
+    if (oc.group === null) throw error;
+  }
   const host = bridgeAddress(oc.bridge as number);
   prepared.outlets.push(newOutlet(oc, NETNS_SOCKS_PORT, { host, port: NETNS_SOCKS_PORT, user: oc.name, pass }));
   prepared.lines.push(`выход «${oc.name}» (ядро, namespace): ${what} → SOCKS ${host}:${NETNS_SOCKS_PORT}`);

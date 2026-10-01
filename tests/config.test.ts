@@ -15,7 +15,7 @@ outlets:
     bridge: 1
     conf: /etc/contour/keys/ext.conf
 `);
-  assert.deepEqual(c.outlets, [{ name: 'ext', kind: 'netns', bridge: 1, protocol: 'amneziawg', conf: '/etc/contour/keys/ext.conf', env: null, dns: [], mtu: null, priority: 100, enabled: true }]);
+  assert.deepEqual(c.outlets, [{ name: 'ext', kind: 'netns', bridge: 1, protocol: 'amneziawg', conf: '/etc/contour/keys/ext.conf', env: null, dns: [], mtu: null, priority: 100, enabled: true, group: null }]);
   assert.throws(() => parseConfig('outlets:\n  - name: ext\n    protocol: amneziawg\n    conf: /x\n    prioriti: 1\n'), /неизвестное поле «prioriti»/);
   assert.throws(() => parseConfig('htpp: {}\n'), /неизвестное поле «htpp»/);
 });

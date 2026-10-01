@@ -6,7 +6,7 @@ import { empty, group, h } from '../../utils/dom.js';
 import { bytes, speed, time } from '../../utils/format.js';
 import { badgeView, Keyed, listSection, rowView, setText } from '../../utils/view.js';
 
-const STATE_TONE = { alive: ['работает', 'ok'], dead: ['не отвечает', 'danger'], unknown: ['проверяется', 'warn'], off: ['выключен', null] };
+const STATE_TONE = { alive: ['работает', 'ok'], dead: ['не отвечает', 'danger'], unknown: ['проверяется', 'warn'], standby: ['запасной', null], off: ['выключен', null] };
 
 /** Текст и тон бейджа выхода. */
 export function outletStatus(o) {

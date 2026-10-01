@@ -5,6 +5,7 @@ import type { Logger } from '../log.ts';
 import type { Dial } from '../outlets/connect.ts';
 import type { Outlet } from '../outlets/outlet.ts';
 import { portsView, type PortProbe } from '../outlets/ports.ts';
+import type { Rivals } from '../outlets/rivals.ts';
 import { rootCall } from '../root/protocol.ts';
 import type { Meter } from '../stats/meter.ts';
 import { requireAuth, sessionOf, type Auth } from './auth.ts';
@@ -28,6 +29,7 @@ export type RoutesDeps = {
   dial: Dial;
   speeds: Map<string, SpeedResult>;
   ports: PortProbe;
+  rivals: Rivals;
   log: Logger;
 };
 
@@ -39,6 +41,7 @@ const schemas = {
   site: z.object({ name: z.string().min(3).max(253), via: z.enum(['tunnel', 'direct', 'auto']) }),
   speed: z.object({ outlet: NAME }),
   ports: z.object({ outlet: NAME }),
+  group: z.object({ with: NAME.nullable() }),
   add: z.object({
     name: NAME,
     source: z.enum(['conf', 'link', 'subscription', 'ovpn']),
@@ -178,6 +181,26 @@ function outletRoutes(router: Router, d: RoutesDeps): void {
     if (!b) return;
     if (!n.success) { fail(res, 400, 'VALIDATION', 'неверное имя'); return; }
     await call(res, { cmd: 'outlet.priority', name: n.data, priority: b.priority });
+  });
+  router.post('/outlets/:name/group', async (req, res) => {
+    const n = NAME.safeParse(req.params.name);
+    const b = parse(schemas.group, req, res);
+    if (!b) return;
+    if (!n.success) { fail(res, 400, 'VALIDATION', 'неверное имя'); return; }
+    await call(res, { cmd: 'outlet.group', name: n.data, with: b.with });
+  });
+  // Поднять запасного вместо работающего — через Contour, не прямо помощнику: состояние выходов знает он.
+  router.post('/outlets/:name/activate', async (req, res) => {
+    const n = NAME.safeParse(req.params.name);
+    if (!n.success) { fail(res, 400, 'VALIDATION', 'неверное имя'); return; }
+    try {
+      await d.rivals.manual(n.data);
+      d.log.info(`панель: «${n.data}» — основной в своей группе`);
+      res.json({ ok: true, data: null });
+      await d.state.rootStatus(true).catch(() => undefined);
+    } catch (error) {
+      fail(res, 400, 'ROOT', (error as Error).message);
+    }
   });
   router.post('/restart', async (_req, res) => { await call(res, { cmd: 'contour.restart' }); });
 }

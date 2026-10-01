@@ -74,11 +74,14 @@ export function removeOutlet(path: string, name: string): void {
   save(path, doc);
 }
 
-export function setOutletField(path: string, name: string, key: 'enabled' | 'priority', value: boolean | number): void {
+/** null — убрать поле (сейчас так снимается группа). */
+export function setOutletField(path: string, name: string, key: 'enabled' | 'priority' | 'group', value: boolean | number | string | null): void {
   const doc = load(path);
   const seq = outletsSeq(doc);
   const i = indexOf(seq, name);
   if (i < 0) throw new ConfigEditError(`выхода «${name}» нет`);
-  (seq.items[i] as YAMLMap).set(key, value);
+  const item = seq.items[i] as YAMLMap;
+  if (value === null) item.delete(key);
+  else item.set(key, value);
   save(path, doc);
 }
