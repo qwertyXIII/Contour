@@ -20,7 +20,9 @@ if [ "${1:-}" != "--generate" ] && [ -t 0 ]; then
 fi
 generated=''
 if [ -z "$pass" ]; then
-  pass=$(head -c 64 /dev/urandom | tr -dc 'a-hjkmnp-z2-9' | head -c 12)
+  # Через crypto Node: ровно 12 знаков всегда. Прежний `head | tr -dc` из 64
+  # случайных байт оставлял в среднем меньше 8 допустимых — и установка падала.
+  pass=$("$NODE" -e "process.stdout.write(require('node:crypto').randomBytes(9).toString('base64url'))")
   generated=1
 fi
 [ "${#pass}" -ge 8 ] || { echo "пароль короче 8 знаков" >&2; exit 1; }
