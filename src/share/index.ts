@@ -20,10 +20,15 @@ import { ShareStore } from './store.ts';
 /** `ports` — куда nginx ведёт домен раздачи: `/` — край, `/list/` — правила. */
 export type Share = { store: ShareStore; edge: Edge; ports: { edge: number; list: number }; stop(): Promise<void> };
 
-/** Ядерные выходы с паролем SOCKS (у запасного его нет, пока не поднят) — по приоритету. */
+/**
+ * Ядерные выходы для UDP — по приоритету, без запасных: namespace запасного не
+ * поднят, и группа «первый живой» до первой проверки слала бы UDP в никуда
+ * (живьём 2026-10-02: запасной `ext` стоял первым). Поднялся запасной — край
+ * пересобирается (`refresh`), и он уже не запасной.
+ */
 function udpOutlets(config: Config, outlets: Outlet[]): UdpOutlet[] {
   const netns = new Set(config.outlets.filter((c) => c.kind === 'netns' && c.enabled).map((c) => c.name));
-  return outlets.filter((o) => netns.has(o.name) && o.socks.pass).sort((a, b) => a.priority - b.priority).map((o) => ({ name: o.name, socks: { ...o.socks } }));
+  return outlets.filter((o) => netns.has(o.name) && o.socks.pass && o.state !== 'standby').sort((a, b) => a.priority - b.priority).map((o) => ({ name: o.name, socks: { ...o.socks } }));
 }
 
 export function startShare(config: Config, deps: { consumers: Consumers; sites: Sites; outlets: Outlet[]; log: Logger }): Share | null {
