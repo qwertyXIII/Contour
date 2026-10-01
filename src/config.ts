@@ -1,0 +1,192 @@
+import { readFileSync } from 'node:fs';
+import { parse } from 'yaml';
+
+/**
+ * Настройки Contour — один YAML, читается при старте.
+ *
+ * Проверяется руками, а не схемой: полей немного, а ошибка должна называть
+ * поле по-русски и говорить, что с ним не так. Неизвестное поле — ошибка,
+ * а не молчание: опечатка в имени иначе выглядит как «настройка не работает».
+ */
+
+export type OutletProtocol = 'amneziawg' | 'wireguard';
+
+export type OutletConfig = {
+  name: string;
+  kind: 'mihomo';
+  protocol: OutletProtocol;
+  /** Конфиг wg-quick / awg, либо файл со ссылкой `vpn://` из Amnezia. */
+  conf: string;
+  /** Необязательный `.env` c AWG_ADDRESS / AWG_DNS — как у aiproxy. */
+  env: string | null;
+  /** Меньше — раньше в очереди. */
+  priority: number;
+  enabled: boolean;
+};
+
+export type Config = {
+  http: { listen: string; port: number };
+  tokens: string;
+  outlets: OutletConfig[];
+  mihomo: { bin: string; dir: string; socksBase: number; controller: string };
+  health: {
+    intervalSec: number;
+    connectTimeoutSec: number;
+    probeHost: string;
+    probePath: string;
+    ipHost: string;
+    ipIntervalSec: number;
+  };
+  sticky: { hours: number };
+};
+
+export const DEFAULTS: Config = {
+  http: { listen: '127.0.0.1', port: 3128 },
+  tokens: '/etc/contour/tokens',
+  outlets: [],
+  mihomo: {
+    bin: '/opt/contour/bin/mihomo',
+    dir: '/var/lib/contour/mihomo',
+    socksBase: 10800,
+    controller: '127.0.0.1:19090',
+  },
+  health: {
+    intervalSec: 10,
+    connectTimeoutSec: 8,
+    probeHost: 'cp.cloudflare.com',
+    probePath: '/generate_204',
+    ipHost: 'api.ipify.org',
+    ipIntervalSec: 300,
+  },
+  sticky: { hours: 24 },
+};
+
+export class ConfigError extends Error {}
+
+type Raw = Record<string, unknown>;
+
+function isRecord(value: unknown): value is Raw {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function section(raw: Raw, key: string): Raw {
+  const value = raw[key];
+  if (value === undefined) return {};
+  if (!isRecord(value)) throw new ConfigError(`«${key}» должен быть разделом, а не ${typeof value}`);
+  return value;
+}
+
+function onlyKnown(raw: Raw, where: string, known: string[]): void {
+  for (const key of Object.keys(raw)) {
+    if (!known.includes(key)) throw new ConfigError(`${where}: неизвестное поле «${key}»`);
+  }
+}
+
+function str(raw: Raw, key: string, fallback: string, where: string): string {
+  const value = raw[key];
+  if (value === undefined || value === null) return fallback;
+  if (typeof value !== 'string' || value.trim() === '') throw new ConfigError(`${where}.${key}: нужна непустая строка`);
+  return value.trim();
+}
+
+function num(raw: Raw, key: string, fallback: number, where: string, min: number, max: number): number {
+  const value = raw[key];
+  if (value === undefined || value === null) return fallback;
+  if (typeof value !== 'number' || !Number.isFinite(value) || value < min || value > max) {
+    throw new ConfigError(`${where}.${key}: нужно число от ${min} до ${max}`);
+  }
+  return value;
+}
+
+function bool(raw: Raw, key: string, fallback: boolean, where: string): boolean {
+  const value = raw[key];
+  if (value === undefined || value === null) return fallback;
+  if (typeof value !== 'boolean') throw new ConfigError(`${where}.${key}: нужно true или false`);
+  return value;
+}
+
+const NAME = /^[a-z0-9][a-z0-9_-]{0,31}$/;
+
+function outlet(raw: unknown, index: number): OutletConfig {
+  const where = `outlets[${index}]`;
+  if (!isRecord(raw)) throw new ConfigError(`${where}: нужен раздел с полями name, protocol, conf`);
+  onlyKnown(raw, where, ['name', 'kind', 'protocol', 'conf', 'env', 'priority', 'enabled']);
+  const name = str(raw, 'name', '', where);
+  if (!NAME.test(name)) {
+    throw new ConfigError(`${where}.name: латиница, цифры, «-» и «_», до 32 знаков — имя идёт в логин потребителя`);
+  }
+  const kind = str(raw, 'kind', 'mihomo', where);
+  if (kind !== 'mihomo') throw new ConfigError(`${where}.kind: пока только «mihomo» (netns для OpenVPN — следующий шаг)`);
+  const protocol = str(raw, 'protocol', '', where);
+  if (protocol !== 'amneziawg' && protocol !== 'wireguard') {
+    throw new ConfigError(`${where}.protocol: «amneziawg» или «wireguard»`);
+  }
+  return {
+    name,
+    kind,
+    protocol,
+    conf: str(raw, 'conf', '', where),
+    env: raw.env === undefined || raw.env === null ? null : str(raw, 'env', '', where),
+    priority: num(raw, 'priority', 100, where, 0, 10_000),
+    enabled: bool(raw, 'enabled', true, where),
+  };
+}
+
+export function parseConfig(text: string): Config {
+  const raw: unknown = parse(text) ?? {};
+  if (!isRecord(raw)) throw new ConfigError('в корне должен быть раздел, а не список или строка');
+  onlyKnown(raw, 'корень', ['http', 'tokens', 'outlets', 'mihomo', 'health', 'sticky']);
+
+  const http = section(raw, 'http');
+  onlyKnown(http, 'http', ['listen', 'port']);
+  const mihomo = section(raw, 'mihomo');
+  onlyKnown(mihomo, 'mihomo', ['bin', 'dir', 'socksBase', 'controller']);
+  const health = section(raw, 'health');
+  onlyKnown(health, 'health', ['intervalSec', 'connectTimeoutSec', 'probeHost', 'probePath', 'ipHost', 'ipIntervalSec']);
+  const sticky = section(raw, 'sticky');
+  onlyKnown(sticky, 'sticky', ['hours']);
+
+  const outletsRaw = raw.outlets ?? [];
+  if (!Array.isArray(outletsRaw)) throw new ConfigError('outlets: нужен список выходов');
+  const outlets = outletsRaw.map(outlet);
+  const names = new Set<string>();
+  for (const o of outlets) {
+    if (names.has(o.name)) throw new ConfigError(`outlets: имя «${o.name}» встречается дважды`);
+    names.add(o.name);
+  }
+
+  const d = DEFAULTS;
+  return {
+    http: {
+      listen: str(http, 'listen', d.http.listen, 'http'),
+      port: num(http, 'port', d.http.port, 'http', 1, 65_535),
+    },
+    tokens: str(raw, 'tokens', d.tokens, 'корень'),
+    outlets,
+    mihomo: {
+      bin: str(mihomo, 'bin', d.mihomo.bin, 'mihomo'),
+      dir: str(mihomo, 'dir', d.mihomo.dir, 'mihomo'),
+      socksBase: num(mihomo, 'socksBase', d.mihomo.socksBase, 'mihomo', 1024, 65_000),
+      controller: str(mihomo, 'controller', d.mihomo.controller, 'mihomo'),
+    },
+    health: {
+      intervalSec: num(health, 'intervalSec', d.health.intervalSec, 'health', 2, 3600),
+      connectTimeoutSec: num(health, 'connectTimeoutSec', d.health.connectTimeoutSec, 'health', 1, 120),
+      probeHost: str(health, 'probeHost', d.health.probeHost, 'health'),
+      probePath: str(health, 'probePath', d.health.probePath, 'health'),
+      ipHost: str(health, 'ipHost', d.health.ipHost, 'health'),
+      ipIntervalSec: num(health, 'ipIntervalSec', d.health.ipIntervalSec, 'health', 10, 86_400),
+    },
+    sticky: { hours: num(sticky, 'hours', d.sticky.hours, 'sticky', 0, 24 * 30) },
+  };
+}
+
+export function loadConfig(path: string): Config {
+  let text: string;
+  try {
+    text = readFileSync(path, 'utf8');
+  } catch (error) {
+    throw new ConfigError(`не прочитать настройки ${path}: ${(error as Error).message}`);
+  }
+  return parseConfig(text);
+}

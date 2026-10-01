@@ -1,0 +1,35 @@
+# Настройки Contour. Правятся руками, читаются при старте:
+#   sudo systemctl restart contour
+# Все поля, кроме outlets, можно не писать — ниже их умолчания.
+
+http:
+  listen: 127.0.0.1          # вход HTTP-прокси для программ этой машины
+  port: 3128
+
+tokens: /etc/contour/tokens   # строки «имя:токен»; без токена прокси отвечает 407
+
+outlets:
+  - name: ext                 # имя выхода: на экране, в логе, в логине потребителя
+    kind: mihomo
+    protocol: amneziawg       # или wireguard
+    conf: /etc/contour/keys/ext.conf   # конфиг wg-quick/awg или файл со ссылкой vpn://
+    env: /etc/contour/keys/ext.env     # AWG_ADDRESS / AWG_DNS, если в conf их нет (как у aiproxy)
+    priority: 10              # меньше — раньше в очереди
+    enabled: true
+
+mihomo:
+  bin: /opt/contour/bin/mihomo
+  dir: /var/lib/contour/mihomo
+  socksBase: 10800            # входы выходов: 127.0.0.1:10800, 10801, … (с паролем, только для Contour)
+  controller: 127.0.0.1:19090 # API mihomo, для экрана
+
+health:
+  intervalSec: 10             # проверка каждого выхода: GET /generate_204 по http
+  connectTimeoutSec: 8        # столько ждём соединения через один выход, потом — следующий
+  probeHost: cp.cloudflare.com
+  probePath: /generate_204
+  ipHost: api.ipify.org       # внешний адрес выхода («а точно через VPN?»)
+  ipIntervalSec: 300
+
+sticky:
+  hours: 24                   # сайт ходит через выход, где открылся, столько часов
