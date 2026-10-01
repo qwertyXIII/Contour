@@ -14,7 +14,10 @@ export type OutletProtocol = 'amneziawg' | 'wireguard';
 
 export type OutletConfig = {
   name: string;
-  kind: 'mihomo';
+  /** `netns` — ядерный туннель в своём namespace (AWG, WG; OpenVPN потом); `mihomo` — то, чего ядро не знает. */
+  kind: 'mihomo' | 'netns';
+  /** Номер моста для `netns`: мост 10.201.N.0/30, SOCKS внутри на 10.201.N.2:1080. */
+  bridge: number | null;
   protocol: OutletProtocol;
   /** Конфиг wg-quick / awg, либо файл со ссылкой `vpn://` из Amnezia. */
   conf: string;
@@ -123,13 +126,15 @@ function dnsList(value: unknown, where: string): string[] {
 function outlet(raw: unknown, index: number): OutletConfig {
   const where = `outlets[${index}]`;
   if (!isRecord(raw)) throw new ConfigError(`${where}: нужен раздел с полями name, protocol, conf`);
-  onlyKnown(raw, where, ['name', 'kind', 'protocol', 'conf', 'env', 'dns', 'mtu', 'priority', 'enabled']);
+  onlyKnown(raw, where, ['name', 'kind', 'bridge', 'protocol', 'conf', 'env', 'dns', 'mtu', 'priority', 'enabled']);
   const name = str(raw, 'name', '', where);
   if (!NAME.test(name)) {
     throw new ConfigError(`${where}.name: латиница, цифры, «-» и «_», до 32 знаков — имя идёт в логин потребителя`);
   }
-  const kind = str(raw, 'kind', 'mihomo', where);
-  if (kind !== 'mihomo') throw new ConfigError(`${where}.kind: пока только «mihomo» (netns для OpenVPN — следующий шаг)`);
+  const kind = str(raw, 'kind', 'netns', where);
+  if (kind !== 'mihomo' && kind !== 'netns') throw new ConfigError(`${where}.kind: «netns» или «mihomo»`);
+  const bridge = kind === 'netns' ? num(raw, 'bridge', 0, where, 1, 250) : null;
+  if (kind === 'netns' && raw.bridge === undefined) throw new ConfigError(`${where}.bridge: у выхода netns нужен номер моста от 1 до 250`);
   const protocol = str(raw, 'protocol', '', where);
   if (protocol !== 'amneziawg' && protocol !== 'wireguard') {
     throw new ConfigError(`${where}.protocol: «amneziawg» или «wireguard»`);
@@ -137,6 +142,7 @@ function outlet(raw: unknown, index: number): OutletConfig {
   return {
     name,
     kind,
+    bridge,
     protocol,
     conf: str(raw, 'conf', '', where),
     env: raw.env === undefined || raw.env === null ? null : str(raw, 'env', '', where),
@@ -165,9 +171,14 @@ export function parseConfig(text: string): Config {
   if (!Array.isArray(outletsRaw)) throw new ConfigError('outlets: нужен список выходов');
   const outlets = outletsRaw.map(outlet);
   const names = new Set<string>();
+  const bridges = new Set<number>();
   for (const o of outlets) {
     if (names.has(o.name)) throw new ConfigError(`outlets: имя «${o.name}» встречается дважды`);
     names.add(o.name);
+    if (o.bridge !== null) {
+      if (bridges.has(o.bridge)) throw new ConfigError(`outlets: мост ${o.bridge} встречается дважды`);
+      bridges.add(o.bridge);
+    }
   }
 
   const d = DEFAULTS;

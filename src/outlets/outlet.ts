@@ -1,6 +1,8 @@
 import { randomBytes } from 'node:crypto';
+import { readFileSync } from 'node:fs';
+import path from 'node:path';
 import type { Config, OutletConfig } from '../config.ts';
-import { readWgProfile, type WgProfile } from './profile.ts';
+import { describeProfile, readWgProfile, type WgProfile } from './profile.ts';
 
 /**
  * Выход — один туннель, в который можно соединиться через локальный SOCKS.
@@ -34,11 +36,11 @@ export type MihomoOutlet = {
   profile: WgProfile;
 };
 
-export function newOutlet(config: OutletConfig, socksPort: number): Outlet {
+export function newOutlet(config: OutletConfig, socksPort: number, socks?: Outlet['socks']): Outlet {
   return {
     name: config.name,
     priority: config.priority,
-    socks: { host: '127.0.0.1', port: socksPort, user: config.name, pass: randomBytes(18).toString('hex') },
+    socks: socks ?? { host: '127.0.0.1', port: socksPort, user: config.name, pass: randomBytes(18).toString('hex') },
     state: 'unknown',
     latencyMs: null,
     failures: 0,
@@ -53,8 +55,41 @@ export function newOutlet(config: OutletConfig, socksPort: number): Outlet {
  * Плохой профиль — ошибка старта, а не молча пропущенный выход: иначе
  * «туннель не работает» обнаружится по 502, а не по строке в логе при запуске.
  */
-export function prepareOutlets(config: Config): MihomoOutlet[] {
-  const prepared: MihomoOutlet[] = [];
+export type Prepared = {
+  /** Все включённые выходы — для выбора и проверки. */
+  outlets: Outlet[];
+  /** Те, что поднимает mihomo, — для его конфига. */
+  mihomo: MihomoOutlet[];
+  /** Строка о каждом для лога запуска, без ключей. */
+  lines: string[];
+};
+
+/** Порт SOCKS внутри namespace выхода — один на всех, адреса у мостов разные. */
+export const NETNS_SOCKS_PORT = 1080;
+
+/** Мост выхода netns: `.1` — хост, `.2` — внутри. Тот же расчёт в deploy/contour-netns.sh. */
+export function bridgeAddress(bridge: number): string {
+  return `10.201.${bridge}.2`;
+}
+
+/**
+ * Пароль SOCKS выхода netns — файл `<имя>.socks` рядом с ключом. Его создаёт
+ * root-часть (contour-netns.sh), когда поднимает выход; Contour только читает.
+ */
+function netnsPassword(oc: OutletConfig): string {
+  const file = path.join(path.dirname(oc.conf), `${oc.name}.socks`);
+  let pass: string;
+  try {
+    pass = readFileSync(file, 'utf8').trim();
+  } catch (error) {
+    throw new Error(`нет пароля SOCKS ${file} — выход ещё не поднимали (systemctl start contour-netns@${oc.name}): ${(error as Error).message}`);
+  }
+  if (pass.length < 16) throw new Error(`пароль SOCKS в ${file} короче 16 знаков`);
+  return pass;
+}
+
+export function prepareOutlets(config: Config): Prepared {
+  const prepared: Prepared = { outlets: [], mihomo: [], lines: [] };
   let index = 0;
   for (const oc of config.outlets) {
     if (!oc.enabled) continue;
@@ -64,8 +99,24 @@ export function prepareOutlets(config: Config): MihomoOutlet[] {
     } catch (error) {
       throw new Error(`выход «${oc.name}»: ${(error as Error).message}`);
     }
-    prepared.push({ outlet: newOutlet(oc, config.mihomo.socksBase + index), config: oc, profile });
-    index += 1;
+    if (oc.kind === 'netns') {
+      let pass: string;
+      try {
+        pass = netnsPassword(oc);
+      } catch (error) {
+        throw new Error(`выход «${oc.name}»: ${(error as Error).message}`);
+      }
+      const host = bridgeAddress(oc.bridge as number);
+      const outlet = newOutlet(oc, NETNS_SOCKS_PORT, { host, port: NETNS_SOCKS_PORT, user: oc.name, pass });
+      prepared.outlets.push(outlet);
+      prepared.lines.push(`выход «${oc.name}» (ядро, namespace): ${describeProfile(profile)} → SOCKS ${host}:${NETNS_SOCKS_PORT}`);
+    } else {
+      const item = { outlet: newOutlet(oc, config.mihomo.socksBase + index), config: oc, profile };
+      index += 1;
+      prepared.outlets.push(item.outlet);
+      prepared.mihomo.push(item);
+      prepared.lines.push(`выход «${oc.name}» (mihomo): ${describeProfile(profile)} → SOCKS :${item.outlet.socks.port}`);
+    }
   }
   return prepared;
 }

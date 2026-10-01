@@ -119,6 +119,14 @@ ensure_key() {
   note "ключ выхода ext скопирован из контура aivpn (оригинал не тронут)"
 }
 
+ensure_netns_meta() {
+  [ -f "$ETC/keys/ext.netns" ] && return
+  printf 'PROTO=amneziawg\nBRIDGE=1\n' > "$ETC/keys/ext.netns"
+  chown root:"$SERVICE_USER" "$ETC/keys/ext.netns"
+  chmod 640 "$ETC/keys/ext.netns"
+  note "выход ext — ядерный AmneziaWG, мост 1"
+}
+
 ensure_config() {
   if [ -f "$ETC/contour.yaml" ]; then
     note "настройки $ETC/contour.yaml уже есть"
@@ -227,9 +235,62 @@ EOF
   fi
 }
 
+# Ядерные выходы: помощник от root и два шаблонных unit'а. Помощник копируется
+# в /opt (root) — из папки владельца root ничего не запускает.
+ensure_netns_units() {
+  install -d -m 755 "$PREFIX/sbin"
+  install -m 755 -o root -g root "$SRC/deploy/contour-netns.sh" "$PREFIX/sbin/contour-netns"
+  cat > /etc/systemd/system/contour-netns@.service <<EOF
+[Unit]
+Description=Contour — ядерный выход %i (namespace ct-%i)
+After=network-online.target
+Wants=network-online.target
+Before=contour.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=$PREFIX/sbin/contour-netns up %i
+ExecStop=$PREFIX/sbin/contour-netns down %i
+TimeoutStartSec=90s
+
+[Install]
+WantedBy=multi-user.target
+EOF
+  cat > /etc/systemd/system/contour-socks@.service <<EOF
+[Unit]
+Description=Contour — SOCKS внутри выхода %i
+BindsTo=contour-netns@%i.service
+After=contour-netns@%i.service
+PartOf=contour-netns@%i.service
+Before=contour.service
+
+[Service]
+Type=simple
+User=$SERVICE_USER
+Group=$SERVICE_USER
+NetworkNamespacePath=/var/run/netns/ct-%i
+ExecStart=$PREFIX/bin/mihomo -d $LIB/netns/%i -f $LIB/netns/%i/config.yaml
+Restart=always
+RestartSec=3s
+StandardOutput=append:$LOG/socks.log
+StandardError=inherit
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=full
+ProtectHome=yes
+ReadWritePaths=$LIB/netns/%i $LOG
+
+[Install]
+WantedBy=multi-user.target
+EOF
+  systemctl daemon-reload
+  note "ядерные выходы: $PREFIX/sbin/contour-netns, unit'ы contour-netns@ и contour-socks@"
+}
+
 ensure_logrotate() {
   cat > /etc/logrotate.d/contour <<EOF
-$LOG/log.log {
+$LOG/log.log $LOG/socks.log {
   weekly
   rotate 8
   missingok
@@ -257,17 +318,22 @@ ensure_dirs
 ensure_node
 ensure_mihomo
 ensure_key
+ensure_netns_meta
 ensure_config
 ensure_tokens
 ensure_owner_token
 ensure_deps
 ensure_unit
+ensure_netns_units
 ensure_sudoers
 ensure_logrotate
 verify
 echo
-if systemctl is-active --quiet contour.service; then
-  echo "Готово. Contour уже работает; код изменился — sudo systemctl restart contour. Проверка: bash $SRC/deploy/check.sh"
+if grep -qE '^[[:space:]]*kind: mihomo' "$ETC/contour.yaml"; then
+  echo "Готово. Выход ext ещё в mihomo (35 КБ/с) — перевести на ядро:"
+  echo "  sudo bash $SRC/deploy/switch-to-kernel.sh"
+elif systemctl is-active --quiet contour.service; then
+  echo "Готово. Contour работает; код изменился — sudo systemctl restart contour. Проверка: bash $SRC/deploy/check.sh"
 else
   echo "Готово. Дальше — переключение с контура aivpn (ключ один, два туннеля не живут):"
   echo "  sudo bash $SRC/deploy/switch-from-aivpn.sh"

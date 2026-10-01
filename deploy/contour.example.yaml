@@ -10,7 +10,8 @@ tokens: /etc/contour/tokens   # строки «имя:токен»; без то�
 
 outlets:
   - name: ext                 # имя выхода: на экране, в логе, в логине потребителя
-    kind: mihomo
+    kind: netns               # ядерный туннель в своём namespace; mihomo — для того, чего ядро не знает (VLESS…)
+    bridge: 1                 # мост 10.201.1.0/30, SOCKS выхода на 10.201.1.2:1080 (пароль — keys/<имя>.socks)
     protocol: amneziawg       # или wireguard
     conf: /etc/contour/keys/ext.conf   # конфиг wg-quick/awg или файл со ссылкой vpn://
     env: /etc/contour/keys/ext.env     # AWG_ADDRESS / AWG_DNS, если в conf их нет (как у aiproxy)

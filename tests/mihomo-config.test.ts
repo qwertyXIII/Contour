@@ -10,7 +10,7 @@ const PRIV = 'cHJpdmF0ZS1rZXktZm9yLXRlc3RzLW9ubHktMDAwMDA=';
 const PUB = 'cHVibGljLWtleS1mb3ItdGVzdHMtb25seS0wMDAwMDA=';
 
 function outlet(name: string, protocol: 'amneziawg' | 'wireguard', port: number, conf: string): MihomoOutlet {
-  const config: OutletConfig = { name, kind: 'mihomo', protocol, conf: '/x', env: null, dns: [], mtu: null, priority: 10, enabled: true };
+  const config: OutletConfig = { name, kind: 'mihomo', bridge: null, protocol, conf: '/x', env: null, dns: [], mtu: null, priority: 10, enabled: true };
   return { outlet: newOutlet(config, port), config, profile: parseWgConf(conf) };
 }
 
