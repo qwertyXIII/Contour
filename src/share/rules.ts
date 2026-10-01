@@ -26,6 +26,15 @@ import type { Sites } from '../panel/sites.ts';
  * - `update-url` — откуда конфиг обновляется сам.
  */
 
+/**
+ * Отказ на самом телефоне. Пробы Meta `…-netseer-ipaddr-assoc.xy.fbcdn.net`:
+ * Instagram шлёт их раз в секунду, адресов IPv4 у них нет — ни один выход их не
+ * откроет, а каждая попытка — строка в журнале края и Contour (живьём 2026-10-02:
+ * 177 пар за две минуты). Instagram от отказа не страдает: он его и так получал,
+ * только по таймауту.
+ */
+const REJECT_KEYWORDS = ['netseer-ipaddr-assoc'];
+
 /** Сайты через Contour и ручные «напрямую»: без поддоменов того, что уже в списке, и без того, что владелец увёл напрямую. */
 export function shareDomains(input: { own: string[]; common: string[]; learned: string[]; overrides: OverrideMap }): { tunnel: string[]; direct: string[] } {
   const direct = Object.entries(input.overrides).filter(([, v]) => v === 'direct').map(([k]) => k).sort();
@@ -62,9 +71,13 @@ export function shadowrocketConf(input: ConfInput): string {
     // QUIC (UDP) через край пока не ходит — пусть приложения сразу идут по TCP.
     'block-quic = all-proxy',
     'udp-policy-not-supported-behaviour = REJECT',
+    // Не разрешилось имя «прямого» сайта — не уводить его через дом: российские
+    // сервисы за заграничным выходом не работают (Госуслуги, Альфа — живьём 2026-10-02).
+    'dns-direct-fallback-proxy = false',
     `update-url = ${input.base}/contour.conf`,
     '',
     '[Rule]',
+    ...REJECT_KEYWORDS.map((k) => `DOMAIN-KEYWORD,${k},REJECT`),
     ...input.direct.map((n) => `DOMAIN-SUFFIX,${n},DIRECT`),
     `DOMAIN-SET,${input.base}/domains.list,PROXY`,
     ...input.nets.map((c) => `IP-CIDR,${c},PROXY,no-resolve`),

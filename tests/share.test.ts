@@ -89,6 +89,7 @@ test('правила: ручное «напрямую» первым и вычи
   const rules = conf.slice(conf.indexOf('[Rule]')).split('\n').filter(Boolean);
   assert.deepEqual(rules, [
     '[Rule]',
+    'DOMAIN-KEYWORD,netseer-ipaddr-assoc,REJECT',
     'DOMAIN-SUFFIX,music.youtube.com,DIRECT',
     'DOMAIN-SUFFIX,x.com,DIRECT',
     'DOMAIN-SET,https://c.example.ru/list/T/domains.list,PROXY',
@@ -97,6 +98,7 @@ test('правила: ручное «напрямую» первым и вычи
   ]);
   assert.match(conf, /^update-url = https:\/\/c\.example\.ru\/list\/T\/contour\.conf$/m);
   assert.match(conf, /^block-quic = all-proxy$/m);
+  assert.match(conf, /^dns-direct-fallback-proxy = false$/m, 'прямой сайт не уходит через дом, если имя не разрешилось');
 });
 
 test('ссылка на правила: по токену включённого устройства и только с адресом; чужое — одинаковый «нет»', () => {
