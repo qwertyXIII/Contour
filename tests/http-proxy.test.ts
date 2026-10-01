@@ -34,7 +34,7 @@ async function setup(): Promise<{ proxy: string; target: http.Server; close: () 
   const consumers = new Consumers(tokens, quiet);
   consumers.load();
 
-  const fake: Outlet = newOutlet({ name: 'fake', kind: 'mihomo', protocol: 'wireguard', conf: '/x', env: null, priority: 1, enabled: true }, 1);
+  const fake: Outlet = newOutlet({ name: 'fake', kind: 'mihomo', protocol: 'wireguard', conf: '/x', env: null, dns: [], priority: 1, enabled: true }, 1);
   fake.state = 'alive';
   const chooser = new Chooser([fake], { stickyMs: 0, connectTimeoutMs: 1000, onFailure: () => {}, log: quiet });
   // Любой адрес ведёт в локальную цель — ограда при этом проверяет то, что просил клиент.
@@ -112,6 +112,51 @@ test('проброс http: запрос уходит в цель с её Host, �
     assert.match(self, /contour/);
   } finally {
     s.close();
+  }
+});
+
+test('повтор с проигрыванием: выход закрылся молча — байты клиента уходят через следующий', async () => {
+  const target = http.createServer((req, res) => res.end(`ok ${req.url}`));
+  await new Promise<void>((r) => target.listen(0, '127.0.0.1', r));
+  const targetPort = (target.address() as net.AddressInfo).port;
+  // «Плохой выход»: принимает соединение и тут же закрывает — как mihomo, когда сайт не открылся.
+  const mute = net.createServer((s) => s.destroy());
+  await new Promise<void>((r) => mute.listen(0, '127.0.0.1', r));
+  const mutePort = (mute.address() as net.AddressInfo).port;
+
+  const dir = mkdtempSync(path.join(tmpdir(), 'contour-'));
+  const tokens = path.join(dir, 'tokens');
+  writeFileSync(tokens, `alter:${TOKEN}\n`);
+  const consumers = new Consumers(tokens, quiet);
+  consumers.load();
+
+  const mk = (name: string): Outlet => {
+    const o = newOutlet({ name, kind: 'mihomo', protocol: 'wireguard', conf: '/x', env: null, dns: [], priority: 1, enabled: true }, 1);
+    o.state = 'alive';
+    return o;
+  };
+  const bad = mk('bad');
+  const good = mk('good');
+  const failures: string[] = [];
+  const chooser = new Chooser([bad, good], { stickyMs: 0, connectTimeoutMs: 1000, onFailure: (o) => failures.push(o.name), log: quiet });
+  chooser.connect = async (_h, _p, exclude = new Set()) => {
+    const outlet = exclude.has('bad') ? good : bad;
+    const socket = net.connect(outlet === bad ? mutePort : targetPort, '127.0.0.1');
+    await new Promise<void>((r, j) => { socket.once('connect', r); socket.once('error', j); });
+    return { socket, outlet, failed: [] };
+  };
+  const server = await startHttpInlet({ listen: '127.0.0.1', port: 0, chooser, consumers, log: quiet });
+  const proxy = `127.0.0.1:${(server.address() as net.AddressInfo).port}`;
+  try {
+    const out = await rawRequest(proxy, `CONNECT example.com:80 HTTP/1.1\r\n${auth}\r\n\r\nGET /again HTTP/1.1\r\nHost: example.com\r\nConnection: close\r\n\r\n`);
+    assert.match(out, /^HTTP\/1\.1 200 Connection Established/);
+    assert.match(out, /ok \/again/, 'запрос проигран через второй выход');
+    assert.deepEqual(failures, ['bad'], 'отказ первого выхода ушёл на проверку');
+
+    const fwd = await rawRequest(proxy, `GET http://example.com/fwd HTTP/1.1\r\nHost: example.com\r\n${auth}\r\nConnection: close\r\n\r\n`);
+    assert.match(fwd, /ok \/fwd/, 'проброс http тоже повторяется');
+  } finally {
+    server.close(); server.closeAllConnections(); target.close(); target.closeAllConnections(); mute.close();
   }
 });
 

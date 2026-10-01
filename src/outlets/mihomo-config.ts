@@ -17,7 +17,18 @@ import type { MihomoOutlet } from './outlet.ts';
  * а резолвер этой машины не видит, куда ходят потребители.
  */
 
-const DEFAULT_DNS = ['1.1.1.1', '8.8.8.8'];
+/**
+ * Публичные резолверы — всегда в списке, после резолвера профиля. Запросы к ним
+ * идут внутрь туннеля (`allowed-ips: 0.0.0.0/0`), утечки нет. Причина — живой
+ * запуск 2026-10-01: туннель ходил, а резолвер Amnezia `10.10.8.15` отвечал
+ * через раз, и каждое имя висело 5 с до `dns resolve failed`.
+ */
+const PUBLIC_DNS = ['1.1.1.1', '8.8.8.8'];
+
+function dnsFor(o: MihomoOutlet): string[] {
+  if (o.config.dns.length > 0) return o.config.dns;
+  return [...new Set([...o.profile.dns, ...PUBLIC_DNS])];
+}
 
 /** Числа — числами, остальное (`i1` с байтовыми шаблонами) — строкой. */
 function amneziaOption(raw: Record<string, string>): Record<string, number | string> {
@@ -42,7 +53,7 @@ function proxyOf(o: MihomoOutlet): Record<string, unknown> {
     'allowed-ips': p.peer.allowedIps,
     udp: true,
     'remote-dns-resolve': true,
-    dns: p.dns.length > 0 ? p.dns : DEFAULT_DNS,
+    dns: dnsFor(o),
   };
   const v6 = bare.find(isIPv6);
   if (v6) proxy.ipv6 = v6;

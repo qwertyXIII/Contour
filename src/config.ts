@@ -1,4 +1,5 @@
 import { readFileSync } from 'node:fs';
+import { isIP } from 'node:net';
 import { parse } from 'yaml';
 
 /**
@@ -19,6 +20,8 @@ export type OutletConfig = {
   conf: string;
   /** Необязательный `.env` c AWG_ADDRESS / AWG_DNS — как у aiproxy. */
   env: string | null;
+  /** Резолверы на дальнем конце туннеля. Пусто — из профиля плюс публичные. */
+  dns: string[];
   /** Меньше — раньше в очереди. */
   priority: number;
   enabled: boolean;
@@ -107,10 +110,18 @@ function bool(raw: Raw, key: string, fallback: boolean, where: string): boolean 
 
 const NAME = /^[a-z0-9][a-z0-9_-]{0,31}$/;
 
+function dnsList(value: unknown, where: string): string[] {
+  if (value === undefined || value === null) return [];
+  if (!Array.isArray(value) || !value.every((v) => typeof v === 'string' && isIP(v.trim()) !== 0)) {
+    throw new ConfigError(`${where}.dns: список адресов резолверов, например [1.1.1.1, 8.8.8.8]`);
+  }
+  return value.map((v: string) => v.trim());
+}
+
 function outlet(raw: unknown, index: number): OutletConfig {
   const where = `outlets[${index}]`;
   if (!isRecord(raw)) throw new ConfigError(`${where}: нужен раздел с полями name, protocol, conf`);
-  onlyKnown(raw, where, ['name', 'kind', 'protocol', 'conf', 'env', 'priority', 'enabled']);
+  onlyKnown(raw, where, ['name', 'kind', 'protocol', 'conf', 'env', 'dns', 'priority', 'enabled']);
   const name = str(raw, 'name', '', where);
   if (!NAME.test(name)) {
     throw new ConfigError(`${where}.name: латиница, цифры, «-» и «_», до 32 знаков — имя идёт в логин потребителя`);
@@ -127,6 +138,7 @@ function outlet(raw: unknown, index: number): OutletConfig {
     protocol,
     conf: str(raw, 'conf', '', where),
     env: raw.env === undefined || raw.env === null ? null : str(raw, 'env', '', where),
+    dns: dnsList(raw.dns, where),
     priority: num(raw, 'priority', 100, where, 0, 10_000),
     enabled: bool(raw, 'enabled', true, where),
   };

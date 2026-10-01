@@ -2,6 +2,7 @@ import http from 'node:http';
 import type { Socket } from 'node:net';
 import type { Consumers } from '../consumers.ts';
 import { errorText, type Logger } from '../log.ts';
+import type { Outlet } from '../outlets/outlet.ts';
 import type { Chooser } from '../select/chooser.ts';
 import { checkDestination } from './fence.ts';
 
@@ -13,8 +14,12 @@ import { checkDestination } from './fence.ts';
  * `Proxy-Authorization` — 407: на машине живут чужие приложения, и прокси
  * без входа был бы бесплатным туннелем для любого из них.
  *
- * Клиент получает `200 Connection Established` только когда соединение
- * через выход уже есть — повтор по выходам (`Chooser`) для него невидим.
+ * ⚠️ mihomo отвечает SOCKS «успех» ДО того, как соединился с сайтом (замечено
+ * на живом запуске 2026-10-01: отказ резолвера приходил уже после «успеха»
+ * как молчаливое закрытие). Поэтому повтор через другой выход устроен не на
+ * соединении, а **с проигрыванием**: пока от сайта не пришло ни байта, байты
+ * клиента копятся в буфере; выход закрылся молча — соединяемся через следующий
+ * и проигрываем буфер. Для TLS это ровно ClientHello, клиент ничего не замечает.
  */
 
 export type HttpInletOptions = {
@@ -24,6 +29,14 @@ export type HttpInletOptions = {
   consumers: Consumers;
   log: Logger;
 };
+
+type Target = { host: string; port: number };
+type Deps = { chooser: Chooser; consumers: Consumers; log: Logger };
+
+/** Сколько байт клиента держим для проигрывания; больше — повтор уже невозможен. */
+const REPLAY_CAP = 256 * 1024;
+/** Сколько выходов перебираем на одно соединение. */
+const MAX_ATTEMPTS = 4;
 
 const STATUS_TEXT: Record<number, string> = {
   400: 'Bad Request',
@@ -49,14 +62,168 @@ function refuse(socket: Socket, status: number, body = '', headers: Record<strin
 const AUTH_HEADERS = { 'Proxy-Authenticate': 'Basic realm="contour"' };
 
 /** `host:port` из строки CONNECT, в том числе `[::1]:443`. */
-export function parseAuthority(value: string | undefined): { host: string; port: number } | null {
+export function parseAuthority(value: string | undefined): Target | null {
   const m = /^(?:\[([^\]]+)\]|([^:\[\]]+)):(\d{1,5})$/.exec(value ?? '');
   if (!m) return null;
   return { host: (m[1] ?? m[2]) as string, port: Number(m[3]) };
 }
 
+// ─── CONNECT: туннель с повтором по выходам ────────────────────────────────
+
+function serveConnect(client: Socket, head: Buffer, who: string, target: Target, deps: Deps): void {
+  const { chooser, consumers, log } = deps;
+  const where = `${who}: ${target.host}:${target.port}`;
+  const exclude = new Set<string>();
+  let buffered: Buffer[] = head.length > 0 ? [head] : [];
+  let bufferedBytes = head.length;
+  let replayable = true;
+  let attempts = 0;
+  let established = false;
+  let finished = false;
+  let upstream: Socket | null = null;
+  let outletName = '';
+  let up = 0;
+  let down = 0;
+
+  const finish = (): void => {
+    if (finished) return;
+    finished = true;
+    client.destroy();
+    upstream?.destroy();
+    consumers.account(who, up, down);
+    log.debug(`${where} через «${outletName}» — ↑${up} ↓${down}`);
+  };
+
+  const attach = (socket: Socket, outlet: Outlet): void => {
+    upstream = socket;
+    outletName = outlet.name;
+    for (const chunk of buffered) socket.write(chunk);
+    socket.on('data', (chunk: Buffer) => {
+      if (replayable) { replayable = false; buffered = []; }
+      down += chunk.length;
+      if (!client.write(chunk)) socket.pause();
+    });
+    socket.on('drain', () => client.resume());
+    socket.on('error', () => { /* закрытие ниже решит, повторять ли */ });
+    socket.on('close', () => {
+      if (finished || socket !== upstream) return;
+      upstream = null;
+      if (replayable && !client.destroyed && attempts < MAX_ATTEMPTS) {
+        void next(outlet, 'закрыл соединение, не ответив');
+      } else {
+        finish();
+      }
+    });
+  };
+
+  const next = async (failed: Outlet | null, why: string): Promise<void> => {
+    if (failed) {
+      exclude.add(failed.name);
+      chooser.noteFailure(failed, why);
+    }
+    attempts += 1;
+    try {
+      const { socket, outlet, failed: skipped } = await chooser.connect(target.host, target.port, exclude);
+      if (client.destroyed) { socket.destroy(); return; }
+      if (failed) log.info(`${where} — «${failed.name}» ${why}, повтор через «${outlet.name}»`);
+      else if (skipped.length > 0) log.info(`${where} через «${outlet.name}» после отказа ${skipped.join(', ')}`);
+      attach(socket, outlet);
+      if (!established) {
+        established = true;
+        client.write('HTTP/1.1 200 Connection Established\r\nProxy-Agent: contour\r\n\r\n');
+      }
+    } catch (error) {
+      const text = errorText(error);
+      log.warn(`${where} — ${text}`);
+      if (!established) refuse(client, 502, text);
+      else finish();
+    }
+  };
+
+  client.setTimeout(0);
+  client.on('data', (chunk: Buffer) => {
+    up += chunk.length;
+    if (replayable) {
+      bufferedBytes += chunk.length;
+      if (bufferedBytes > REPLAY_CAP) { replayable = false; buffered = []; }
+      else buffered.push(chunk);
+    }
+    if (upstream && !upstream.write(chunk)) client.pause();
+  });
+  client.on('drain', () => upstream?.resume());
+  client.on('close', finish);
+  client.on('error', finish);
+
+  void next(null, '');
+}
+
+// ─── Проброс http: запрос целиком, повтор для запросов без тела ────────────
+
+function serveForward(req: http.IncomingMessage, res: http.ServerResponse, who: string, target: URL, deps: Deps): void {
+  const { chooser, consumers, log } = deps;
+  const host = target.hostname.replace(/^\[|\]$/g, '');
+  const port = Number(target.port) || 80;
+  const where = `${who}: ${host}:${port}`;
+  const exclude = new Set<string>();
+  const retriable = req.method === 'GET' || req.method === 'HEAD';
+  let attempts = 0;
+  let up = 0;
+  let down = 0;
+  req.on('data', (chunk: Buffer) => { up += chunk.length; });
+
+  const headers = { ...req.headers };
+  delete headers['proxy-authorization'];
+  delete headers['proxy-connection'];
+  headers.connection = 'close';
+  headers.host = target.host;
+
+  const fail = (text: string): void => {
+    log.warn(`${where} — ${text}`);
+    if (!res.headersSent) res.writeHead(502, { 'Content-Type': 'text/plain; charset=utf-8' });
+    res.end(`${text}\n`);
+  };
+
+  const attempt = async (): Promise<void> => {
+    attempts += 1;
+    let socket: Socket;
+    let outlet: Outlet;
+    try {
+      ({ socket, outlet } = await chooser.connect(host, port, exclude));
+    } catch (error) {
+      fail(errorText(error));
+      return;
+    }
+    let answered = false;
+    const out = http.request({ createConnection: () => socket, host, port, method: req.method, path: `${target.pathname}${target.search}`, headers }, (answer) => {
+      answered = true;
+      answer.on('data', (chunk: Buffer) => { down += chunk.length; });
+      res.writeHead(answer.statusCode ?? 502, answer.headers);
+      answer.pipe(res);
+    });
+    out.on('error', (error) => {
+      if (!answered && retriable && attempts < MAX_ATTEMPTS && !res.destroyed) {
+        exclude.add(outlet.name);
+        chooser.noteFailure(outlet, error.message);
+        log.info(`${where} — «${outlet.name}» ${error.message}, повтор`);
+        void attempt();
+        return;
+      }
+      fail(`через «${outlet.name}»: ${error.message}`);
+    });
+    res.on('close', () => socket.destroy());
+    if (retriable) out.end();
+    else req.pipe(out);
+  };
+
+  res.on('close', () => consumers.account(who, up, down));
+  void attempt();
+}
+
+// ─── Сервер ────────────────────────────────────────────────────────────────
+
 export function startHttpInlet(opts: HttpInletOptions): Promise<http.Server> {
   const { chooser, consumers, log } = opts;
+  const deps: Deps = { chooser, consumers, log };
   const server = http.createServer();
   // Туннели живут долго (докачка на часы) — таймаут соединения без дела не нужен.
   server.timeout = 0;
@@ -73,23 +240,7 @@ export function startHttpInlet(opts: HttpInletOptions): Promise<http.Server> {
       refuse(socket, 403, fence.reason);
       return;
     }
-    socket.on('error', () => { /* клиент оборвал — ниже закроем выход */ });
-
-    void chooser.connect(target.host, target.port).then(({ socket: upstream, outlet, failed }) => {
-      if (socket.destroyed) { upstream.destroy(); return; }
-      if (failed.length > 0) log.info(`${who}: ${target.host}:${target.port} через «${outlet.name}» после отказа ${failed.join(', ')}`);
-      socket.write('HTTP/1.1 200 Connection Established\r\nProxy-Agent: contour\r\n\r\n');
-      if (head.length > 0) upstream.write(head);
-      socket.setTimeout(0);
-      pipeBoth(socket, upstream, (up, down) => {
-        consumers.account(who, up, down);
-        log.debug(`${who}: ${target.host}:${target.port} через «${outlet.name}» — ↑${up} ↓${down}`);
-      });
-    }, (error: unknown) => {
-      const text = errorText(error);
-      log.warn(`${who}: ${target.host}:${target.port} — ${text}`);
-      refuse(socket, 502, text);
-    });
+    serveConnect(socket, head, who, target, deps);
   });
 
   server.on('request', (req, res) => {
@@ -113,53 +264,14 @@ export function startHttpInlet(opts: HttpInletOptions): Promise<http.Server> {
       res.writeHead(400); res.end('плохой адрес\n'); return;
     }
     if (target.protocol !== 'http:') { res.writeHead(400); res.end('через проброс только http; для https — CONNECT\n'); return; }
-    const host = target.hostname.replace(/^\[|\]$/g, '');
-    const port = Number(target.port) || 80;
-    const fence = checkDestination(host, port);
+    const fence = checkDestination(target.hostname.replace(/^\[|\]$/g, ''), Number(target.port) || 80);
     if (!fence.ok) {
       log.warn(`${who}: отказ ограды — ${fence.reason}`);
       res.writeHead(403, { 'Content-Type': 'text/plain; charset=utf-8' });
       res.end(`${fence.reason}\n`);
       return;
     }
-
-    void chooser.connect(host, port).then(({ socket: upstream, outlet }) => {
-      const headers = { ...req.headers };
-      delete headers['proxy-authorization'];
-      delete headers['proxy-connection'];
-      headers.connection = 'close';
-      headers.host = target.host;
-      let up = 0;
-      let down = 0;
-      req.on('data', (chunk: Buffer) => { up += chunk.length; });
-      const out = http.request({
-        createConnection: () => upstream,
-        host,
-        port,
-        method: req.method,
-        path: `${target.pathname}${target.search}`,
-        headers,
-      }, (answer) => {
-        answer.on('data', (chunk: Buffer) => { down += chunk.length; });
-        res.writeHead(answer.statusCode ?? 502, answer.headers);
-        answer.pipe(res);
-      });
-      out.on('error', (error) => {
-        log.warn(`${who}: ${host}:${port} через «${outlet.name}» — ${error.message}`);
-        if (!res.headersSent) res.writeHead(502, { 'Content-Type': 'text/plain; charset=utf-8' });
-        res.end(`${error.message}\n`);
-      });
-      res.on('close', () => {
-        upstream.destroy();
-        consumers.account(who, up, down);
-      });
-      req.pipe(out);
-    }, (error: unknown) => {
-      const text = errorText(error);
-      log.warn(`${who}: ${host}:${port} — ${text}`);
-      res.writeHead(502, { 'Content-Type': 'text/plain; charset=utf-8' });
-      res.end(`${text}\n`);
-    });
+    serveForward(req, res, who, target, deps);
   });
 
   server.on('clientError', (error: NodeJS.ErrnoException, socket: Socket) => {
@@ -175,26 +287,4 @@ export function startHttpInlet(opts: HttpInletOptions): Promise<http.Server> {
       resolve(server);
     });
   });
-}
-
-/** Два сокета навстречу, со счётом байт и закрытием второго вслед за первым. */
-function pipeBoth(client: Socket, upstream: Socket, done: (up: number, down: number) => void): void {
-  let up = 0;
-  let down = 0;
-  let finished = false;
-  const finish = (): void => {
-    if (finished) return;
-    finished = true;
-    client.destroy();
-    upstream.destroy();
-    done(up, down);
-  };
-  client.on('data', (chunk: Buffer) => { up += chunk.length; });
-  upstream.on('data', (chunk: Buffer) => { down += chunk.length; });
-  client.pipe(upstream);
-  upstream.pipe(client);
-  client.on('close', finish);
-  upstream.on('close', finish);
-  upstream.on('error', finish);
-  client.on('error', finish);
 }

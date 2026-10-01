@@ -146,6 +146,22 @@ ensure_tokens() {
   echo
 }
 
+# Токен для консоли владельца: `curl -x "$(cat ~/.config/contour/proxy)" …`,
+# yt-dlp, check.sh без sudo. Файл 600 в его доме, в чат и лог не попадает.
+ensure_owner_token() {
+  local token line dir="/home/$OWNER/.config/contour"
+  if ! grep -q "^$OWNER:" "$ETC/tokens"; then
+    token=$(openssl rand -hex 24 2>/dev/null || head -c 48 /dev/urandom | od -An -tx1 | tr -d ' \n' | head -c 48)
+    printf '%s:%s\n' "$OWNER" "$token" >> "$ETC/tokens"
+  fi
+  line=$(grep "^$OWNER:" "$ETC/tokens" | head -1 | cut -d: -f2-)
+  install -d -m 700 -o "$OWNER" -g "$OWNER" "/home/$OWNER/.config" "$dir"
+  printf 'http://%s:%s@127.0.0.1:3128\n' "$OWNER" "$line" > "$dir/proxy"
+  chown "$OWNER:$OWNER" "$dir/proxy"
+  chmod 600 "$dir/proxy"
+  note "токен для консоли владельца: $dir/proxy"
+}
+
 # --- зависимости кода -------------------------------------------------------
 # От владельца, не от root: node_modules лежит в его папке.
 
@@ -239,6 +255,7 @@ ensure_mihomo
 ensure_key
 ensure_config
 ensure_tokens
+ensure_owner_token
 ensure_deps
 ensure_unit
 ensure_sudoers

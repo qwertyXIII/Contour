@@ -37,6 +37,8 @@ export type Health = {
 
 const DEAD_AFTER = 2;
 const RESPONSE_TIMEOUT_MS = 8_000;
+/** Точка графика задержки — не чаще раза в минуту: проверка раз в 10 с дала бы 8,6 тыс. строк в сутки. */
+const GRAPH_EVERY_MS = 60_000;
 
 /** Один запрос по открытому сокету: строка статуса и тело (до конца соединения). */
 export function httpOverSocket(socket: Socket, host: string, path: string, timeoutMs: number): Promise<{ status: number; body: string }> {
@@ -60,6 +62,7 @@ export function httpOverSocket(socket: Socket, host: string, path: string, timeo
 export function startHealth(outlets: Outlet[], opts: HealthOptions): Health {
   const busy = new Set<string>();
   const ipAt = new Map<string, number>();
+  const graphAt = new Map<string, number>();
   let stopped = false;
 
   const probe = async (outlet: Outlet): Promise<void> => {
@@ -78,7 +81,10 @@ export function startHealth(outlets: Outlet[], opts: HealthOptions): Health {
         outlet.state = 'alive';
         ipAt.delete(outlet.name);
       }
-      opts.log.graph('outlet.latency_ms', outlet.latencyMs, { meta: { outlet: outlet.name } });
+      if (Date.now() - (graphAt.get(outlet.name) ?? 0) >= GRAPH_EVERY_MS) {
+        graphAt.set(outlet.name, Date.now());
+        opts.log.graph('outlet.latency_ms', outlet.latencyMs, { meta: { outlet: outlet.name } });
+      }
     } catch (error) {
       outlet.failures += 1;
       outlet.lastError = errorText(error);

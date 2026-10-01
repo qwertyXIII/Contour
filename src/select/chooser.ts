@@ -65,9 +65,15 @@ export class Chooser {
     return list;
   }
 
-  async connect(host: string, port: number): Promise<Connected> {
+  /** Отказ выхода, замеченный уже после соединения (закрыл, не ответив) — на проверку. */
+  noteFailure(outlet: Outlet, why: string): void {
+    this.opts.onFailure(outlet, new Error(why));
+  }
+
+  async connect(host: string, port: number, exclude: ReadonlySet<string> = new Set()): Promise<Connected> {
     const errors: string[] = [];
     for (const outlet of this.order(host)) {
+      if (exclude.has(outlet.name)) continue;
       try {
         const socket = await dialVia(outlet, host, port, this.opts.connectTimeoutMs);
         if (this.opts.stickyMs > 0) this.sticky.set(host, { name: outlet.name, until: Date.now() + this.opts.stickyMs });

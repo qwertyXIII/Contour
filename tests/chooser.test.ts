@@ -7,7 +7,7 @@ import { createLogger } from '../src/vendor/logger.js';
 const quiet = createLogger({ enabled: false });
 
 function outlet(name: string, priority: number, state: Outlet['state'], latencyMs: number | null = null): Outlet {
-  const o = newOutlet({ name, kind: 'mihomo', protocol: 'wireguard', conf: '/x', env: null, priority, enabled: true }, 1);
+  const o = newOutlet({ name, kind: 'mihomo', protocol: 'wireguard', conf: '/x', env: null, dns: [], priority, enabled: true }, 1);
   o.state = state;
   o.latencyMs = latencyMs;
   return o;

@@ -10,7 +10,7 @@ const PRIV = 'cHJpdmF0ZS1rZXktZm9yLXRlc3RzLW9ubHktMDAwMDA=';
 const PUB = 'cHVibGljLWtleS1mb3ItdGVzdHMtb25seS0wMDAwMDA=';
 
 function outlet(name: string, protocol: 'amneziawg' | 'wireguard', port: number, conf: string): MihomoOutlet {
-  const config: OutletConfig = { name, kind: 'mihomo', protocol, conf: '/x', env: null, priority: 10, enabled: true };
+  const config: OutletConfig = { name, kind: 'mihomo', protocol, conf: '/x', env: null, dns: [], priority: 10, enabled: true };
   return { outlet: newOutlet(config, port), config, profile: parseWgConf(conf) };
 }
 
@@ -40,11 +40,20 @@ test('каждый выход — proxy wireguard и свой SOCKS-вход с 
   assert.equal(ext.server, 'vpn.example.org');
   assert.equal(ext.port, 51820);
   assert.equal(ext['remote-dns-resolve'], true);
-  assert.deepEqual(ext.dns, ['1.1.1.1']);
+  assert.deepEqual(ext.dns, ['1.1.1.1', '8.8.8.8'], 'резолвер профиля плюс публичные, без повтора');
   assert.deepEqual(ext['amnezia-wg-option'], { jc: 4, jmin: 40, jmax: 70, s1: 15, s2: 90, h1: 1, h2: 2, h3: 3, h4: 4, i1: '<b 0xf6ab><r 10>' });
 
   // Протокол wireguard: параметры Amnezia из файла игнорируются.
   assert.equal(doc.proxies[1]['amnezia-wg-option'], undefined);
+});
+
+test('резолверы: из профиля плюс публичные без повторов; список в настройках выхода — вместо', () => {
+  const a = outlet('a', 'wireguard', 1, AWG.replace('DNS = 1.1.1.1', 'DNS = 10.10.8.15, 8.8.8.8'));
+  const b = outlet('b', 'wireguard', 2, AWG);
+  b.config.dns = ['9.9.9.9'];
+  const doc = parse(buildMihomoConfig({ outlets: [a, b], controller: 'c', secret: 's' })) as Record<string, any>;
+  assert.deepEqual(doc.proxies[0].dns, ['10.10.8.15', '8.8.8.8', '1.1.1.1']);
+  assert.deepEqual(doc.proxies[1].dns, ['9.9.9.9']);
 });
 
 test('пароль SOCKS у каждого выхода свой и длинный', () => {
