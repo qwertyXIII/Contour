@@ -14,7 +14,8 @@ import { isIPv4, isIPv6 } from 'node:net';
 export type FenceVerdict = { ok: true } | { ok: false; reason: string };
 
 /** [сеть, биты] — что не выпускаем по IPv4. */
-const PRIVATE_V4: Array<[string, number]> = [
+/** Частные и служебные сети IPv4 — их не пускаем ни через выход, ни в наборы шлюза. */
+export const PRIVATE_V4: Array<[string, number]> = [
   ['0.0.0.0', 8],
   ['10.0.0.0', 8],
   ['100.64.0.0', 10],

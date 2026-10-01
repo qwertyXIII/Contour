@@ -2,7 +2,7 @@ import { chmodSync, chownSync, mkdirSync, rmSync } from 'node:fs';
 import net from 'node:net';
 import path from 'node:path';
 import { errorText, log } from '../log.ts';
-import { allowAddresses, applyGateway, seenDevices, setDeviceMode } from './gateway.ts';
+import { allowAddresses, applyGateway, seenDevices, setDeviceMode, setNets } from './gateway.ts';
 import { activateOutletCmd, addOutletCmd, enableOutletCmd, groupOutletCmd, priorityOutletCmd, removeOutletCmd, restartContourCmd, restartOutletCmd, statusCmd } from './outlets.ts';
 import { MAX_REQUEST_BYTES, ROOT_SOCKET, type RootRequest, type RootResponse } from './protocol.ts';
 import { groupId } from './sys.ts';
@@ -42,6 +42,7 @@ async function dispatch(req: RootRequest): Promise<unknown> {
     // Не в общую очередь: DNS ждёт ответа перед ответом устройству, а очередь может стоять за минутным подъёмом выхода.
     case 'gateway.allow': return allowAddresses(req.ips, req.ttl);
     case 'gateway.seen': return seenDevices();
+    case 'gateway.nets': return serial(() => setNets(req.cidrs));
     case 'contour.restart': return serial(async () => restartContourCmd());
     default: throw new Error('неизвестная команда');
   }
@@ -53,7 +54,8 @@ function describe(req: RootRequest): string {
   const extra = req.cmd === 'outlet.add' ? ` (${req.source})`
     : req.cmd === 'outlet.enable' ? ` → ${req.enabled ? 'вкл' : 'выкл'}`
     : req.cmd === 'outlet.group' ? ` → ${req.with === null ? 'без соперника' : `соперник «${String(req.with)}»`}`
-    : req.cmd === 'gateway.set' ? ` ${String(req.mac)} → ${req.mode ?? 'выкл'}` : '';
+    : req.cmd === 'gateway.set' ? ` ${String(req.mac)} → ${req.mode ?? 'выкл'}`
+    : req.cmd === 'gateway.nets' ? ` — ${Array.isArray(req.cidrs) ? req.cidrs.length : '?'} подсетей` : '';
   return `${req.cmd}${name}${extra}`;
 }
 

@@ -3,8 +3,9 @@ import { chownSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync }
 import { isIPv4 } from 'node:net';
 import path from 'node:path';
 import { MAC } from '../arp.ts';
-import { GATEWAY_FILE, GW_MARK_DIRECT, GW_MARK_VPN, GW_TABLE, readGateway, type GatewayMode, type GatewayState } from '../gateway.ts';
-import { isPrivateV4 } from '../inlets/fence.ts';
+import { formatCidr, overlaps, parseCidr, type Cidr } from '../cidr.ts';
+import { GATEWAY_FILE, GATEWAY_NETS_FILE, GW_MARK_DIRECT, GW_MARK_VPN, GW_TABLE, readGateway, type GatewayMode, type GatewayState } from '../gateway.ts';
+import { isPrivateV4, PRIVATE_V4 } from '../inlets/fence.ts';
 import { groupId, run, runInput } from './sys.ts';
 
 /**
@@ -53,6 +54,7 @@ export function gatewayRuleset(iface: string): string {
   set gw_blocked { type ether_addr; }
   set gw_all { type ether_addr; }
   set vpn_dst { type ipv4_addr; flags timeout; }
+  set vpn_net { type ipv4_addr; flags interval; auto-merge; }
   set gw_seen { type ether_addr; flags dynamic, timeout; timeout 10m; }
   set local_dst { type ipv4_addr; flags interval; elements = { ${LOCAL.join(', ')} } }
   chain gw_pre {
@@ -61,6 +63,7 @@ export function gatewayRuleset(iface: string): string {
     iifname "${iface}" ether saddr @gw_all ip daddr != @local_dst update @gw_seen { ether saddr }
     ${at} ether saddr @gw_all ip daddr != @local_dst ct mark set ${vpn}
     ${at} ether saddr @gw_blocked ip daddr @vpn_dst ct mark set ${vpn}
+    ${at} ether saddr @gw_blocked ip daddr @vpn_net ct mark set ${vpn}
     ${at} ct mark != ${vpn} ether saddr @gw_blocked ip daddr != @local_dst ct mark set ${direct}
     ct direction original ct mark ${vpn} meta mark set ${vpn}
   }
@@ -149,7 +152,44 @@ export async function applyGateway(state: GatewayState = readGateway()): Promise
     writeFileSync(APPLIED, hash);
   }
   await nft(deviceCommands(state));
+  await nft(netCommands(readNets()));
   await ensureRule();
+}
+
+const MAX_NETS = 4_096;
+const PRIVATE: Cidr[] = PRIVATE_V4.map(([net, bits]) => parseCidr(`${net}/${bits}`) as Cidr);
+
+function readNets(): string[] {
+  try {
+    const raw = JSON.parse(readFileSync(GATEWAY_NETS_FILE, 'utf8')) as { nets?: unknown };
+    return Array.isArray(raw.nets) ? raw.nets.filter((n): n is string => typeof n === 'string' && parseCidr(n) !== null) : [];
+  } catch {
+    return [];
+  }
+}
+
+export function netCommands(nets: string[]): string {
+  const lines = [`flush set ip ${TABLE} vpn_net`];
+  if (nets.length > 0) lines.push(`add element ip ${TABLE} vpn_net { ${nets.join(', ')} }`);
+  return `${lines.join('\n')}\n`;
+}
+
+/** Подсети «через VPN» для режима `blocked` (от DNS): проверить, сохранить у себя, положить в набор. */
+export async function setNets(cidrs: unknown): Promise<number> {
+  if (!Array.isArray(cidrs) || cidrs.length > MAX_NETS) throw new GatewayError(`подсети — список до ${MAX_NETS}`);
+  const nets: string[] = [];
+  for (const raw of cidrs) {
+    const c = typeof raw === 'string' ? parseCidr(raw) : null;
+    if (!c || c.bits < 8 || PRIVATE.some((p) => overlaps(c, p))) throw new GatewayError(`«${String(raw)}» — не публичная подсеть /8…/32`);
+    nets.push(formatCidr(c));
+  }
+  mkdirSync(path.dirname(GATEWAY_NETS_FILE), { recursive: true });
+  const tmp = `${GATEWAY_NETS_FILE}.tmp`;
+  writeFileSync(tmp, `${JSON.stringify({ nets })}\n`, { mode: 0o640 });
+  chownSync(tmp, 0, groupId('contour'));
+  renameSync(tmp, GATEWAY_NETS_FILE);
+  if ((await run('nft', ['list', 'table', 'ip', TABLE])).code === 0) await nft(netCommands(nets));
+  return nets.length;
 }
 
 export async function downGateway(): Promise<void> {

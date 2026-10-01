@@ -1,6 +1,6 @@
-import { mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
-import { errorText, type Logger } from '../log.ts';
+import type { Logger } from '../log.ts';
+import { RemoteList } from './remote-list.ts';
 
 /**
  * Списки сайтов, которые сразу идут через VPN.
@@ -15,9 +15,6 @@ import { errorText, type Logger } from '../log.ts';
  * (ChatGPT отвечает 403 после нормального соединения) видны только по списку.
  */
 
-const REFRESH_MS = 24 * 3_600_000;
-const RETRY_MS = 3_600_000;
-const FETCH_TIMEOUT_MS = 30_000;
 const NAME = /^(?=.{1,253}$)([a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z0-9-]{2,63}$/;
 
 /** Строки файла списка → имена: комментарии, `*.`, пробелы и мусор — прочь. */
@@ -44,16 +41,23 @@ export function inSet(name: string, set: ReadonlySet<string>): string | null {
 export class Lists {
   private own: Set<string>;
   private common = new Set<string>();
-  private timer: NodeJS.Timeout | null = null;
-  private readonly urls: string[];
-  private readonly cacheFile: string;
-  private readonly log: Logger;
+  private readonly remote: RemoteList<string>;
 
   constructor(opts: { own: string[]; urls: string[]; cacheDir: string; log: Logger }) {
     this.own = new Set(opts.own);
-    this.urls = opts.urls;
-    this.cacheFile = path.join(opts.cacheDir, 'blocked-domains.lst');
-    this.log = opts.log;
+    this.remote = new RemoteList<string>({
+      urls: opts.urls,
+      cacheFile: path.join(opts.cacheDir, 'blocked-domains.lst'),
+      parse: parseList,
+      key: (n) => n,
+      format: (n) => n,
+      onUpdate: (names, from) => {
+        this.common = new Set(names);
+        opts.log.info(from === 'disk' ? `общий список с диска: ${names.length} сайтов` : `общий список обновлён: ${names.length} сайтов`);
+      },
+      label: 'общий список',
+      log: opts.log,
+    });
   }
 
   /** Какой записью списка совпало имя — для лога; null — ни с какой. */
@@ -67,51 +71,10 @@ export class Lists {
 
   /** Копия с диска сразу, свежая из сети — в фоне, потом раз в сутки. */
   start(): void {
-    try {
-      this.common = new Set(parseList(readFileSync(this.cacheFile, 'utf8')));
-      this.log.info(`общий список с диска: ${this.common.size} сайтов`);
-    } catch {
-      // первый запуск — копии ещё нет
-    }
-    void this.refresh();
+    this.remote.start();
   }
 
   stop(): void {
-    if (this.timer) clearTimeout(this.timer);
-  }
-
-  private async refresh(): Promise<void> {
-    if (this.urls.length === 0) return;
-    const names = new Set<string>();
-    const failed: string[] = [];
-    for (const url of this.urls) {
-      try {
-        const res = await fetch(url, { signal: AbortSignal.timeout(FETCH_TIMEOUT_MS) });
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        for (const n of parseList(await res.text())) names.add(n);
-      } catch (error) {
-        failed.push(`${url}: ${errorText(error)}`);
-      }
-    }
-    if (names.size > 0 && failed.length === 0) {
-      this.common = names;
-      try {
-        mkdirSync(path.dirname(this.cacheFile), { recursive: true });
-        writeFileSync(`${this.cacheFile}.tmp`, `${[...names].sort().join('\n')}\n`);
-        renameSync(`${this.cacheFile}.tmp`, this.cacheFile);
-      } catch (error) {
-        this.log.warn(`общий список: не сохранить копию — ${errorText(error)}`);
-      }
-      this.log.info(`общий список обновлён: ${names.size} сайтов`);
-      this.schedule(REFRESH_MS);
-    } else {
-      this.log.warn(`общий список не обновился (работаю по копии, ${this.common.size} сайтов): ${failed.join('; ')}`);
-      this.schedule(RETRY_MS);
-    }
-  }
-
-  private schedule(ms: number): void {
-    this.timer = setTimeout(() => { void this.refresh(); }, ms);
-    this.timer.unref();
+    this.remote.stop();
   }
 }

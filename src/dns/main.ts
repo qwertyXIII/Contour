@@ -7,6 +7,7 @@ import { startDns, type Decide } from './server.ts';
 import { makeTunnelProbe, readToken } from './tunnel-probe.ts';
 import { TunnelResolver } from './tunnel-resolve.ts';
 import { GatewayClients, gatewayHook } from './gateway.ts';
+import { Subnets } from './subnets.ts';
 import { hintSender } from '../inlets/hints.ts';
 import { rootCall } from '../root/protocol.ts';
 
@@ -59,6 +60,14 @@ try {
     allow: async (ips, ttl) => { await rootCall({ cmd: 'gateway.allow', ips, ttl }, 3_000); },
     log: dnsLog,
   }) : undefined;
+  // Подсети сервисов, что ходят по адресам (голос Discord, звонки), — помощнику для шлюза.
+  new Subnets({
+    urls: lan.subnetLists,
+    skip: lan.subnetSkip,
+    cacheDir: lan.dataDir,
+    push: async (cidrs) => { await rootCall({ cmd: 'gateway.nets', cidrs }, 30_000); },
+    log: dnsLog,
+  }).start();
   startDns({ lan, decide, log: dnsLog, onOwn: (client, name) => { if (name !== panelName) hint(client, name); }, gateway });
   const sizes = lists.size();
   dnsLog.info(`обычный DNS: ${lan.upstream.join(', ')}; свой список — ${sizes.own} сайтов, общий — ${sizes.common}; самообучение ${learner ? 'включено' : 'выключено'}`);

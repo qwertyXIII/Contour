@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { isIP } from 'node:net';
 import { parse } from 'yaml';
+import { parseCidr } from './cidr.ts';
 
 /**
  * Настройки Contour — один YAML, читается при старте.
@@ -115,6 +116,14 @@ export type Config = {
     ports: Array<{ port: number; hosts: string[] }>;
     /** Куда `contour-dns` шлёт подсказки «устройство спросило имя» (UDP, 127.0.0.1). */
     hintPort: number;
+    /**
+     * Подсети сервисов, которые ходят по адресам, а не по именам (голос Discord,
+     * звонки Telegram и WhatsApp): устройства-шлюзы в режиме «заблокированное»
+     * ведут их через VPN. Списки по ссылкам, раз в сутки.
+     */
+    subnetLists: string[];
+    /** Подсети, которые из списков выбрасываются (по умолчанию — Cloudflare). */
+    subnetSkip: string[];
   };
 };
 
@@ -131,6 +140,27 @@ export const GAME_PORTS = [
 
 /** itdoginfo/allow-domains, «Russia inside» — заблокированное и недоступное из России. */
 export const DEFAULT_LISTS = ['https://raw.githubusercontent.com/itdoginfo/allow-domains/main/Russia/inside-raw.lst'];
+
+/**
+ * itdoginfo/allow-domains, Subnets/IPv4: Discord (голос — свои сети и Google
+ * Cloud), Telegram и Meta (звонки Telegram и WhatsApp, которые в России режут).
+ * Решение владельца 2026-10-02: «списки добавить нужно».
+ */
+export const DEFAULT_SUBNET_LISTS = ['discord', 'telegram', 'meta']
+  .map((s) => `https://raw.githubusercontent.com/itdoginfo/allow-domains/main/Subnets/IPv4/${s}.lst`);
+
+/**
+ * Cloudflare (cloudflare.com/ips-v4): за ним пол-интернета, и в списке Discord
+ * он есть. Через VPN по подсети его не ведём — Discord и сайты на Cloudflare и
+ * так идут через VPN по именам (DNS), а весь Cloudflare в туннеле — это медленно
+ * и дорого по трафику. Так предложено 2026-10-02; владелец ответил «списки
+ * добавить нужно», вариант с Cloudflare — заменой этого списка на [].
+ */
+export const CLOUDFLARE_V4 = [
+  '173.245.48.0/20', '103.21.244.0/22', '103.22.200.0/22', '103.31.4.0/22', '141.101.64.0/18', '108.162.192.0/18',
+  '190.93.240.0/20', '188.114.96.0/20', '197.234.240.0/22', '198.41.128.0/17', '162.158.0.0/15', '104.16.0.0/13',
+  '104.24.0.0/14', '172.64.0.0/13', '131.0.72.0/22',
+];
 
 /**
  * YouTube целиком: страницы, API приложения для ТВ, видео (googlevideo),
@@ -181,6 +211,8 @@ export const DEFAULTS: Config = {
     tlsPort: 18443,
     httpPort: 18080,
     lists: DEFAULT_LISTS,
+    subnetLists: DEFAULT_SUBNET_LISTS,
+    subnetSkip: CLOUDFLARE_V4,
     learn: true,
     probeBudgetMs: 1_500,
     dataDir: '/var/lib/contour/dns',
@@ -277,10 +309,18 @@ function portRules(value: unknown, fallback: Array<{ port: number; hosts: string
   });
 }
 
-function urlList(value: unknown, fallback: string[]): string[] {
+function urlList(value: unknown, fallback: string[], where = 'lan.lists'): string[] {
   if (value === undefined || value === null) return fallback;
   if (!Array.isArray(value) || !value.every((v) => typeof v === 'string' && /^https:\/\/\S+$/.test(v))) {
-    throw new ConfigError('lan.lists: список ссылок https:// на файлы со списком сайтов (пустой [] — без общего списка)');
+    throw new ConfigError(`${where}: список ссылок https:// на файлы со списком (пустой [] — без списка)`);
+  }
+  return value as string[];
+}
+
+function cidrList(value: unknown, fallback: string[]): string[] {
+  if (value === undefined || value === null) return fallback;
+  if (!Array.isArray(value) || !value.every((v) => typeof v === 'string' && parseCidr(v) !== null)) {
+    throw new ConfigError('lan.subnetSkip: список подсетей вида 104.16.0.0/13');
   }
   return value as string[];
 }
@@ -345,7 +385,7 @@ export function parseConfig(text: string): Config {
   const panel = section(raw, 'panel');
   onlyKnown(panel, 'panel', ['enabled', 'listen', 'port', 'name', 'passwordFile', 'dataDir']);
   const lan = section(raw, 'lan');
-  onlyKnown(lan, 'lan', ['enabled', 'address', 'allow', 'upstream', 'domains', 'extraDomains', 'tlsPort', 'httpPort', 'lists', 'learn', 'probeBudgetMs', 'dataDir', 'ports', 'hintPort']);
+  onlyKnown(lan, 'lan', ['enabled', 'address', 'allow', 'upstream', 'domains', 'extraDomains', 'tlsPort', 'httpPort', 'lists', 'learn', 'probeBudgetMs', 'dataDir', 'ports', 'hintPort', 'subnetLists', 'subnetSkip']);
 
   const outletsRaw = raw.outlets ?? [];
   if (!Array.isArray(outletsRaw)) throw new ConfigError('outlets: нужен список выходов');
@@ -403,6 +443,8 @@ export function parseConfig(text: string): Config {
       tlsPort: num(lan, 'tlsPort', d.lan.tlsPort, 'lan', 1024, 65_535),
       httpPort: num(lan, 'httpPort', d.lan.httpPort, 'lan', 1024, 65_535),
       lists: urlList(lan.lists, d.lan.lists),
+      subnetLists: urlList(lan.subnetLists, d.lan.subnetLists, 'lan.subnetLists'),
+      subnetSkip: cidrList(lan.subnetSkip, d.lan.subnetSkip),
       learn: bool(lan, 'learn', d.lan.learn, 'lan'),
       probeBudgetMs: num(lan, 'probeBudgetMs', d.lan.probeBudgetMs, 'lan', 100, 5_000),
       dataDir: str(lan, 'dataDir', d.lan.dataDir, 'lan'),

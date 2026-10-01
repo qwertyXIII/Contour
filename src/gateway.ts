@@ -23,6 +23,8 @@ export type GatewayState = { devices: Record<string, GatewayMode> };
 
 /** root:contour 640 — DNS и Contour читают, пишет только помощник. */
 export const GATEWAY_FILE = '/etc/contour/gateway.json';
+/** Подсети «через VPN» для режима `blocked` (голос Discord, звонки) — пишет помощник по слову DNS (`dns/subnets.ts`). */
+export const GATEWAY_NETS_FILE = '/etc/contour/gateway-nets.json';
 
 /** Метка соединения «через VPN» и «напрямую» и таблица маршрутов шлюза. Та же таблица — в deploy/contour-netns.sh. */
 export const GW_MARK_VPN = 0x2c1;

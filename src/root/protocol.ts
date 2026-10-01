@@ -29,6 +29,7 @@ export type RootRequest =
   | { cmd: 'gateway.set'; mac: string; mode: 'blocked' | 'all' | null }
   | { cmd: 'gateway.allow'; ips: string[]; ttl: number }
   | { cmd: 'gateway.seen' }
+  | { cmd: 'gateway.nets'; cidrs: string[] }
   | { cmd: 'contour.restart' };
 
 export type OutletRuntime = {

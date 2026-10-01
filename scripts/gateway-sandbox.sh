@@ -53,6 +53,7 @@ ip -n dev2 route add default via 192.168.0.50
 # «Интернет» на роутере и «туннель» выхода к нему.
 ip -n router addr add 198.51.100.10/32 dev lo
 ip -n router addr add 198.51.100.20/32 dev lo
+ip -n router addr add 198.51.100.30/32 dev lo   # голосовой сервер: адреса нет в DNS, есть в подсети
 ip link add tun0 type veth peer name tunr
 ip link set tun0 netns ct-t && ip link set tunr netns router
 ip -n ct-t addr add 172.31.0.2/30 dev tun0 && ip -n ct-t link set tun0 up
@@ -94,6 +95,8 @@ mac() { ip -n "$1" -o link show eth0 | sed -n 's/.*link\/ether \([0-9a-f:]*\).*/
 MAC1=$(mac dev1)
 MAC2=$(mac dev2)
 printf '{"devices":{"%s":"blocked","%s":"all"}}\n' "$MAC1" "$MAC2" > /etc/contour/gateway.json
+# Подсети — так их сохраняет помощник по слову DNS (setNets; chown в песочнице не сделать).
+printf '{"nets":["198.51.100.24/29"]}\n' > /etc/contour/gateway-nets.json
 
 # Настоящий код помощника: правила, режимы, набор «через VPN».
 cd "$ROOT"
@@ -111,6 +114,7 @@ echo "Шлюз в песочнице:"
 check "dev1 («заблокированное») → заблокированный, TCP 9339" 172.31.0.2 "$(tcp dev1 198.51.100.10 9339)"
 check "dev1 → заблокированный, UDP 50000 (голос)" 172.31.0.2 "$(udp dev1 198.51.100.10 50000)"
 check "dev1 → обычный сайт — напрямую" 192.168.0.50 "$(tcp dev1 198.51.100.20 80)"
+check "dev1 → адрес из подсети списка (не из DNS) — через выход" 172.31.0.2 "$(tcp dev1 198.51.100.30 80)"
 check "dev1 → обычный, UDP — напрямую" 192.168.0.50 "$(udp dev1 198.51.100.20 50000)"
 check "dev2 («всё через VPN») → обычный сайт — через выход" 172.31.0.2 "$(tcp dev2 198.51.100.20 80)"
 
