@@ -99,7 +99,8 @@ export function relay(client: Socket, head: Buffer, who: string, target: Target,
         hooks.onEstablished();
       }
     } catch (error) {
-      const text = errorText(error);
+      // Причина отказа прошлого выхода — в ту же строку: «других выходов нет» без неё ничего не объясняет.
+      const text = failed ? `«${failed.name}» ${why}; ${errorText(error)}` : errorText(error);
       log.warn(`${where} — ${text}`);
       if (!established) hooks.onFail(text);
       else finish();

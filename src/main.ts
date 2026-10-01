@@ -4,6 +4,8 @@ import path from 'node:path';
 import { Consumers } from './consumers.ts';
 import { ConfigError, loadConfig } from './config.ts';
 import { startHttpInlet } from './inlets/http-proxy.ts';
+import { startGamePorts } from './inlets/game-ports.ts';
+import { Hints } from './inlets/hints.ts';
 import { startLanInlet } from './inlets/lan.ts';
 import { errorText, log } from './log.ts';
 import { startHealth } from './outlets/health.ts';
@@ -98,6 +100,10 @@ async function main(): Promise<void> {
   const lanServers = config.lan.enabled
     ? startLanInlet(config.lan, { chooser, consumers, log, meter }, panel ? { hosts: panelHosts, take: panel.take } : null)
     : [];
+  // Порты игр — по подсказкам DNS (inlets/hints.ts, game-ports.ts).
+  const hints = new Hints();
+  const hintSocket = config.lan.enabled && config.lan.ports.length > 0 ? hints.listen(config.lan.hintPort, log) : null;
+  const gameServers = hintSocket ? startGamePorts(config.lan, hints, { chooser, consumers, log, meter }) : [];
   log.info('Contour готов');
 
   let stopping = false;
@@ -111,7 +117,8 @@ async function main(): Promise<void> {
     panel?.server.close();
     server.close();
     server.closeAllConnections();
-    for (const s of lanServers) s.close();
+    for (const s of [...lanServers, ...gameServers]) s.close();
+    hintSocket?.close();
     void (mihomo ? mihomo.stop() : Promise.resolve()).finally(() => process.exit(0));
     setTimeout(() => process.exit(0), 7_000).unref();
   };

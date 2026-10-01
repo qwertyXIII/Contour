@@ -5,6 +5,7 @@ import { Lists } from './lists.ts';
 import { Overrides } from './overrides.ts';
 import { startDns, type Decide } from './server.ts';
 import { makeTunnelProbe, readToken } from './tunnel-probe.ts';
+import { hintSender } from '../inlets/hints.ts';
 
 /**
  * Точка входа `contour-dns` — отдельный процесс от Contour (см. server.ts).
@@ -44,7 +45,9 @@ try {
     const d = await learner.decide(name);
     return { tunnel: d.via === 'tunnel', shortTtl: d.pending === true };
   };
-  startDns(lan, decide, dnsLog);
+  // Подсказки для портов игр: устройство получило наш адрес на имя — Contour узнает, куда вести.
+  const hint = hintSender(lan.hintPort);
+  startDns(lan, decide, dnsLog, (client, name) => { if (name !== panelName) hint(client, name); });
   const sizes = lists.size();
   dnsLog.info(`обычный DNS: ${lan.upstream.join(', ')}; свой список — ${sizes.own} сайтов, общий — ${sizes.common}; самообучение ${learner ? 'включено' : 'выключено'}`);
   process.on('SIGTERM', () => process.exit(0));

@@ -46,7 +46,9 @@ export type PanelHook = { hosts: Set<string>; take: (socket: Socket, head: Buffe
 
 function serve(kind: 'tls' | 'http', port: number, client: Socket, lan: LanConfig, deps: RelayDeps, panel: PanelHook | null = null): void {
   const { log } = deps;
-  const from = client.remoteAddress ?? '?';
+  // Адреса нет — устройство оборвало соединение раньше, чем мы его взяли (так бывает сразу после перезапуска). Не отказ, а нечего вести.
+  const from = client.remoteAddress;
+  if (!from) { client.destroy(); return; }
   const who = `lan:${from.replace(/^::ffff:/, '')}`;
   if (!inCidr(from, lan.allow)) {
     log.warn(`${who}: не из домашней сети — отказ`);

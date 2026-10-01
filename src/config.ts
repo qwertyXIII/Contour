@@ -96,8 +96,26 @@ export type Config = {
     probeBudgetMs: number;
     /** Где DNS держит копию общего списка и выученное. */
     dataDir: string;
+    /**
+     * Порты игр (TCP без имени в соединении): Contour слушает их на `address`
+     * и ведёт по подсказке DNS — к имени из `hosts`, которое устройство
+     * спросило последним.
+     */
+    ports: Array<{ port: number; hosts: string[] }>;
+    /** Куда `contour-dns` шлёт подсказки «устройство спросило имя» (UDP, 127.0.0.1). */
+    hintPort: number;
   };
 };
+
+/**
+ * Supercell: игровой сервер — TCP 9339; все их имена — в общем списке, поэтому
+ * DNS отдаёт игре наш адрес. ⚠️ Через выход, который пропускает только ходовые
+ * порты, правило бесполезно: замер 2026-10-01 — вход `ext` (в России) принимает
+ * соединение на 9339 и сразу закрывает, а напрямую сервер игры держит его.
+ */
+export const GAME_PORTS = [
+  { port: 9339, hosts: ['brawlstarsgame.com', 'clashroyaleapp.com', 'clashofclans.com', 'supercell.com', 'haydaygame.com', 'boombeachgame.com', 'squadbustersgame.com'] },
+];
 
 /** itdoginfo/allow-domains, «Russia inside» — заблокированное и недоступное из России. */
 export const DEFAULT_LISTS = ['https://raw.githubusercontent.com/itdoginfo/allow-domains/main/Russia/inside-raw.lst'];
@@ -152,6 +170,8 @@ export const DEFAULTS: Config = {
     learn: true,
     probeBudgetMs: 1_500,
     dataDir: '/var/lib/contour/dns',
+    ports: GAME_PORTS,
+    hintPort: 18053,
   },
 };
 
@@ -226,6 +246,23 @@ function domainList(value: unknown, where: string, fallback: string[]): string[]
   });
 }
 
+/** Порты, которые уже заняты своим: на них игры не пустить. */
+const RESERVED_PORTS = new Set([53, 80, 443]);
+
+function portRules(value: unknown, fallback: Array<{ port: number; hosts: string[] }>): Array<{ port: number; hosts: string[] }> {
+  if (value === undefined || value === null) return fallback;
+  if (!Array.isArray(value)) throw new ConfigError('lan.ports: список вида [{port: 9339, hosts: [brawlstarsgame.com]}]');
+  return value.map((raw, i) => {
+    const where = `lan.ports[${i}]`;
+    if (!isRecord(raw)) throw new ConfigError(`${where}: нужен раздел с port и hosts`);
+    const port = num(raw, 'port', 0, where, 1, 65_535);
+    if (RESERVED_PORTS.has(port)) throw new ConfigError(`${where}.port: ${port} занят DNS или входом для сайтов`);
+    const hosts = domainList(raw.hosts, `${where}.hosts`, []);
+    if (hosts.length === 0) throw new ConfigError(`${where}.hosts: хотя бы один сайт`);
+    return { port, hosts };
+  });
+}
+
 function urlList(value: unknown, fallback: string[]): string[] {
   if (value === undefined || value === null) return fallback;
   if (!Array.isArray(value) || !value.every((v) => typeof v === 'string' && /^https:\/\/\S+$/.test(v))) {
@@ -289,7 +326,7 @@ export function parseConfig(text: string): Config {
   const panel = section(raw, 'panel');
   onlyKnown(panel, 'panel', ['enabled', 'listen', 'port', 'name', 'passwordFile', 'dataDir']);
   const lan = section(raw, 'lan');
-  onlyKnown(lan, 'lan', ['enabled', 'address', 'allow', 'upstream', 'domains', 'extraDomains', 'tlsPort', 'httpPort', 'lists', 'learn', 'probeBudgetMs', 'dataDir']);
+  onlyKnown(lan, 'lan', ['enabled', 'address', 'allow', 'upstream', 'domains', 'extraDomains', 'tlsPort', 'httpPort', 'lists', 'learn', 'probeBudgetMs', 'dataDir', 'ports', 'hintPort']);
 
   const outletsRaw = raw.outlets ?? [];
   if (!Array.isArray(outletsRaw)) throw new ConfigError('outlets: нужен список выходов');
@@ -348,6 +385,8 @@ export function parseConfig(text: string): Config {
       learn: bool(lan, 'learn', d.lan.learn, 'lan'),
       probeBudgetMs: num(lan, 'probeBudgetMs', d.lan.probeBudgetMs, 'lan', 100, 5_000),
       dataDir: str(lan, 'dataDir', d.lan.dataDir, 'lan'),
+      ports: portRules(lan.ports, d.lan.ports),
+      hintPort: num(lan, 'hintPort', d.lan.hintPort, 'lan', 1024, 65_535),
     },
   };
 }

@@ -108,7 +108,10 @@ function servfail(packet: Buffer): Buffer | null {
   }
 }
 
-export async function resolvePacket(packet: Buffer, lan: Lan, decide: Decide, log: Logger): Promise<Buffer | null> {
+/** Кому сообщить, что устройство получило наш адрес на имя (подсказка для портов игр). */
+export type OnOwn = (client: string, name: string) => void;
+
+export async function resolvePacket(packet: Buffer, lan: Lan, decide: Decide, log: Logger, client = '', onOwn?: OnOwn): Promise<Buffer | null> {
   let query: Packet;
   try {
     query = dnsPacket.decode(packet);
@@ -119,7 +122,10 @@ export async function resolvePacket(packet: Buffer, lan: Lan, decide: Decide, lo
   const decision: Decision = name !== null ? await decide(name) : { tunnel: false };
   if (decision.tunnel) {
     const own = answerOwn(query, lan);
-    if (own) return own;
+    if (own) {
+      if (name && query.questions?.[0]?.type === TYPE_A) onOwn?.(client, name.toLowerCase().replace(/\.$/, ''));
+      return own;
+    }
   }
   try {
     const answer = await askUpstream(packet, lan.upstream);
@@ -130,11 +136,11 @@ export async function resolvePacket(packet: Buffer, lan: Lan, decide: Decide, lo
   }
 }
 
-export function startDns(lan: Lan, decide: Decide, log: Logger): { udp: dgram.Socket; tcp: net.Server } {
+export function startDns(lan: Lan, decide: Decide, log: Logger, onOwn?: OnOwn): { udp: dgram.Socket; tcp: net.Server } {
   const udp = dgram.createSocket('udp4');
   udp.on('message', (msg, rinfo) => {
     if (!inCidr(rinfo.address, lan.allow)) return;
-    void resolvePacket(msg, lan, decide, log).then((answer) => {
+    void resolvePacket(msg, lan, decide, log, rinfo.address, onOwn).then((answer) => {
       if (answer) udp.send(answer, rinfo.port, rinfo.address);
     });
   });
@@ -152,7 +158,7 @@ export function startDns(lan: Lan, decide: Decide, log: Logger): { udp: dgram.So
         const len = buf.readUInt16BE(0);
         const msg = buf.subarray(2, 2 + len);
         buf = buf.subarray(2 + len);
-        void resolvePacket(Buffer.from(msg), lan, decide, log).then((answer) => {
+        void resolvePacket(Buffer.from(msg), lan, decide, log, (socket.remoteAddress ?? '').replace(/^::ffff:/, ''), onOwn).then((answer) => {
           if (!answer || socket.destroyed) return;
           const head = Buffer.alloc(2);
           head.writeUInt16BE(answer.length, 0);
