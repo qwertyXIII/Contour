@@ -36,7 +36,14 @@ const schemas = {
   device: z.object({ name: z.string().max(40) }),
   site: z.object({ name: z.string().min(3).max(253), via: z.enum(['tunnel', 'direct', 'auto']) }),
   speed: z.object({ outlet: NAME }),
-  add: z.object({ name: NAME, source: z.enum(['conf', 'link', 'subscription', 'ovpn']), text: z.string().min(1).max(200_000), priority: z.number().int().min(0).max(10_000).optional() }),
+  add: z.object({
+    name: NAME,
+    source: z.enum(['conf', 'link', 'subscription', 'ovpn']),
+    text: z.string().min(1).max(200_000),
+    priority: z.number().int().min(0).max(10_000).optional(),
+    // Логин и пароль OpenVPN — дальше помощнику от root, в журналы не пишутся.
+    auth: z.object({ user: z.string().min(1).max(256), pass: z.string().min(1).max(256) }).optional(),
+  }),
   enable: z.object({ enabled: z.boolean() }),
   priority: z.object({ priority: z.number().int().min(0).max(10_000) }),
 };
@@ -134,7 +141,7 @@ function outletRoutes(router: Router, d: RoutesDeps): void {
   };
   router.post('/outlets', async (req, res) => {
     const b = parse(schemas.add, req, res);
-    if (b) await call(res, { cmd: 'outlet.add', name: b.name, source: b.source, text: b.text, priority: b.priority });
+    if (b) await call(res, { cmd: 'outlet.add', name: b.name, source: b.source, text: b.text, priority: b.priority, auth: b.auth });
   });
   router.delete('/outlets/:name', async (req, res) => {
     const n = NAME.safeParse(req.params.name);

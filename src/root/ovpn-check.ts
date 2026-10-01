@@ -20,8 +20,12 @@ const FORBIDDEN = new Set([
 // безвредны: Contour ставит свои `--dev`/`--dev-type` после `--config`, а
 // `--route-noexec` не даёт openvpn трогать маршруты.
 
-/** Возвращает строку «OpenVPN, сервер:порт» или бросает с причиной. */
-export function checkOvpn(text: string): string {
+/**
+ * Возвращает строку «OpenVPN, сервер:порт» или бросает с причиной. `withAuth` —
+ * к ключу приложены логин и пароль: тогда голая `auth-user-pass` допустима,
+ * файл с ними Contour передаст сам (`--auth-user-pass` после `--config`).
+ */
+export function checkOvpn(text: string, withAuth = false): string {
   if (!/^\s*remote\s+\S+/m.test(text)) throw new OvpnError('в .ovpn нет строки remote — это не конфиг клиента');
   let inBlock: string | null = null;
   for (const raw of text.split(/\r?\n/)) {
@@ -33,8 +37,8 @@ export function checkOvpn(text: string): string {
     if (!line || line.startsWith('#') || line.startsWith(';')) continue;
     const directive = line.split(/\s+/)[0]?.toLowerCase().replace(/^--/, '') ?? '';
     if (FORBIDDEN.has(directive)) throw new OvpnError(`директива «${directive}» в .ovpn не допускается: openvpn работает от root, программы и файлы задаёт Contour`);
-    if (directive === 'auth-user-pass' && line.split(/\s+/).length > 1) throw new OvpnError('auth-user-pass с файлом не поддерживается — нужен .ovpn без логина или со встроенными ключами');
-    if (directive === 'auth-user-pass') throw new OvpnError('.ovpn просит логин и пароль — пока не поддерживается');
+    if (directive === 'auth-user-pass' && line.split(/\s+/).length > 1) throw new OvpnError('auth-user-pass с путём к файлу не допускается — убери путь, логин и пароль впиши в поля');
+    if (directive === 'auth-user-pass' && !withAuth) throw new OvpnError('.ovpn просит логин и пароль — впиши их в поля ниже');
   }
   if (inBlock) throw new OvpnError(`блок <${inBlock}> не закрыт`);
   const m = /^\s*remote\s+(\S+)(?:\s+(\d+))?/m.exec(text);

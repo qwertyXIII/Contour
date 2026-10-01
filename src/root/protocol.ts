@@ -14,10 +14,12 @@ export const ROOT_SOCKET = '/run/contour/root.sock';
 export const MAX_REQUEST_BYTES = 256 * 1024;
 
 export type AddSource = 'conf' | 'link' | 'subscription' | 'ovpn';
+/** Логин и пароль OpenVPN (`auth-user-pass`). Лежат у root в `<имя>.auth`, 600. */
+export type OvpnAuth = { user: string; pass: string };
 
 export type RootRequest =
   | { cmd: 'status' }
-  | { cmd: 'outlet.add'; name: string; source: AddSource; text: string; priority?: number }
+  | { cmd: 'outlet.add'; name: string; source: AddSource; text: string; priority?: number; auth?: OvpnAuth }
   | { cmd: 'outlet.remove'; name: string }
   | { cmd: 'outlet.restart'; name: string }
   | { cmd: 'outlet.enable'; name: string; enabled: boolean }

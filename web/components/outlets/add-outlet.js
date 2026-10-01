@@ -1,4 +1,5 @@
-// Диалог «Новый выход»: имя, что добавить, ключ текстом или файлом, приоритет.
+// Диалог «Новый выход»: имя, что добавить, ключ текстом или файлом, приоритет;
+// у OpenVPN — ещё логин и пароль, если .ovpn их просит.
 // Ключ уходит помощнику от root, тот проверяет сам; ошибка — его словами в диалоге.
 import { api } from '../../utils/api.js';
 import { API, EVENTS, SOURCE_HINTS } from '../../utils/constants.js';
@@ -35,7 +36,19 @@ export class AddOutlet {
   }
 
   #hint() {
-    this.#dialog.querySelector('[data-source-hint]').textContent = SOURCE_HINTS[this.#form.elements.source.value] ?? '';
+    const source = this.#form.elements.source.value;
+    this.#dialog.querySelector('[data-source-hint]').textContent = SOURCE_HINTS[source] ?? '';
+    this.#dialog.querySelector('[data-ovpn-auth]').hidden = source !== 'ovpn';
+  }
+
+  /** Логин и пароль — только у OpenVPN и только если вписаны оба. */
+  #auth() {
+    const f = this.#form.elements;
+    const user = f.user.value.trim();
+    const pass = f.pass.value;
+    if (f.source.value !== 'ovpn' || (!user && !pass)) return undefined;
+    if (!user || !pass) throw new Error('нужны и логин, и пароль');
+    return { user, pass };
   }
 
   async #readFile(file) {
@@ -60,7 +73,7 @@ export class AddOutlet {
       const data = await api(API.outlets, {
         method: 'POST',
         timeout: 120_000,
-        body: { name: f.name.value.trim(), source: f.source.value, text: f.text.value, priority: Number(f.priority.value) || 50 },
+        body: { name: f.name.value.trim(), source: f.source.value, text: f.text.value, priority: Number(f.priority.value) || 50, auth: this.#auth() },
       });
       this.#dialog.close();
       document.dispatchEvent(new CustomEvent(EVENTS.restart, { detail: { text: `Выход «${f.name.value}» добавлен: ${data.about}. Contour перезапускается…` } }));

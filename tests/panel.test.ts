@@ -60,6 +60,14 @@ test('.ovpn: обычный клиент проходит, скрипты и ф�
   assert.throws(() => checkOvpn('client\nremote a 1\n<ca>\nxx\n'), /не закрыт/);
 });
 
+test('.ovpn с логином: голая auth-user-pass — с полями логина, путь к файлу — никогда', () => {
+  // Как у профиля провайдера: Windows-директивы, протокол tcp-client, порт в строке remote.
+  const text = 'client\ndev tun\nproto tcp-client\nremote vpn.example.org 443\nroute-method exe\nauth-user-pass\n<ca>\nx\n</ca>\n';
+  assert.throws(() => checkOvpn(text), /впиши их в поля/);
+  assert.equal(checkOvpn(text, true), 'OpenVPN, vpn.example.org:443');
+  assert.throws(() => checkOvpn('client\nremote a 1\nauth-user-pass /etc/shadow\n', true), /путём к файлу/);
+});
+
 test('правка contour.yaml: добавить, поменять, удалить — комментарии целы, мусор не пишется', () => {
   const file = path.join(tmp(), 'contour.yaml');
   writeFileSync(file, '# мои настройки\nhttp:\n  port: 3128  # вход\noutlets:\n  - name: ext\n    kind: netns\n    bridge: 1\n    protocol: amneziawg\n    conf: /k/ext.conf\n');

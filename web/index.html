@@ -97,6 +97,16 @@
         <textarea class="textarea textarea_mono field__control" id="outlet-text" name="text" rows="6" required spellcheck="false"></textarea>
         <input class="text text_style_small" type="file" name="file" accept=".conf,.ovpn,.txt" aria-label="Файл ключа">
       </div>
+      <div class="stack stack_gap_l" data-ovpn-auth hidden>
+        <div class="field">
+          <div class="field__text"><label class="field__label" for="outlet-user">Логин</label><p class="field__hint">Если .ovpn просит логин и пароль (auth-user-pass)</p></div>
+          <div class="input field__control"><input class="input__control" id="outlet-user" name="user" maxlength="256" autocomplete="off" spellcheck="false"></div>
+        </div>
+        <div class="field">
+          <div class="field__text"><label class="field__label" for="outlet-pass">Пароль</label><p class="field__hint">Хранится у root в файле, который читает только openvpn</p></div>
+          <div class="input field__control"><input class="input__control" id="outlet-pass" name="pass" type="password" maxlength="256" autocomplete="new-password"></div>
+        </div>
+      </div>
       <div class="field">
         <div class="field__text"><label class="field__label" for="outlet-priority">Приоритет</label><p class="field__hint">Меньше — раньше в очереди. Основной выход — 10</p></div>
         <div class="input field__control"><input class="input__control" id="outlet-priority" name="priority" type="number" min="0" max="10000" value="50"></div>

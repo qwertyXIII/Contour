@@ -22,6 +22,8 @@
 #
 # Файлы выхода в /etc/contour/keys:
 #   <имя>.conf   — конфиг awg/wg (полный или ядерный)
+#   <имя>.ovpn   — конфиг OpenVPN (вместо .conf)
+#   <имя>.auth   — необязательно: логин и пароль OpenVPN, по строке; root 600
 #   <имя>.env    — необязательно: AWG_ADDRESS, AWG_DNS (формат aiproxy)
 #   <имя>.netns  — PROTO=amneziawg|wireguard, BRIDGE=N (пишет переключение)
 #   <имя>.socks  — пароль SOCKS; создаётся здесь, если нет
@@ -55,7 +57,7 @@ load_meta() {
   case "${PROTO:-}" in
     amneziawg) LINK_TYPE=amneziawg; TOOL=awg; MODULE=amneziawg ;;
     wireguard) LINK_TYPE=wireguard; TOOL=wg; MODULE=wireguard ;;
-    openvpn) LINK_TYPE=''; TOOL=''; MODULE=tun ;;
+    openvpn) LINK_TYPE=''; TOOL=''; MODULE=tun; CONF="$KEYS/$NAME.ovpn" ;;
     *) die "PROTO в $META — amneziawg, wireguard или openvpn" ;;
   esac
   WG_IF="ctw$BRIDGE"
@@ -127,16 +129,27 @@ ovpn_tunnel() {
   command -v openvpn >/dev/null || die "openvpn не установлен: apt install openvpn"
   [ -f "$OVPN_PID" ] && kill "$(cat "$OVPN_PID")" 2>/dev/null || true
   rm -f "$OVPN_PID"
-  openvpn --config "$CONF" --dev "$TUN_IF" --dev-type tun --disable-dco --persist-tun \
+  # Логин и пароль — файлом после --config: голая auth-user-pass в .ovpn иначе
+  # ждала бы их с клавиатуры, которой у службы нет.
+  local auth=()
+  if [ -f "$KEYS/$NAME.auth" ]; then
+    chown root:root "$KEYS/$NAME.auth"; chmod 600 "$KEYS/$NAME.auth"
+    auth=(--auth-user-pass "$KEYS/$NAME.auth" --auth-nocache)
+  fi
+  # Журнал openvpn создаёт закрытым (600); создаём сами открытым на чтение, как
+  # остальные журналы Contour: там нет ни ключей, ни пароля, а причину отказа видно.
+  local logf="/var/log/contour/ovpn-$NAME.log"
+  [ -f "$logf" ] || install -m 644 /dev/null "$logf"
+  openvpn --config "$CONF" "${auth[@]}" --dev "$TUN_IF" --dev-type tun --disable-dco --persist-tun \
     --route-noexec --ifconfig-noexec --script-security 2 \
     --setenv CT_NS "$NS" --up /opt/contour/sbin/contour-ovpn-up \
-    --daemon "contour-ovpn-$NAME" --writepid "$OVPN_PID" --log-append "/var/log/contour/ovpn-$NAME.log"
+    --daemon "contour-ovpn-$NAME" --writepid "$OVPN_PID" --log-append "$logf"
   local i
   for i in $(seq 1 30); do
     ip -n "$NS" link show "$TUN_IF" >/dev/null 2>&1 && { note "OpenVPN: туннель $TUN_IF в $NS"; return; }
     sleep 1
   done
-  tail -n 15 "/var/log/contour/ovpn-$NAME.log" >&2 || true
+  tail -n 15 "$logf" >&2 || true
   die "OpenVPN не поднял туннель за 30 с — лог выше"
 }
 

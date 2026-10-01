@@ -4,7 +4,7 @@ import type { OutletConfig, OutletProtocol } from '../config.ts';
 import { describeLink, parseLink } from '../outlets/links.ts';
 import { decodeVpnLink, describeProfile, parseWgConf } from '../outlets/profile.ts';
 import { addOutlet, freeBridge, readOutlets, removeOutlet, setOutletField } from './config-edit.ts';
-import type { AddSource, OutletRuntime, RootStatus } from './protocol.ts';
+import type { AddSource, OutletRuntime, OvpnAuth, RootStatus } from './protocol.ts';
 import { groupId, netnsRuntime, run, systemctl, unitState } from './sys.ts';
 import { checkOvpn } from './ovpn-check.ts';
 
@@ -49,7 +49,24 @@ function writeKey(file: string, text: string): void {
   chownSync(file, 0, groupId('contour'));
 }
 
-type Planned = { entry: Record<string, unknown>; files: Array<[string, string]>; netns: boolean; about: string };
+/** Секрет только для root (логин и пароль OpenVPN): 600, Contour его не читает — нужен лишь openvpn. */
+function writeSecret(file: string, text: string): void {
+  mkdirSync(KEYS, { recursive: true });
+  writeFileSync(file, text, { mode: 0o600 });
+  chownSync(file, 0, 0);
+}
+
+/** `secrets` — файлы только для root; при откате уезжают вместе с остальными. */
+type Planned = { entry: Record<string, unknown>; files: Array<[string, string]>; secrets?: Array<[string, string]>; netns: boolean; about: string };
+
+/** Логин и пароль — по строке в файле: без переводов строк и нулей, иначе openvpn прочтёт не то. */
+function checkAuth(auth: unknown): OvpnAuth | null {
+  if (auth === undefined || auth === null) return null;
+  const ok = (v: unknown): v is string => typeof v === 'string' && v.length > 0 && v.length <= 256 && !/[\r\n\0]/.test(v);
+  const a = auth as Partial<OvpnAuth>;
+  if (!ok(a.user) || !ok(a.pass)) throw new CommandError('логин и пароль — по одной строке, до 256 знаков');
+  return { user: a.user, pass: a.pass };
+}
 
 function planConf(name: string, raw: string, priority: number, bridge: number): Planned {
   const text = raw.trim().startsWith('vpn://') ? decodeVpnLink(raw).conf : raw;
@@ -66,14 +83,15 @@ function planConf(name: string, raw: string, priority: number, bridge: number): 
   };
 }
 
-function planOvpn(name: string, text: string, priority: number, bridge: number): Planned {
-  const about = checkOvpn(text);
+function planOvpn(name: string, text: string, priority: number, bridge: number, auth: OvpnAuth | null): Planned {
+  const about = checkOvpn(text, auth !== null);
   const conf = path.join(KEYS, `${name}.ovpn`);
   return {
     entry: { name, kind: 'netns', bridge, protocol: 'openvpn', conf, priority, enabled: true },
     files: [[conf, text], [path.join(KEYS, `${name}.netns`), `PROTO=openvpn\nBRIDGE=${bridge}\n`]],
+    secrets: auth ? [[path.join(KEYS, `${name}.auth`), `${auth.user}\n${auth.pass}\n`]] : [],
     netns: true,
-    about,
+    about: auth ? `${about}, с логином` : about,
   };
 }
 
@@ -90,23 +108,25 @@ function planSubscription(name: string, text: string, priority: number): Planned
   return { entry: { name, kind: 'mihomo', protocol: 'subscription', conf, priority, enabled: true }, files: [[conf, url]], netns: false, about: `подписка ${new URL(url).host}` };
 }
 
-function plan(name: string, source: AddSource, text: string, priority: number): Planned {
+function plan(name: string, source: AddSource, text: string, priority: number, auth: OvpnAuth | null): Planned {
   const bridge = freeBridge(readOutlets(CONFIG_PATH));
+  if (auth && source !== 'ovpn') throw new CommandError('логин и пароль бывают только у OpenVPN');
   if (source === 'conf') return planConf(name, text, priority, bridge);
-  if (source === 'ovpn') return planOvpn(name, text, priority, bridge);
+  if (source === 'ovpn') return planOvpn(name, text, priority, bridge, auth);
   if (source === 'link') return planLink(name, text, priority);
   if (source === 'subscription') return planSubscription(name, text, priority);
   throw new CommandError('источник: conf, ovpn, link или subscription');
 }
 
-export async function addOutletCmd(args: { name: unknown; source: unknown; text: unknown; priority?: unknown }): Promise<{ about: string }> {
+export async function addOutletCmd(args: { name: unknown; source: unknown; text: unknown; priority?: unknown; auth?: unknown }): Promise<{ about: string }> {
   const name = checkName(args.name);
   if (typeof args.text !== 'string' || args.text.trim() === '' || args.text.length > MAX_TEXT) throw new CommandError('ключ пустой или длиннее 200 КБ');
   const priority = typeof args.priority === 'number' && Number.isInteger(args.priority) && args.priority >= 0 && args.priority <= 10_000 ? args.priority : 100;
   if (readOutlets(CONFIG_PATH).some((o) => o.name === name)) throw new CommandError(`выход «${name}» уже есть`);
-  const p = plan(name, args.source as AddSource, args.text, priority);
+  const p = plan(name, args.source as AddSource, args.text, priority, checkAuth(args.auth));
 
   for (const [file, text] of p.files) writeKey(file, text);
+  for (const [file, text] of p.secrets ?? []) writeSecret(file, text);
   try {
     if (p.netns) {
       await systemctl('enable', '--now', `contour-netns@${name}.service`);
@@ -123,7 +143,7 @@ export async function addOutletCmd(args: { name: unknown; source: unknown; text:
 
 async function rollback(name: string, p: Planned): Promise<void> {
   if (p.netns) await run('systemctl', ['disable', '--now', `contour-socks@${name}.service`, `contour-netns@${name}.service`]);
-  for (const [file] of p.files) if (existsSync(file)) moveAway(file);
+  for (const [file] of [...p.files, ...(p.secrets ?? [])]) if (existsSync(file)) moveAway(file);
 }
 
 /** Удалённое не стирается — уезжает в keys/removed с отметкой времени: ошибку можно отменить руками. */
