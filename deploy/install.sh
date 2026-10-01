@@ -130,6 +130,8 @@ ensure_netns_meta() {
 ensure_config() {
   if [ -f "$ETC/contour.yaml" ]; then
     note "настройки $ETC/contour.yaml уже есть"
+    # Права — каждый раз: Contour читает их от пользователя contour.
+    chown root:"$SERVICE_USER" "$ETC/contour.yaml"; chmod 640 "$ETC/contour.yaml"
   else
     install -m 640 -o root -g "$SERVICE_USER" "$SRC/deploy/contour.example.yaml" "$ETC/contour.yaml"
     [ -f "$ETC/keys/ext.env" ] || sed -i 's#^\( *\)env: .*#\1# env: (нет)#' "$ETC/contour.yaml"

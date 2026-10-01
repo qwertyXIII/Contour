@@ -1,4 +1,4 @@
-import { copyFileSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
+import { chownSync, copyFileSync, readFileSync, renameSync, statSync, writeFileSync } from 'node:fs';
 import { isMap, isSeq, parseDocument, YAMLMap, YAMLSeq, type Document } from 'yaml';
 import { parseConfig, type OutletConfig } from '../config.ts';
 
@@ -35,7 +35,12 @@ function save(path: string, doc: Document): void {
   const text = doc.toString({ lineWidth: 0 });
   parseConfig(text); // бросит ConfigError — и файл останется прежним
   copyFileSync(path, `${path}.bak`);
-  writeFileSync(`${path}.tmp`, text, { mode: 0o640 });
+  // Новый файл — с владельцем и правами старого: помощник от root создал бы его
+  // root:root, и Contour (пользователь contour) перестал бы читать свои настройки —
+  // так и случилось 2026-10-01 на первом же «выключить выход» из панели.
+  const { uid, gid, mode } = statSync(path);
+  writeFileSync(`${path}.tmp`, text, { mode: mode & 0o777 });
+  chownSync(`${path}.tmp`, uid, gid);
   renameSync(`${path}.tmp`, path);
 }
 
