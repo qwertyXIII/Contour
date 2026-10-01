@@ -3,7 +3,9 @@ import path from 'node:path';
 import type { Config } from '../config.ts';
 import type { Consumers } from '../consumers.ts';
 import { errorText, type Logger } from '../log.ts';
+import type { Outlet } from '../outlets/outlet.ts';
 import type { Sites } from '../panel/sites.ts';
+import type { UdpOutlet } from './edge-config.ts';
 import { Edge } from './edge.ts';
 import { ShareRules } from './rules.ts';
 import { startShareServer } from './server.ts';
@@ -18,7 +20,13 @@ import { ShareStore } from './store.ts';
 /** `ports` — куда nginx ведёт домен раздачи: `/` — край, `/list/` — правила. */
 export type Share = { store: ShareStore; edge: Edge; ports: { edge: number; list: number }; stop(): Promise<void> };
 
-export function startShare(config: Config, deps: { consumers: Consumers; sites: Sites; log: Logger }): Share | null {
+/** Ядерные выходы с паролем SOCKS (у запасного его нет, пока не поднят) — по приоритету. */
+function udpOutlets(config: Config, outlets: Outlet[]): UdpOutlet[] {
+  const netns = new Set(config.outlets.filter((c) => c.kind === 'netns' && c.enabled).map((c) => c.name));
+  return outlets.filter((o) => netns.has(o.name) && o.socks.pass).sort((a, b) => a.priority - b.priority).map((o) => ({ name: o.name, socks: { ...o.socks } }));
+}
+
+export function startShare(config: Config, deps: { consumers: Consumers; sites: Sites; outlets: Outlet[]; log: Logger }): Share | null {
   if (!config.share.enabled) return null;
   const log = deps.log.child({ src: 'share' });
   let store: ShareStore;
@@ -37,6 +45,8 @@ export function startShare(config: Config, deps: { consumers: Consumers; sites: 
     port: config.share.port,
     controller: config.share.controller,
     proxy: { host: config.http.listen === '0.0.0.0' ? '127.0.0.1' : config.http.listen, port: config.http.port },
+    udp: () => udpOutlets(config, deps.outlets),
+    probeUrl: `http://${config.health.probeHost}${config.health.probePath}`,
     log,
   });
   edge.start();

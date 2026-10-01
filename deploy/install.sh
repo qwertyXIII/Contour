@@ -297,6 +297,18 @@ WantedBy=multi-user.target
 EOF
   systemctl daemon-reload
   note "ядерные выходы: $PREFIX/sbin/contour-netns, unit'ы contour-netns@ и contour-socks@"
+  refresh_socks
+}
+
+# Поднятым выходам — новый конфиг SOCKS (UDP, ограда) без перезапуска туннеля.
+# Перезапуск SOCKS на секунду рвёт соединения Contour через этот выход; новые идут сразу.
+refresh_socks() {
+  local unit name
+  for unit in $(systemctl list-units --plain --no-legend --state=active 'contour-netns@*.service' | awk '{print $1}'); do
+    name=${unit#contour-netns@}
+    name=${name%.service}
+    "$PREFIX/sbin/contour-netns" socks "$name" || note "SOCKS выхода $name не обновлён — посмотри вывод выше"
+  done
 }
 
 # Домашняя сеть: сторож второго адреса (root) и DNS (contour). Включает их

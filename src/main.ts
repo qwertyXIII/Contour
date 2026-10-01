@@ -91,6 +91,7 @@ async function main(): Promise<void> {
   const dial = makeDial(new Resolver(), config.health.connectTimeoutSec * 1000);
   // Соперники — до проверки живости: запасной не поднят, и проверка его не трогает.
   let recheck: ((o: Outlet) => void) | null = null;
+  let shareRefresh: (() => void) | null = null;
   const rivals = new Rivals(outlets, config.outlets, {
     log,
     activate: async (name) => { await rootCall({ cmd: 'outlet.activate', name }); },
@@ -103,6 +104,8 @@ async function main(): Promise<void> {
         log.warn(`выход «${o.name}» поднят, но ${errorText(error)}`);
       }
       recheck?.(o);
+      // Край раздачи ведёт UDP прямо в SOCKS выходов — у поднятого запасного пароль только теперь.
+      shareRefresh?.();
     },
   });
   await rivals.init();
@@ -144,7 +147,8 @@ async function main(): Promise<void> {
   const server = await startHttpInlet({ ...config.http, chooser, consumers, log, meter, ports });
   const sites = new Sites({ dnsDir: config.lan.dataDir, own: config.lan.domains });
   // Раздача — после входа HTTP-прокси: край ходит в него за каждое устройство.
-  const share = startShare(config, { consumers, sites, log });
+  const share = startShare(config, { consumers, sites, outlets, log });
+  shareRefresh = share ? () => share.edge.refresh() : null;
   const panel = config.panel.enabled ? startPanel(config, { outlets, meter, dial, ports, rivals, sites, share }) : null;
   const panelHosts = new Set([config.panel.name, config.lan.address]);
   const lanServers = config.lan.enabled

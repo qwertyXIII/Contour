@@ -1,11 +1,12 @@
 import assert from 'node:assert/strict';
-import { mkdtempSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
 import { parse } from 'yaml';
 import { parseConfig } from '../src/config.ts';
 import { Consumers } from '../src/consumers.ts';
+import { PRIVATE_V4 } from '../src/inlets/fence.ts';
 import { Sites } from '../src/panel/sites.ts';
 import { buildEdgeConfig } from '../src/share/edge-config.ts';
 import { shareLinks } from '../src/share/links.ts';
@@ -61,7 +62,8 @@ test('край: вход VLESS по WebSocket, каждое устройство
   const a = store.add('iPhone');
   const off = store.add('старый');
   store.setEnabled(off.id, false);
-  const doc = parse(buildEdgeConfig({ devices: store.devices(), wsPath: '/s-1', listen: '127.0.0.1', port: 18300, proxy: { host: '127.0.0.1', port: 3128 }, controller: '127.0.0.1:19091', secret: 's' })) as {
+  const base = { devices: store.devices(), wsPath: '/s-1', listen: '127.0.0.1', port: 18300, proxy: { host: '127.0.0.1', port: 3128 }, probeUrl: 'http://cp.cloudflare.com/generate_204', controller: '127.0.0.1:19091', secret: 's' };
+  const doc = parse(buildEdgeConfig({ ...base, udp: [] })) as {
     listeners: Array<{ type: string; listen: string; 'ws-path': string; 'allow-insecure': boolean; users: Array<{ username: string; uuid: string }> }>;
     proxies: Array<{ name: string; type: string; username: string; password: string }>;
     rules: string[];
@@ -72,8 +74,29 @@ test('край: вход VLESS по WebSocket, каждое устройство
   assert.equal(doc.listeners[0]?.['allow-insecure'], true, 'без него mihomo 1.19 вход без TLS не открывает; TLS снимает nginx');
   assert.deepEqual(doc.listeners[0]?.users, [{ username: a.id, uuid: a.uuid }], 'выключенного нет');
   assert.deepEqual(doc.proxies.map((p) => [p.type, p.username, p.password]), [['http', `share.${a.id}`, a.uuid]]);
-  assert.deepEqual(doc.rules, ['NETWORK,udp,REJECT', `IN-USER,${a.id},via-${a.id}`, 'MATCH,REJECT']);
+  const fence = PRIVATE_V4.map(([net, bits]) => `IP-CIDR,${net}/${bits},REJECT,no-resolve`);
+  assert.deepEqual(doc.rules, [...fence, 'NETWORK,udp,REJECT', `IN-USER,${a.id},via-${a.id}`, 'MATCH,REJECT'], 'ядерных выходов нет — UDP отвергается');
   assert.ok(!doc.rules.some((r) => r.includes('DIRECT')));
+
+  // UDP — прямо в SOCKS ядерных выходов, группой «первый живой»; имена — DoH через неё же.
+  const sock = (name: string, n: number) => ({ name, socks: { host: `10.201.${n}.2`, port: 1080, user: name, pass: `p${n}` } });
+  const withUdp = parse(buildEdgeConfig({ ...base, udp: [sock('corp_ext', 2), sock('ext', 1)] })) as {
+    proxies: Array<{ name: string; type: string; server: string; udp?: boolean }>;
+    'proxy-groups': Array<{ name: string; type: string; proxies: string[] }>;
+    dns: { nameserver: string[] };
+    rules: string[];
+  };
+  assert.deepEqual(withUdp.proxies.filter((p) => p.type === 'socks5').map((p) => [p.name, p.server, p.udp]), [['udp-corp_ext', '10.201.2.2', true], ['udp-ext', '10.201.1.2', true]]);
+  assert.deepEqual(withUdp['proxy-groups'][0], { name: 'udp', type: 'fallback', proxies: ['udp-corp_ext', 'udp-ext'], url: 'http://cp.cloudflare.com/generate_204', interval: 60, lazy: false });
+  assert.ok(withUdp.dns.nameserver.every((n) => n.endsWith('#udp')), 'имена для UDP — через выход, не DNS провайдера дома');
+  assert.ok(withUdp.rules.indexOf('NETWORK,udp,udp') > withUdp.rules.indexOf(fence.at(-1) as string), 'ограда — раньше UDP: Contour этот путь не видит');
+});
+
+test('ограда SOCKS внутри namespace — те же сети, что у Contour', () => {
+  const script = readFileSync(new URL('../deploy/contour-netns.sh', import.meta.url), 'utf8');
+  const m = /^FENCE_V4="([^"]+)"/m.exec(script);
+  assert.deepEqual(m?.[1]?.split(' '), PRIVATE_V4.map(([net, bits]) => `${net}/${bits}`));
+  assert.match(script, /^    udp: true$/m);
 });
 
 test('правила: ручное «напрямую» первым и вычищено из списка, поддомены схлопнуты, подсети — no-resolve', () => {

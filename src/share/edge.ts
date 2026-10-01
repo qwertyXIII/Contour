@@ -4,7 +4,7 @@ import net from 'node:net';
 import path from 'node:path';
 import { errorText, type Logger } from '../log.ts';
 import { runMihomo, type MihomoHandle } from '../outlets/mihomo.ts';
-import { buildEdgeConfig } from './edge-config.ts';
+import { buildEdgeConfig, type UdpOutlet } from './edge-config.ts';
 import type { ShareStore } from './store.ts';
 
 /**
@@ -14,7 +14,9 @@ import type { ShareStore } from './store.ts';
  *
  * Смена устройств — перезапуск целиком, а не перечитывание конфига: убранное
  * или выключенное устройство должно потерять и уже открытые соединения.
- * Устройств нет — края нет: незачем держать открытый вход.
+ * Устройств нет — края нет: незачем держать открытый вход. Поднялся запасной
+ * выход — тоже перезапуск (`refresh`): у него пароль SOCKS появляется только
+ * после подъёма, а UDP идёт прямо в SOCKS выходов.
  */
 
 export type EdgeOptions = {
@@ -25,6 +27,9 @@ export type EdgeOptions = {
   port: number;
   controller: string;
   proxy: { host: string; port: number };
+  /** Ядерные выходы для UDP, по приоритету (спрашивается на каждом перезапуске). */
+  udp: () => UdpOutlet[];
+  probeUrl: string;
   log: Logger;
 };
 
@@ -54,6 +59,11 @@ export class Edge {
   start(): void {
     this.opts.store.onChange(() => this.schedule(SETTLE_MS));
     this.schedule(0);
+  }
+
+  /** Пересобрать край: поднялся другой выход. */
+  refresh(): void {
+    this.schedule(SETTLE_MS);
   }
 
   /** Край поднят и вход открыт — для панели. */
@@ -89,10 +99,12 @@ export class Edge {
     const secret = randomBytes(24).toString('hex');
     const configPath = path.join(this.opts.dir, 'config.yaml');
     mkdirSync(this.opts.dir, { recursive: true, mode: 0o700 });
-    const text = buildEdgeConfig({ devices, wsPath: store.settings().path, listen: this.opts.listen, port: this.opts.port, proxy: this.opts.proxy, controller: this.opts.controller, secret });
+    const udp = this.opts.udp();
+    const { listen, port, proxy, probeUrl, controller } = this.opts;
+    const text = buildEdgeConfig({ devices, wsPath: store.settings().path, listen, port, proxy, udp, probeUrl, controller, secret });
     writeFileSync(configPath, text, { mode: 0o600 });
     chmodSync(configPath, 0o600);
-    log.info(`край раздачи: устройств ${devices.length}, вход ${this.opts.listen}:${this.opts.port}`);
+    log.info(`край раздачи: устройств ${devices.length}, вход ${listen}:${port}, UDP — ${udp.length > 0 ? udp.map((o) => o.name).join(' → ') : 'нет ядерных выходов, отвергается'}`);
     this.handle = runMihomo({ bin: this.opts.bin, dir: this.opts.dir, configPath, controller: this.opts.controller, secret, log, label: 'edge' });
     await this.handle.ready;
     this.open = await listening(this.opts.listen, this.opts.port);

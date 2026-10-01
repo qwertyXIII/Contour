@@ -2,7 +2,10 @@
 #
 # Выход «netns»: ядерный туннель в своём namespace и мост к хосту.
 #
-#   contour-netns up|down|status <имя>
+#   contour-netns up|down|status|socks <имя>
+#
+# `socks` — переписать конфиг SOCKS внутри и перезапустить только его, туннель
+# не трогая (так install.sh обновляет выходы, которые уже подняты).
 #
 # Устанавливается в /opt/contour/sbin (root), запускается unit'ом
 # contour-netns@<имя>. Из папки владельца не запускается: правка кода там
@@ -34,10 +37,13 @@ export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 KEYS=/etc/contour/keys
 LIB=/var/lib/contour/netns
 SERVICE_USER=contour
+MIHOMO=/opt/contour/bin/mihomo
 SOCKS_PORT=1080
 DEFAULT_MTU=1420
 # Таблица маршрутов шлюза для устройств — то же число, что GW_TABLE в src/gateway.ts.
 GW_TABLE=2701
+# Частные и служебные сети — те же, что PRIVATE_V4 в src/inlets/fence.ts (тест сверяет).
+FENCE_V4="0.0.0.0/8 10.0.0.0/8 100.64.0.0/10 127.0.0.0/8 169.254.0.0/16 172.16.0.0/12 192.0.0.0/24 192.168.0.0/16 198.18.0.0/15 224.0.0.0/4 240.0.0.0/4"
 
 die() { echo "ОШИБКА: $*" >&2; exit 1; }
 note() { echo "  $*"; }
@@ -100,23 +106,34 @@ write_socks_config() {
   local dir="$LIB/$NAME"
   install -d -m 700 -o "$SERVICE_USER" -g "$SERVICE_USER" "$LIB" "$dir"
   # mihomo внутри namespace — только как SOCKS-сервер с паролем и выходом
-  # «напрямую», то есть в туннель: другого маршрута там нет. Имена ему не
-  # приходят — Contour присылает уже адрес.
+  # «напрямую», то есть в туннель: другого маршрута там нет. TCP Contour
+  # присылает уже адресом и сам проверяет оградой. UDP (раздача, голос) приходит
+  # с края мимо Contour — поэтому ограда и здесь: иначе через мост можно
+  # достучаться до служб самого сервера (10.201.N.1) и домашней сети. Пришло
+  # имя — mihomo разрешит его своим DNS через туннель (resolv.conf хоста внутри
+  # не годится) и сверит адрес с оградой.
+  local fence c
+  fence=$(for c in $FENCE_V4; do printf '  - IP-CIDR,%s,REJECT\n' "$c"; done)
   (umask 077; cat > "$dir/config.yaml" <<EOF
 mode: rule
 log-level: warning
 ipv6: false
 geo-auto-update: false
+dns:
+  enable: true
+  ipv6: false
+  nameserver: [1.1.1.1, 8.8.8.8]
 listeners:
   - name: in
     type: socks
     listen: $NS_IP
     port: $SOCKS_PORT
-    udp: false
+    udp: true
     users:
       - username: $NAME
         password: $SOCKS_PASS
 rules:
+$fence
   - MATCH,DIRECT
 EOF
   )
@@ -266,9 +283,28 @@ cmd_status() {
   ip netns exec "$NS" "$TOOL" show "$WG_IF" transfer | awk '{ printf "принято %.1f МБ, отправлено %.1f МБ\n", $2/1048576, $3/1048576 }'
 }
 
+# Переписать конфиг SOCKS и перезапустить только его: туннель, мост и шлюз остаются.
+cmd_socks() {
+  load_meta
+  ip netns list | grep -qw "$NS" || die "namespace $NS не поднят — нечего обновлять"
+  local conf="$LIB/$NAME/config.yaml"
+  [ -f "$conf" ] && cp -p "$conf" "$conf.bak"
+  ensure_password
+  write_socks_config
+  # Не принял бы mihomo конфиг — SOCKS падал бы по кругу, и выход умер бы для всех.
+  if ! runuser -u "$SERVICE_USER" -- "$MIHOMO" -t -d "$LIB/$NAME" -f "$conf" >/dev/null 2>&1; then
+    [ -f "$conf.bak" ] && mv "$conf.bak" "$conf"
+    die "mihomo не принял новый конфиг SOCKS выхода $NAME — оставлен прежний, SOCKS не перезапускали"
+  fi
+  rm -f "$conf.bak"
+  systemctl restart "contour-socks@$NAME.service"
+  note "SOCKS выхода $NAME обновлён и перезапущен (туннель не трогали)"
+}
+
 case "$CMD" in
   up) cmd_up ;;
   down) cmd_down ;;
   status) cmd_status ;;
-  *) die "использование: contour-netns up|down|status <имя>" ;;
+  socks) cmd_socks ;;
+  *) die "использование: contour-netns up|down|status|socks <имя>" ;;
 esac
