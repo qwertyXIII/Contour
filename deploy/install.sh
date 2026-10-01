@@ -157,9 +157,13 @@ ensure_owner_token() {
   line=$(grep "^$OWNER:" "$ETC/tokens" | head -1 | cut -d: -f2-)
   install -d -m 700 -o "$OWNER" -g "$OWNER" "/home/$OWNER/.config" "$dir"
   printf 'http://%s:%s@127.0.0.1:3128\n' "$OWNER" "$line" > "$dir/proxy"
-  chown "$OWNER:$OWNER" "$dir/proxy"
-  chmod 600 "$dir/proxy"
-  note "токен для консоли владельца: $dir/proxy"
+  # Адрес для Alter'а — туда же: владелец вписывает его в настройки Alter'а
+  # (или просит это сделать), не перепечатывая токен из терминала.
+  line=$(grep '^alter:' "$ETC/tokens" | head -1 | cut -d: -f2-)
+  printf 'http://alter:%s@127.0.0.1:3128\n' "$line" > "$dir/alter-proxy"
+  chown "$OWNER:$OWNER" "$dir/proxy" "$dir/alter-proxy"
+  chmod 600 "$dir/proxy" "$dir/alter-proxy"
+  note "токены в доме владельца: $dir/proxy (консоль), $dir/alter-proxy (для настроек Alter'а)"
 }
 
 # --- зависимости кода -------------------------------------------------------
