@@ -1,0 +1,65 @@
+/*
+ * Блок textarea: многострочный текст — промпт, ответ собеседнику, заметка.
+ * Растёт по содержимому (field-sizing) между min и max; где браузер этого
+ * не умеет — обычное поле с ручкой изменения высоты.
+ *
+ *   textarea_size_s (короче) · textarea_mono (JSON, промпты) · textarea_invalid
+ */
+.textarea {
+  --textarea-min: 120px;
+
+  display: block;
+  width: 100%;
+  min-height: var(--textarea-min);
+  max-height: 60vh;
+  margin: 0;
+  padding: var(--space-3) var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-m);
+  background: var(--color-well);
+  color: var(--color-text);
+  font: inherit;
+  font-size: var(--text-field);
+  line-height: var(--leading-normal);
+  resize: vertical;
+  field-sizing: content;
+  transition: border-color var(--duration-fast) ease, box-shadow var(--duration-fast) ease;
+}
+
+.textarea::placeholder {
+  color: var(--color-text-faint);
+  opacity: 1;
+}
+
+.textarea:focus-visible {
+  outline: none;
+  border-color: var(--color-focus);
+  box-shadow: 0 0 0 3px var(--color-accent-soft);
+}
+
+.textarea:disabled {
+  opacity: .5;
+  cursor: not-allowed;
+}
+
+.textarea_invalid,
+.textarea:user-invalid {
+  border-color: var(--color-danger);
+}
+
+.textarea_size_s {
+  --textarea-min: 76px;
+}
+
+.textarea_mono {
+  font-family: var(--font-mono);
+  font-size: max(var(--text-small), 13px);
+  line-height: 1.5;
+}
+
+/* На пальце ручка изменения высоты только мешает прокрутке. */
+@media (pointer: coarse) {
+  .textarea {
+    resize: none;
+  }
+}

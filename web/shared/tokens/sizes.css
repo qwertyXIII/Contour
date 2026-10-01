@@ -1,0 +1,69 @@
+/*
+ * Размеры, зависящие от плотности.
+ *
+ * Телефон и десктоп отличаются не вёрсткой, а плотностью: одна переменная
+ * --density (0 — палец, 1 — курсор) ужимает высоты контролов, отступы и
+ * кегли. Блоки о плотности не знают ничего — они берут токены отсюда.
+ *
+ * Значение по умолчанию — от устройства (медиазапрос ниже), а на любой
+ * области его можно задать явно: .theme_density_touch / .theme_density_compact
+ * (блок theme). Так телефон и десктоп встают рядом на одной странице.
+ *
+ * ⚠️ Токены объявлены и на .theme — по той же причине, что производные акцента:
+ * calc(… var(--density)) вычисляется там, где объявлен. Иначе область с другой
+ * плотностью унаследовала бы уже посчитанные корневые числа.
+ */
+:root {
+  --density: 0;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  :root {
+    --density: 1;
+  }
+}
+
+:root,
+.theme {
+  /* Контролы */
+  --control-h-s: calc(36px - 6px * var(--density));
+  --control-h-m: calc(46px - 8px * var(--density));
+  --control-h-l: calc(54px - 10px * var(--density));
+  --control-pad-x: calc(18px - 4px * var(--density));
+  --hit-min: calc(44px - 12px * var(--density));
+
+  /* Поверхности */
+  --card-pad: calc(18px - 4px * var(--density));
+  --row-pad-y: calc(15px - 4px * var(--density));
+  --row-pad-x: calc(16px - 2px * var(--density));
+  --list-gap: calc(10px - 2px * var(--density));
+  --tile-h: calc(132px - 20px * var(--density));
+
+  /* Значки и ручки */
+  --icon-s: calc(18px - 2px * var(--density));
+  --icon-m: calc(22px - 2px * var(--density));
+  --icon-l: calc(28px - 4px * var(--density));
+  --switch-w: calc(52px - 8px * var(--density));
+  --switch-h: calc(32px - 6px * var(--density));
+  --check-size: calc(22px - 4px * var(--density));
+  --knob-size: calc(26px - 6px * var(--density));
+
+  /*
+   * Кегли. Поля ввода берут --text-field: на телефоне не меньше 16px, иначе
+   * iOS увеличивает страницу при фокусе в поле.
+   */
+  --text-caption: calc(12px - .5px * var(--density));
+  --text-small: calc(13.5px - 1px * var(--density));
+  --text-body: calc(15.5px - 1.5px * var(--density));
+  --text-lead: calc(17px - 2px * var(--density));
+  --text-field: calc(17px - 2px * var(--density));
+  --text-heading: calc(20px - 2px * var(--density));
+  --text-title: calc(24px - 2px * var(--density));
+  --text-value: calc(32px - 4px * var(--density));
+  --text-display: calc(40px - 4px * var(--density));
+  /* Крупное тонким весом: приветствие экрана и одно главное число. */
+  --text-hero: calc(44px - 4px * var(--density));
+  --text-figure: calc(60px - 8px * var(--density));
+  /* Реплика в разговоре: плакатная на телефоне, но не больше 23px. */
+  --text-message: calc(clamp(19px, 5vw, 23px) - 2px * var(--density));
+}

@@ -1,0 +1,26 @@
+/*
+ * Блок avatar-stack: несколько человек стопкой — участники беседы, кто
+ * ждёт ответа. Аватары наезжают друг на друга с кольцом цвета фона.
+ *
+ *   <div class="avatar-stack" aria-label="Рустам, Мама, Стас и ещё 2">
+ *     <span class="avatar avatar_size_s avatar-stack__item">Р</span> …
+ *     <span class="avatar avatar_size_s avatar-stack__more">+2</span>
+ *   </div>
+ */
+.avatar-stack {
+  display: inline-flex;
+  align-items: center;
+  padding-inline-start: var(--space-2);
+}
+
+.avatar-stack__item,
+.avatar-stack__more {
+  margin-inline-start: calc(-1 * var(--space-2));
+  box-shadow: 0 0 0 2px var(--color-bg);
+}
+
+.avatar-stack__more {
+  --avatar-bg: var(--color-fill-2);
+  --avatar-fg: var(--color-text-muted);
+  font-size: var(--text-caption);
+}

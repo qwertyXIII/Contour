@@ -1,0 +1,33 @@
+/*
+ * Модификатор media_view_fill: одно фото на всю высоту места — колонка ряда,
+ * которая тянется на высоту соседа (владелец, 2026-09-30: «фото на всю высоту
+ * левой колонки»). Своей пропорции нет, и высоты месту картинка не задаёт:
+ * плитка лежит поверх ленты, а лента — во всю высоту корня. Где высоты у места
+ * нет (столбик, ряд встал столбиком) — пропорция --media-fill-ratio, по
+ * умолчанию 16:9.
+ *
+ *   <div class="media media_view_fill columns__item columns__item_fill">
+ *     <div class="media__track"><button class="media__item" type="button">…</button></div>
+ *   </div>
+ *
+ *   --media-fill-height · --media-fill-ratio — ставит родитель, когда его высота
+ *   уже есть (columns__item_fill в ряду): `100%` и `auto`. Без них — высота по
+ *   пропорции: `height: 100%` от места без высоты во флекс-столбике даёт корню
+ *   ноль, и фото ложилось бы на соседа.
+ */
+.media_view_fill .media__track {
+  position: relative;
+  display: block;
+  width: 100%;
+  height: var(--media-fill-height, auto);
+  aspect-ratio: var(--media-fill-ratio, 16 / 9);
+}
+
+.media_view_fill .media__item {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  aspect-ratio: auto;
+  --media-play: 56px;
+}

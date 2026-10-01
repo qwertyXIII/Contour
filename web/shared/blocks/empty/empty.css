@@ -1,0 +1,48 @@
+/*
+ * Блок empty: здесь пока ничего нет — и что с этим сделать. Пустота
+ * объясняется, а не показывается белым листом.
+ *
+ *   __visual (glyph) · __title · __text · __actions
+ *   empty_size_s — внутри карточки или списка
+ */
+.empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-10) var(--space-4);
+  text-align: center;
+}
+
+.empty_size_s {
+  padding: var(--space-6) var(--space-3);
+}
+
+.empty__visual {
+  margin-bottom: var(--space-1);
+}
+
+.empty__title {
+  margin: 0;
+  font-size: var(--text-heading);
+  font-weight: var(--weight-bold);
+  line-height: 1.25;
+  letter-spacing: var(--tracking-snug);
+}
+
+.empty__text {
+  margin: 0;
+  max-width: 38ch;
+  color: var(--color-text-muted);
+  font-size: var(--text-body);
+  line-height: var(--leading-normal);
+  text-wrap: balance;
+}
+
+.empty__actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: var(--space-2);
+  margin-top: var(--space-1);
+}

@@ -1,0 +1,49 @@
+/*
+ * Блок popup: всплывающая панель у кнопки или поля — список select, меню
+ * «Ещё». Живёт в верхнем слое браузера (атрибут popover), поэтому её не
+ * обрезают карточки, панели и макеты с overflow: hidden.
+ *
+ * Положение (top/left/width/max-height) ставит JS от прямоугольника того, у
+ * чего она открылась (utils/popup.js): это слой, у него нет родителя, который
+ * бы его разместил, — как у диалога.
+ *
+ *   popup_up — открылась вверх (снизу не хватило места)
+ *
+ * Переменные темы панель наследует по DOM, а не по слою: список внутри
+ * светлой или «десктопной» области будет светлым и «десктопным».
+ */
+.popup {
+  position: fixed;
+  inset: auto;
+  z-index: var(--z-dropdown);
+  box-sizing: border-box;
+  min-width: 180px;
+  max-height: 360px;
+  margin: 0;
+  padding: var(--space-1);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-l);
+  background: var(--color-bg-elevated);
+  color: var(--color-text);
+  box-shadow: var(--shadow-l);
+  font: inherit;
+  font-size: var(--text-body);
+}
+
+.popup:popover-open {
+  animation: popup-in var(--duration-fast) var(--ease-out);
+}
+
+.popup_up:popover-open {
+  animation-name: popup-in-up;
+}
+
+@keyframes popup-in {
+  from { opacity: 0; transform: translateY(-4px) scale(.98); }
+}
+
+@keyframes popup-in-up {
+  from { opacity: 0; transform: translateY(4px) scale(.98); }
+}

@@ -1,0 +1,98 @@
+/*
+ * Блок map: карта от сменного провайдера. Блок даёт рамку, подложку, место
+ * под метки и под подпись провайдера; что нарисовано внутри __canvas —
+ * дело провайдера (компонент MapView, utils/map-providers.js).
+ *
+ *   __canvas (рисует провайдер) · __svg · __route · __route-casing (у схемы) ·
+ *   __pin (+ map-pin, ставит провайдер) · __attribution · __message
+ *   map_fill (на всю высоту родителя) · от JS: map_ready · map_error
+ *
+ * ⚠️ Подпись провайдера (__attribution) убирать нельзя: у Яндекса логотип и
+ * условия — часть бесплатного тарифа.
+ */
+.map {
+  --map-h: 220px;
+  --map-radius: var(--radius-l);
+  --map-route-w: 5px;
+  --map-casing-w: 9px;
+
+  position: relative;
+  min-width: 0;
+  height: var(--map-h);
+  border-radius: var(--map-radius);
+  background: var(--color-fill-1);
+  overflow: hidden;
+  isolation: isolate;
+}
+
+.map_fill {
+  height: 100%;
+}
+
+/* Тихий фон схемы — сетка точек: видно, что это поле, но оно не спорит с маршрутом. */
+.map__canvas {
+  position: absolute;
+  inset: 0;
+  background-image: radial-gradient(circle, var(--color-fill-3) 1px, transparent 1.5px);
+  background-size: var(--space-4) var(--space-4);
+}
+
+.map__svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+
+.map__route,
+.map__route-casing {
+  fill: none;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.map__route {
+  stroke: var(--color-accent);
+  stroke-width: var(--map-route-w);
+}
+
+/* Подложка под линией — отделяет её от фона и от других линий. */
+.map__route-casing {
+  stroke: var(--color-surface-solid);
+  stroke-width: var(--map-casing-w);
+}
+
+/* Метку ставит провайдер (left/top — точка на карте), центр метки — в точке. */
+.map__pin {
+  position: absolute;
+  z-index: 1;
+  translate: -50% -50%;
+}
+
+.map__attribution {
+  position: absolute;
+  right: var(--space-2);
+  bottom: var(--space-1);
+  z-index: 2;
+  margin: 0;
+  color: var(--color-text-faint);
+  font-size: var(--text-caption);
+  font-weight: var(--weight-medium);
+  pointer-events: none;
+}
+
+.map__attribution:empty {
+  display: none;
+}
+
+.map__message {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  margin: 0;
+  place-items: center;
+  color: var(--color-text-muted);
+  font-size: var(--text-small);
+  font-weight: var(--weight-medium);
+}

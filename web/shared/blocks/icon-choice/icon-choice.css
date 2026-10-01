@@ -1,0 +1,127 @@
+/*
+ * Блок icon-choice: выбрать значок — сетка значков, отмечен один. Значок экрана,
+ * пилюли, группы — чего угодно, что подписывается значком по выбору человека.
+ * Внутри — настоящие radio: стрелки, форма и скринридер работают сами, без JS.
+ *
+ *   <div class="icon-choice" role="radiogroup" aria-label="Значок">
+ *     <label class="icon-choice__option">
+ *       <input class="icon-choice__input visually-hidden" type="radio" name="icon" value="" aria-label="Без значка">
+ *       <span class="icon-choice__face icon-choice__face_empty" aria-hidden="true"></span>
+ *     </label>
+ *     <label class="icon-choice__option">
+ *       <input class="icon-choice__input visually-hidden" type="radio" name="icon" value="home" aria-label="Дом">
+ *       <span class="icon-choice__face"><svg class="icon">…#home</svg></span>
+ *     </label> …
+ *   </div>
+ *
+ *   __option · __input · __face (_empty — «без значка»: перечёркнутый круг, рисует блок)
+ *   __heading — раздел значков во всю строку сетки · __empty — «ничего не нашлось»
+ *   Клетка квадратная; колонок — сколько влезает (--icon-choice-cell — наименьшая клетка);
+ *   --icon-choice-stroke и --icon-choice-none — линия и размер перечёркнутого круга.
+ *
+ * Подложек нет (владелец, 2026-09-30: «зачем контейнер в контейнере?»): значок —
+ * просто значок, сетка течёт в прокрутке того, на чём лежит. Выбранный — значок
+ * цветом акцента в мягком кружке акцента; нажатие — кружок на миг, без постоянной
+ * плашки.
+ */
+.icon-choice {
+  --icon-choice-cell: var(--control-h-m);
+  --icon-choice-stroke: 1.9px;
+  --icon-choice-none: calc(var(--icon-m) * .82);
+
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(var(--icon-choice-cell), 1fr));
+  gap: var(--space-1);
+}
+
+.icon-choice__option {
+  position: relative;
+  display: flex;
+  justify-content: center;
+  min-width: 0;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.icon-choice__face {
+  display: grid;
+  place-items: center;
+  width: var(--icon-choice-cell);
+  max-width: 100%;
+  aspect-ratio: 1;
+  border-radius: var(--radius-full);
+  background: transparent;
+  color: var(--color-text);
+  transition: background-color var(--duration-fast) ease, color var(--duration-fast) ease,
+    transform var(--duration-press) var(--ease-out);
+  --icon-size: var(--icon-m);
+}
+
+/* «Без значка» — перечёркнутый круг: пустая клетка читалась как «значок не загрузился». */
+.icon-choice__face_empty {
+  color: var(--color-text-muted);
+}
+
+.icon-choice__face_empty::before,
+.icon-choice__face_empty::after {
+  content: '';
+  grid-area: 1 / 1;
+}
+
+.icon-choice__face_empty::before {
+  width: var(--icon-choice-none);
+  aspect-ratio: 1;
+  border: var(--icon-choice-stroke) solid currentColor;
+  border-radius: var(--radius-full);
+}
+
+.icon-choice__face_empty::after {
+  width: var(--icon-choice-none);
+  height: var(--icon-choice-stroke);
+  border-radius: var(--radius-full);
+  background: currentColor;
+  transform: rotate(-45deg);
+}
+
+@media (hover: hover) {
+  .icon-choice__option:hover .icon-choice__face {
+    background: var(--color-fill-1);
+  }
+}
+
+.icon-choice__option:active .icon-choice__face {
+  background: var(--color-fill-2);
+  transform: scale(var(--press-scale-strong));
+}
+
+.icon-choice__input:checked + .icon-choice__face {
+  background: var(--color-accent-soft);
+  color: var(--color-accent-text);
+}
+
+.icon-choice__input:focus-visible + .icon-choice__face {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 2px;
+}
+
+.icon-choice__heading,
+.icon-choice__empty {
+  grid-column: 1 / -1;
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: var(--text-small);
+}
+
+.icon-choice__heading {
+  padding-top: var(--space-3);
+  font-weight: var(--weight-semibold);
+}
+
+/* Спрятанное поиском: display у клетки перекрыл бы [hidden] браузера. */
+.icon-choice__option[hidden],
+.icon-choice__heading[hidden],
+.icon-choice__empty[hidden] {
+  display: none;
+}

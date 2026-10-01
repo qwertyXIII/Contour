@@ -1,0 +1,26 @@
+/*
+ * Блок checkbox-group: «выбрать все» и пункты под ним. Главный флажок сам
+ * становится «частично», когда отмечена часть, — это ведёт CheckboxGroup.
+ *
+ *   <div class="checkbox-group">
+ *     <label class="checkbox">
+ *       <input class="checkbox__input checkbox-group__all visually-hidden" type="checkbox"> …Все
+ *     </label>
+ *     <div class="checkbox-group__items">
+ *       <label class="checkbox"><input class="checkbox__input checkbox-group__item visually-hidden" …> …</label> …
+ *     </div>
+ *   </div>
+ */
+.checkbox-group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+.checkbox-group__items {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding-left: calc(var(--check-size) + var(--space-3));
+}

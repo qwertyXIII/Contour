@@ -1,0 +1,156 @@
+/*
+ * Модификатор sheet_layered — панель разговора приложения: части лежат слоями, а
+ * не потоком, корень — во весь экран (высоту держит приложение), видимая часть
+ * растёт снизу вверх:
+ *   - ручка — поверх ВСЕЙ закрытой пилюли: тянуть и нажимать можно за любое место;
+ *     у открытой — полоса под островом (остров перехватывает касания); ходит с
+ *     верхом листа;
+ *   - лента — во всю панель, прижата к низу: закрытая показывает хвост последней
+ *     реплики, потянули — сверху открываются прежние;
+ *   - поле — у низа и выезжает на половине хода (sheet_field-up), а не с открытием:
+ *     пока панель тянут вверх, строка ввода уже на месте. Лента уступает ему место
+ *     к той же половине — сдвигом, а не отступом: без перекладки текста.
+ * Высоту и ход держит компонент Sheet, клавиатуру — приложение (chat/sheet.js в
+ * /m/). Числа сняты на телефоне (прежний /m/styles.css), поэтому они — переменные
+ * блока, а не токены.
+ *
+ *   sheet_field-up  — поле на месте (компонент: ход > 0.5)
+ *   sheet_keyboard  — клавиатура открыта: лента и поле поднимаются на --sheet-kb,
+ *                     сама панель не двигается (ставит приложение)
+ *   --sheet-kb · --sheet-safe-top · --sheet-safe-bottom — ставит приложение
+ *   --sheet-foot-h — высота подвала (меряет компонент Sheet при перемене): подвал
+ *                     бывает выше строки ввода — над полем встаёт полоса файлов;
+ *                     на столько же поднимается низ ленты (последняя реплика не
+ *                     уходит под полосу) и дальше уходит спрятанный подвал
+ */
+@property --sheet-cut { syntax: "<length>"; inherits: false; initial-value: 0px; }
+@property --sheet-room { syntax: "<length>"; inherits: false; initial-value: 0px; }
+@property --sheet-fade { syntax: "<length>"; inherits: false; initial-value: 0px; }
+
+.sheet_layered {
+  --sheet-handle-open: 76px;
+  --sheet-body-top: 96px;
+  --sheet-body-bottom: 118px;
+  --sheet-body-bottom-closed: 20px;
+  --sheet-foot-bottom: 18px;
+  --sheet-foot-hidden: 130px;
+  /* Подвал в одну строку — строка ввода; от неё сняты числа выше. */
+  --sheet-foot-row: var(--control-h-l);
+  --sheet-foot-extra: max(0px, var(--sheet-foot-h, var(--sheet-foot-row)) - var(--sheet-foot-row));
+  --sheet-lift: .3s;
+  /* Нижний упор — закрытая пилюля, пока компонент не намерил своего. */
+  --sheet-low: var(--sheet-closed);
+
+  display: block;
+}
+
+/* Верх видимой части от верха корня; у ленты — на её собственный сдвиг меньше.
+   На корне и на частях, которым компонент пишет долю сам (см. sheet_live). */
+.sheet_layered,
+.sheet_layered > .sheet__handle,
+.sheet_layered > .sheet__body,
+.sheet_layered > .sheet__voice {
+  --sheet-cut: calc(var(--sheet-rest) - var(--sheet-below));
+  --sheet-room: calc((var(--sheet-body-bottom) + var(--sheet-foot-extra, 0px) - var(--sheet-body-bottom-closed)) * var(--sheet-float));
+  --sheet-fade: calc(var(--sheet-rest) - var(--sheet-room));
+}
+
+/* Верхние углы распрямляются на последних 5 % хода: открытая уходит под остров. */
+.sheet_layered.sheet_live {
+  --sheet-rt: calc(var(--sheet-radius) * clamp(0, (1 - var(--sheet-p)) * 20, 1));
+
+  translate: none;
+  clip-path: inset(var(--sheet-cut) var(--sheet-side) var(--sheet-below) round var(--sheet-rt) var(--sheet-rt) var(--sheet-rb) var(--sheet-rb));
+  transform-origin: 50% calc(100% - var(--sheet-below));
+}
+
+.sheet_layered .sheet__handle {
+  position: absolute;
+  inset: 0 0 auto;
+  z-index: 1;
+  height: var(--sheet-closed);
+  translate: 0 var(--sheet-cut);
+}
+
+.sheet_layered .sheet__handle::after {
+  transition: top var(--sheet-lift) var(--ease-out);
+}
+
+.sheet_layered.sheet_open .sheet__handle {
+  height: calc(var(--sheet-safe-top, 0px) + var(--sheet-handle-open));
+}
+
+.sheet_layered.sheet_open {
+  --sheet-grip-top: calc(var(--sheet-safe-top, 0px) + 15px);
+}
+
+/*
+ * Лента: отступы — открытой (закрытая получает свои сдвигом), бока — с зазором
+ * пилюли, чтобы текст не переносился заново, когда бока уходят к краю. Прижата к
+ * низу: у открытой — распоркой ::before (прокрутка до начала не теряется), у
+ * закрытой — flex-end (виден хвост, как бы далеко ни была прокрутка).
+ * Подъём над клавиатурой — transform, не отступы: без перекладки текста и на
+ * композиторе, поэтому едет плавно, и позицию прокрутки тянуть не нужно.
+ */
+.sheet_layered .sheet__body {
+  /*
+   * Низ гаснет под подвалом. Под строкой ввода — последние 56 px (число с телефона);
+   * над полем полоса файлов (--sheet-foot-extra) — тогда лента гаснет вся от верха
+   * полосы, начиная от низа последней реплики: между превью листаемые реплики не
+   * просвечивают. «× 10» — ступенька: полоса есть — полные числа, нет — ноль.
+   */
+  --sheet-foot-gone: calc(var(--sheet-foot-extra, 0px) + min(var(--sheet-foot-extra, 0px) * 10,
+    var(--sheet-safe-bottom, 0px) + var(--sheet-foot-bottom) + var(--sheet-foot-row)));
+  --sheet-foot-fade: calc(56px + min(var(--sheet-foot-extra, 0px) * 10, var(--sheet-body-bottom) + var(--sheet-foot-extra, 0px) - 56px));
+
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  padding: calc(var(--sheet-safe-top, 0px) + var(--sheet-body-top)) calc(var(--space-6) + var(--sheet-gap, 0px))
+    calc(var(--sheet-body-bottom) + var(--sheet-foot-extra, 0px));
+  -webkit-overflow-scrolling: touch;
+  translate: 0 calc(var(--sheet-room) - var(--sheet-below));
+  transition: transform var(--sheet-lift) var(--ease-out);
+  -webkit-mask-image: linear-gradient(to bottom, transparent var(--sheet-fade), var(--color-mask) calc(var(--sheet-fade) + 52px),
+    var(--color-mask) calc(100% - var(--sheet-foot-fade)), transparent calc(100% - var(--sheet-foot-gone)));
+  mask-image: linear-gradient(to bottom, transparent var(--sheet-fade), var(--color-mask) calc(var(--sheet-fade) + 52px),
+    var(--color-mask) calc(100% - var(--sheet-foot-fade)), transparent calc(100% - var(--sheet-foot-gone)));
+}
+
+.sheet_layered .sheet__body::before {
+  content: "";
+  flex: 1 1 auto;
+}
+
+/* Закрытая: хвост ленты у низа пилюли, прежние строки гаснут под её верхом. */
+.sheet_layered:not(.sheet_open) .sheet__body {
+  justify-content: flex-end;
+  overflow: hidden;
+  -webkit-mask-image: linear-gradient(to bottom, transparent var(--sheet-fade), var(--color-mask) calc(var(--sheet-fade) + 30px));
+  mask-image: linear-gradient(to bottom, transparent var(--sheet-fade), var(--color-mask) calc(var(--sheet-fade) + 30px));
+}
+
+.sheet_layered .sheet__foot {
+  position: absolute;
+  right: var(--space-3);
+  bottom: calc(var(--sheet-safe-bottom, 0px) + var(--sheet-foot-bottom));
+  left: var(--space-3);
+  display: block;
+  padding: 0;
+  transform: translateY(calc(var(--sheet-foot-hidden) + var(--sheet-foot-extra, 0px)));
+  transition: transform var(--sheet-lift) var(--ease-out);
+}
+
+.sheet_layered.sheet_field-up .sheet__foot {
+  transform: translateY(0);
+}
+
+.sheet_keyboard .sheet__body {
+  transform: translateY(calc(-1 * var(--sheet-kb, 0px)));
+}
+
+/* Индикатор «Домой» сейчас лежит на клавиатуре — его отступ поле не держит. */
+.sheet_keyboard.sheet_field-up .sheet__foot {
+  transform: translateY(calc(var(--sheet-safe-bottom, 0px) - var(--sheet-kb, 0px)));
+}

@@ -1,0 +1,110 @@
+/*
+ * Блок chip: выбор одного или нескольких из короткого списка — фильтры,
+ * режимы, теги. Внутри настоящий radio/checkbox: клавиатура, формы и
+ * скринридеры работают сами.
+ *
+ *   <label class="chip"><input class="chip__input visually-hidden" type="checkbox"> Текст</label>
+ *
+ *   chip_static — просто метка, без выбора (span)
+ *   chip_removable — с крестиком __remove (компонент Chip)
+ *   __icon (микс с icon) · __count · __remove
+ */
+.chip {
+  --chip-bg: var(--color-surface);
+  --chip-bg-hover: var(--color-surface-hover);
+  --chip-fg: var(--color-text);
+  --chip-border: var(--color-border);
+
+  position: relative;
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: var(--space-1);
+  height: var(--control-h-s);
+  padding: 0 var(--space-3);
+  border: 1px solid var(--chip-border);
+  border-radius: var(--radius-full);
+  background: var(--chip-bg);
+  color: var(--chip-fg);
+  font-size: var(--text-small);
+  font-weight: var(--weight-semibold);
+  line-height: 1;
+  white-space: nowrap;
+  cursor: pointer;
+  user-select: none;
+  -webkit-user-select: none;
+  --icon-size: var(--icon-s);
+  transition:
+    transform var(--duration-press) var(--ease-out),
+    background-color var(--duration-fast) ease,
+    color var(--duration-fast) ease;
+}
+
+@media (hover: hover) {
+  .chip:hover {
+    background-color: var(--chip-bg-hover);
+  }
+}
+
+.chip:active {
+  transform: scale(var(--press-scale));
+}
+
+.chip:has(.chip__input:checked) {
+  --chip-bg: var(--color-accent);
+  --chip-bg-hover: var(--color-accent-hover);
+  --chip-fg: var(--color-on-accent);
+  --chip-border: transparent;
+}
+
+.chip:has(.chip__input:focus-visible) {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 2px;
+}
+
+.chip:has(.chip__input:disabled) {
+  opacity: .45;
+  cursor: default;
+  pointer-events: none;
+}
+
+.chip_static {
+  cursor: default;
+}
+
+.chip_static:active {
+  transform: none;
+}
+
+.chip_removable {
+  padding-inline-end: var(--space-1);
+}
+
+.chip__count {
+  font-variant-numeric: tabular-nums;
+  opacity: .64;
+}
+
+.chip__remove {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: inherit;
+  opacity: .6;
+  cursor: pointer;
+  --icon-size: 16px;
+  transition: opacity var(--duration-fast) ease, background-color var(--duration-fast) ease;
+}
+
+@media (hover: hover) {
+  .chip__remove:hover {
+    background: var(--color-fill-2);
+    opacity: 1;
+  }
+}

@@ -1,0 +1,21 @@
+/*
+ * viewer__flyer — снимок в полёте между плиткой и просмотром (flight.js). Рамка
+ * обрезает: её место, размер и скругление по кадрам задаёт полёт (left/top/
+ * width/height/border-radius). В ней — снимок целиком (__picture), его место и
+ * размер относительно рамки ведёт та же пружина: в начале в рамке ровно то, что
+ * было на плитке, в конце снимок и рамка совпадают — обрезка раскрывается.
+ */
+.viewer__flyer {
+  position: fixed;
+  z-index: 1;
+  display: block;
+  overflow: hidden;
+  pointer-events: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+.viewer__flyer .viewer__picture {
+  position: absolute;
+  aspect-ratio: auto;
+}

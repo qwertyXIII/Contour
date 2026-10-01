@@ -1,0 +1,52 @@
+/*
+ * ТВ — смотрят с дивана, управляют голосом: крупно, без кнопок, с подсказкой,
+ * что сказать. Сенсора нет — интерактивное здесь не нужно (разбор
+ * декларативного интерфейса, §9.5).
+ */
+.player_view_tv {
+  --player-bg: transparent;
+  --player-border: transparent;
+  --player-pad: 0px;
+
+  grid-template-columns: minmax(0, 2fr) minmax(0, 3fr);
+  align-content: center;
+  align-items: center;
+  gap: var(--space-10);
+  height: auto;
+  /* Экран телевизора — весь под плеер: по центру по вертикали. */
+  min-height: 100%;
+  border-radius: 0;
+  overflow: visible;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+
+.player_view_tv .player__art {
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-l);
+}
+
+.player_view_tv .player__body {
+  justify-content: center;
+  gap: var(--space-6);
+}
+
+.player_view_tv .player__title {
+  font-size: var(--text-display);
+  font-weight: var(--weight-bold);
+  line-height: var(--leading-title);
+  letter-spacing: var(--tracking-display);
+  white-space: normal;
+}
+
+.player_view_tv .player__artist {
+  font-size: var(--text-title);
+}
+
+.player_view_tv .player__line {
+  height: 6px;
+}
+
+.player_view_tv .player__times {
+  font-size: var(--text-lead);
+}

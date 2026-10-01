@@ -1,0 +1,70 @@
+/*
+ * Модификатор sheet_live: геометрию ведёт компонент Sheet. Корень лежит в высоте
+ * верхнего упора (--sheet-h) у нижнего края того, кто его ставит; видимая часть —
+ * вырез clip-path, и весь ход — из одной доли --sheet-p:
+ *   - бока и зазор снизу (--sheet-gap) сходят к нулю к середине хода — внизу лист
+ *     плавает, как закрытая панель разговора, вверху касается краёв;
+ *   - нижние углы распрямляются к 60 % хода, верхние остаются (у панели — ниже);
+ *   - корень съезжает вниз на недостающую высоту (translate), содержимое — от верха
+ *     листа: свёрнутый показывает начало, потянули — открывается остальное.
+ * На кадре JS пишет только --sheet-p и transform (уход за нижний упор, растяжение
+ * за верхним, желе от скорости); раскладка не пересчитывается.
+ *
+ *   --sheet-p (JS, 0…1) · --sheet-h, --sheet-low (JS: высоты верхнего и нижнего упоров)
+ *   --sheet-gap — зазор плавающего листа до краёв окна
+ *   sheet_dragging — лист под пальцем (JS)
+ *
+ * Выведенное из доли — ненаследуемое (см. sheet.css): часть, которой оно нужно,
+ * берёт его явно — `--sheet-cut: inherit`.
+ */
+@property --sheet-float { syntax: "<number>"; inherits: false; initial-value: 1; }
+@property --sheet-side { syntax: "<length>"; inherits: false; initial-value: 0px; }
+@property --sheet-below { syntax: "<length>"; inherits: false; initial-value: 0px; }
+@property --sheet-rest { syntax: "<length>"; inherits: false; initial-value: 0px; }
+@property --sheet-rt { syntax: "<length>"; inherits: false; initial-value: 0px; }
+@property --sheet-rb { syntax: "<length>"; inherits: false; initial-value: 0px; }
+
+/*
+ * Выведенное из доли — на корне и на частях панели разговора, которым компонент
+ * пишет долю сам (ручка, лента, слой голоса — SHEET.followers): каждая считает
+ * своё. ⚠️ Не `inherit`: WebKit не пересчитывает `inherit` ненаследуемой
+ * переменной, пока у родителя меняется только она, — на iPhone ручка и лента
+ * догоняли ход рывками по 5 % (их будил только --sheet-tone), кольцо голоса не
+ * появлялось вовсе (2026-10-01, проверено в WebKit: tests/showcase/wk.mjs).
+ */
+.sheet_live,
+.sheet_live > .sheet__handle,
+.sheet_live > .sheet__body,
+.sheet_live > .sheet__voice {
+  --sheet-float: max(0, 1 - 2 * var(--sheet-p));
+  --sheet-side: calc(var(--sheet-gap) * var(--sheet-float));
+  --sheet-below: var(--sheet-side);
+  --sheet-rest: calc((1 - var(--sheet-p)) * (var(--sheet-h, 0px) - var(--sheet-low, 0px)));
+}
+
+.sheet_live {
+  --sheet-gap: var(--space-1);
+  --sheet-rt: var(--sheet-radius);
+  --sheet-rb: calc(var(--sheet-radius) * max(0, 1 - var(--sheet-p) / .6));
+
+  /* Скругляет вырез, а не рамка: у рамки углы ушли бы под край вместе с корнем. */
+  border-radius: 0;
+  translate: 0 calc(var(--sheet-rest) - var(--sheet-below));
+  clip-path: inset(0 var(--sheet-side) var(--sheet-rest) round var(--sheet-rt) var(--sheet-rt) var(--sheet-rb) var(--sheet-rb));
+  transform-origin: 50% calc(100% - var(--sheet-rest));
+  transition: none;
+  will-change: transform;
+  /* Касания мимо выреза уходят дальше (clip-path режет и их); родитель-слой может
+     быть прозрачен для касаний — сам лист их ловит всегда. */
+  pointer-events: auto;
+}
+
+.sheet_dragging {
+  cursor: grabbing;
+}
+
+/* Свёрнутый: тело не прокручивается — палец по нему тянет лист. */
+.sheet_live:not(.sheet_open) .sheet__body {
+  overflow: hidden;
+  touch-action: none;
+}

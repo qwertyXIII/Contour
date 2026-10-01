@@ -1,0 +1,48 @@
+/*
+ * Модификатор sheet_view_surface — лист вопроса или формы: поверхность над экраном
+ * в схеме темы, без смены цвета по ходу. Разметка:
+ *
+ *   <… class="sheet sheet_view_surface sheet_live …">
+ *     <div class="sheet__handle" aria-hidden="true"></div>       ← ручка (::after)
+ *     <header class="sheet__head bar bar_size_s">…</header>        ← заголовок и главное действие
+ *     <div class="sheet__body">…</div>
+ *     <div class="sheet__foot">…</div>                           ← необязательно: ползунок согласия
+ *   </…>
+ *
+ * Крестика в шапке нет (владелец): справа — одна кнопка главного действия значком
+ * (галочка — сохранить, согласиться; плюс — создать), отмена — смахнуть лист вниз.
+ * Узлы, видимые в свёрнутом листе, — [data-sheet-peek]: нижний упор — по последнему.
+ *
+ *   --sheet-peek-pad — воздух под последним таким узлом
+ *   --sheet-peek-min — свёрнутый хотя бы на столько ниже раскрытого, иначе упор один
+ */
+.sheet_view_surface {
+  --sheet-from: var(--color-bg-elevated);
+  --sheet-to: var(--color-bg-elevated);
+  --sheet-fg: var(--color-text);
+  --sheet-grip: var(--color-fill-3);
+  --sheet-grip-w: 40px;
+  --sheet-grip-top: var(--space-2);
+  --sheet-peek-pad: var(--space-5);
+  --sheet-peek-min: var(--space-12);
+
+  min-height: 0;
+  color-scheme: inherit;
+  user-select: auto;
+  -webkit-user-select: auto;
+}
+
+.sheet_view_surface .sheet__handle {
+  height: var(--space-5);
+}
+
+.sheet_view_surface .sheet__body {
+  padding: var(--space-2) var(--space-5) calc(var(--sheet-safe-bottom, 0px) + var(--space-5));
+  container-type: inline-size;
+}
+
+/* Внизу — только согласие жестом; кнопки «Отмена» нет: отмена — смахнуть лист. */
+.sheet_view_surface .sheet__foot {
+  padding: var(--space-3) var(--space-5) calc(var(--sheet-safe-bottom, 0px) + var(--space-5));
+  border-top: 1px solid var(--color-border);
+}

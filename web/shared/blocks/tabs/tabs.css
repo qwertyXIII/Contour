@@ -1,0 +1,72 @@
+/*
+ * Блок tabs: переключение между видами одного экрана — «Люди · Группы»,
+ * «Сегодня · Неделя». Поведение (стрелки, Home/End, aria-selected) — компонент Tabs.
+ *
+ *   <div class="tabs">
+ *     <div class="tabs__list" role="tablist">
+ *       <button class="tabs__tab" role="tab" aria-selected="true" aria-controls="p1" id="t1">…</button> …
+ *     </div>
+ *     <div class="tabs__panel" role="tabpanel" id="p1" aria-labelledby="t1">…</div> …
+ *   </div>
+ *
+ * Выбранная вкладка — контрастная таблетка, а не акцент: акцент у чипов
+ * означает «выбрано в фильтре», здесь — «ты находишься тут».
+ */
+.tabs {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  min-width: 0;
+}
+
+.tabs__list {
+  display: flex;
+  gap: var(--space-2);
+  margin: -3px;
+  padding: 3px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  overscroll-behavior-x: contain;
+}
+
+.tabs__list::-webkit-scrollbar {
+  display: none;
+}
+
+.tabs__tab {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: var(--space-1);
+  height: var(--control-h-s);
+  margin: 0;
+  padding: 0 var(--space-4);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-full);
+  background: var(--color-surface);
+  color: var(--color-text-muted);
+  font: inherit;
+  font-size: var(--text-small);
+  font-weight: var(--weight-semibold);
+  line-height: 1;
+  white-space: nowrap;
+  cursor: pointer;
+  --icon-size: var(--icon-s);
+  transition: background-color var(--duration-fast) ease, color var(--duration-fast) ease;
+}
+
+@media (hover: hover) {
+  .tabs__tab:hover {
+    color: var(--color-text);
+  }
+}
+
+.tabs__tab[aria-selected="true"] {
+  border-color: transparent;
+  background: var(--color-contrast);
+  color: var(--color-on-contrast);
+}
+
+.tabs__panel {
+  min-width: 0;
+}

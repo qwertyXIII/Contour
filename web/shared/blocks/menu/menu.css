@@ -1,0 +1,95 @@
+/*
+ * Блок menu: действия под кнопкой — «Ещё» у карточки, у строки, у файла.
+ * Панель — блок popup, поведение (стрелки, Esc, закрыть по выбору) — Menu.
+ *
+ *   <div class="menu">
+ *     <button class="button button_view_ghost button_shape_round menu__trigger" type="button"
+ *             aria-label="Ещё" popovertarget="m1">…</button>
+ *     <div class="popup menu__popup" id="m1" popover role="menu">
+ *       <button class="menu__item" role="menuitem" type="button" data-value="copy">…</button>
+ *       <div class="menu__separator" role="separator"></div>
+ *       <button class="menu__item menu__item_tone_danger" role="menuitem" type="button">…</button>
+ *     </div>
+ *   </div>
+ *
+ *   menu_align_end — панель выровнена по правому краю кнопки
+ *   __label (подпись секции) · __item → __item-text · __item-hint ; __item_tone_danger · __separator
+ */
+.menu {
+  position: relative;
+  display: inline-flex;
+}
+
+.menu__popup {
+  min-width: 220px;
+}
+
+.menu__label {
+  padding: var(--space-2) var(--space-3) var(--space-1);
+  color: var(--color-text-faint);
+  font-size: var(--text-caption);
+  font-weight: var(--weight-semibold);
+  letter-spacing: var(--tracking-caps);
+  text-transform: uppercase;
+}
+
+.menu__item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  width: 100%;
+  min-height: var(--hit-min);
+  margin: 0;
+  padding: var(--space-2) var(--space-3);
+  border: 0;
+  border-radius: calc(var(--radius-l) - var(--space-1));
+  background: transparent;
+  color: var(--color-text);
+  font: inherit;
+  font-size: var(--text-body);
+  text-align: start;
+  cursor: pointer;
+  --icon-size: var(--icon-s);
+  transition: background-color var(--duration-press) ease;
+}
+
+@media (hover: hover) {
+  .menu__item:hover {
+    background: var(--color-fill-1);
+  }
+}
+
+.menu__item:focus-visible {
+  outline: none;
+  background: var(--color-fill-1);
+}
+
+.menu__item:active {
+  background: var(--color-fill-2);
+}
+
+.menu__item:disabled {
+  opacity: .42;
+  cursor: default;
+}
+
+.menu__item_tone_danger {
+  color: var(--color-danger);
+}
+
+.menu__item-text {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.menu__item-hint {
+  flex: 0 0 auto;
+  color: var(--color-text-faint);
+  font-size: var(--text-small);
+}
+
+.menu__separator {
+  height: 1px;
+  margin: var(--space-1) var(--space-2);
+  background: var(--color-border);
+}

@@ -1,0 +1,40 @@
+/*
+ * Блок glyph: значок на цветной подложке — вход в строке настроек, картинка
+ * пустого состояния, признак плитки.
+ *
+ *   glyph_size_{s|m|l|xl}   24 · 32 · 56 · 72
+ *   glyph_tone_{accent|ok|danger|warn|info}   glyph_view_solid   glyph_shape_round
+ */
+.glyph {
+  --glyph-size: 32px;
+  --glyph-radius: var(--radius-s);
+  --glyph-bg: var(--color-fill-2);
+  --glyph-fg: var(--color-text);
+
+  display: inline-grid;
+  flex: 0 0 auto;
+  place-items: center;
+  width: var(--glyph-size);
+  height: var(--glyph-size);
+  border-radius: var(--glyph-radius);
+  background: var(--glyph-bg);
+  color: var(--glyph-fg);
+  --icon-size: calc(var(--glyph-size) * .56);
+}
+
+.glyph_size_s { --glyph-size: 24px; --glyph-radius: var(--radius-xs); }
+.glyph_size_l { --glyph-size: 56px; --glyph-radius: var(--radius-m); }
+.glyph_size_xl { --glyph-size: 72px; --glyph-radius: var(--radius-l); }
+
+.glyph_shape_round { --glyph-radius: 50%; }
+
+.glyph_tone_accent { --glyph-bg: var(--color-accent-soft); --glyph-fg: var(--color-accent-text); }
+.glyph_tone_ok { --glyph-bg: var(--color-ok-soft); --glyph-fg: var(--color-ok); }
+.glyph_tone_danger { --glyph-bg: var(--color-danger-soft); --glyph-fg: var(--color-danger); }
+.glyph_tone_warn { --glyph-bg: var(--color-warn-soft); --glyph-fg: var(--color-warn); }
+.glyph_tone_info { --glyph-bg: var(--color-info-soft); --glyph-fg: var(--color-info); }
+
+.glyph_view_solid {
+  --glyph-bg: var(--color-accent);
+  --glyph-fg: var(--color-on-accent);
+}

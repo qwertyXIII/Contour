@@ -1,0 +1,43 @@
+/*
+ * Блок screens: экраны, которые листаются вбок, — «Предложения», «Главный»
+ * и экраны владельца или агента. Листает браузер (scroll-snap), переключатель
+ * — отдельный блок screen-tabs: его ставит оболочка над свёрнутым чатом и
+ * связывает с пейджером через aria-controls.
+ *
+ *   <div class="screens" id="home-screens" aria-label="Экраны">
+ *     <section class="screens__page" aria-label="Предложения">…</section>
+ *     <section class="screens__page" aria-label="Главный">…</section>
+ *   </div>
+ *
+ * Страница — любой экран (обычно panel); она заполняет пейджер. Не текущие
+ * страницы компонент делает inert: фокус и скринридер не уходят за край.
+ * Панелям внутри пейджер отдаёт жест вбок: --panel-touch (touch-action) и
+ * --panel-overscroll (прокрутка тела уходит пейджеру по горизонтали).
+ */
+.screens {
+  --panel-touch: pan-x pan-y;
+  --panel-overscroll: auto contain;
+
+  display: flex;
+  min-width: 0;
+  height: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
+  overscroll-behavior-x: contain;
+  scroll-snap-type: x mandatory;
+  scrollbar-width: none;
+}
+
+.screens::-webkit-scrollbar {
+  display: none;
+}
+
+.screens__page {
+  position: relative;
+  flex: 0 0 100%;
+  min-width: 0;
+  height: 100%;
+  overflow: hidden;
+  scroll-snap-align: start;
+  scroll-snap-stop: always;
+}

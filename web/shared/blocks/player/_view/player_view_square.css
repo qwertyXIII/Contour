@@ -1,0 +1,42 @@
+/*
+ * Квадрат — виджет 2×2: обложка на весь виджет, внизу на затемнении
+ * название и кнопки. Текст поверх картинки — всегда светлый.
+ */
+.player_view_square {
+  --player-border: transparent;
+  --player-muted: var(--color-text-muted);
+
+  grid-template-rows: minmax(0, 1fr) auto auto;
+  gap: var(--space-1);
+  color-scheme: dark;
+  color: var(--color-on-media);
+}
+
+.player_view_square .player__art {
+  position: absolute;
+  inset: 0;
+  aspect-ratio: auto;
+  border-radius: 0;
+}
+
+.player_view_square .player__art::after {
+  position: absolute;
+  inset: 0;
+  background: var(--gradient-media-foot);
+  content: '';
+}
+
+/* Позиционированы, чтобы лечь поверх обложки (она absolute). */
+.player_view_square .player__meta,
+.player_view_square .player__controls {
+  position: relative;
+}
+
+.player_view_square .player__meta {
+  grid-row: 2;
+}
+
+.player_view_square .player__controls {
+  grid-row: 3;
+  justify-content: space-between;
+}

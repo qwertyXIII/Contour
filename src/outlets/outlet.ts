@@ -2,6 +2,7 @@ import { randomBytes } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import type { Config, OutletConfig } from '../config.ts';
+import { describeLink, parseLink, type MihomoProxy } from './links.ts';
 import { describeProfile, readWgProfile, type WgProfile } from './profile.ts';
 
 /**
@@ -29,11 +30,13 @@ export type Outlet = {
   checkedAt: number | null;
 };
 
-/** Выход mihomo: что нужно, чтобы вписать его в конфиг ядра. */
+/** Выход mihomo: что нужно, чтобы вписать его в конфиг ядра. Ровно одно из трёх. */
 export type MihomoOutlet = {
   outlet: Outlet;
   config: OutletConfig;
-  profile: WgProfile;
+  profile?: WgProfile;
+  link?: MihomoProxy;
+  subscription?: string;
 };
 
 export function newOutlet(config: OutletConfig, socksPort: number, socks?: Outlet['socks']): Outlet {
@@ -88,34 +91,56 @@ function netnsPassword(oc: OutletConfig): string {
   return pass;
 }
 
+function readText(file: string): string {
+  try {
+    return readFileSync(file, 'utf8').trim();
+  } catch (error) {
+    throw new Error(`не прочитать ${file}: ${(error as Error).message}`);
+  }
+}
+
+/** Сервер из .ovpn — для строки в логе; ключи и сертификаты не трогаем. */
+function describeOvpn(file: string): string {
+  const m = /^\s*remote\s+(\S+)(?:\s+(\d+))?/m.exec(readText(file));
+  return m ? `OpenVPN, ${m[1]}:${m[2] ?? 1194}` : 'OpenVPN';
+}
+
+function prepareNetns(oc: OutletConfig, prepared: Prepared): void {
+  const what = oc.protocol === 'openvpn' ? describeOvpn(oc.conf) : describeProfile(readWgProfile(oc.conf, oc.env));
+  const pass = netnsPassword(oc);
+  const host = bridgeAddress(oc.bridge as number);
+  prepared.outlets.push(newOutlet(oc, NETNS_SOCKS_PORT, { host, port: NETNS_SOCKS_PORT, user: oc.name, pass }));
+  prepared.lines.push(`выход «${oc.name}» (ядро, namespace): ${what} → SOCKS ${host}:${NETNS_SOCKS_PORT}`);
+}
+
+function prepareMihomo(oc: OutletConfig, port: number, prepared: Prepared): void {
+  const item: MihomoOutlet = { outlet: newOutlet(oc, port), config: oc };
+  let what: string;
+  if (oc.protocol === 'link') {
+    item.link = parseLink(readText(oc.conf));
+    what = describeLink(item.link);
+  } else if (oc.protocol === 'subscription') {
+    item.subscription = readText(oc.conf);
+    if (!/^https?:\/\/\S+$/.test(item.subscription)) throw new Error('в файле подписки не ссылка http(s)');
+    what = `подписка ${new URL(item.subscription).host}`;
+  } else {
+    item.profile = readWgProfile(oc.conf, oc.env);
+    what = describeProfile(item.profile);
+  }
+  prepared.outlets.push(item.outlet);
+  prepared.mihomo.push(item);
+  prepared.lines.push(`выход «${oc.name}» (mihomo): ${what} → SOCKS :${port}`);
+}
+
 export function prepareOutlets(config: Config): Prepared {
   const prepared: Prepared = { outlets: [], mihomo: [], lines: [] };
-  let index = 0;
   for (const oc of config.outlets) {
     if (!oc.enabled) continue;
-    let profile: WgProfile;
     try {
-      profile = readWgProfile(oc.conf, oc.env);
+      if (oc.kind === 'netns') prepareNetns(oc, prepared);
+      else prepareMihomo(oc, config.mihomo.socksBase + prepared.mihomo.length, prepared);
     } catch (error) {
       throw new Error(`выход «${oc.name}»: ${(error as Error).message}`);
-    }
-    if (oc.kind === 'netns') {
-      let pass: string;
-      try {
-        pass = netnsPassword(oc);
-      } catch (error) {
-        throw new Error(`выход «${oc.name}»: ${(error as Error).message}`);
-      }
-      const host = bridgeAddress(oc.bridge as number);
-      const outlet = newOutlet(oc, NETNS_SOCKS_PORT, { host, port: NETNS_SOCKS_PORT, user: oc.name, pass });
-      prepared.outlets.push(outlet);
-      prepared.lines.push(`выход «${oc.name}» (ядро, namespace): ${describeProfile(profile)} → SOCKS ${host}:${NETNS_SOCKS_PORT}`);
-    } else {
-      const item = { outlet: newOutlet(oc, config.mihomo.socksBase + index), config: oc, profile };
-      index += 1;
-      prepared.outlets.push(item.outlet);
-      prepared.mihomo.push(item);
-      prepared.lines.push(`выход «${oc.name}» (mihomo): ${describeProfile(profile)} → SOCKS :${item.outlet.socks.port}`);
     }
   }
   return prepared;

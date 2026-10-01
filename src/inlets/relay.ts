@@ -3,6 +3,7 @@ import type { Consumers } from '../consumers.ts';
 import { errorText, type Logger } from '../log.ts';
 import type { Outlet } from '../outlets/outlet.ts';
 import type { Chooser } from '../select/chooser.ts';
+import type { Meter } from '../stats/meter.ts';
 
 /**
  * Поток байт клиента через выход — с повтором и проигрыванием.
@@ -19,7 +20,7 @@ import type { Chooser } from '../select/chooser.ts';
  */
 
 export type Target = { host: string; port: number };
-export type RelayDeps = { chooser: Chooser; consumers: Consumers; log: Logger };
+export type RelayDeps = { chooser: Chooser; consumers: Consumers; log: Logger; meter?: Meter };
 export type RelayHooks = {
   /** Первый выход открылся — один раз. */
   onEstablished: () => void;
@@ -33,7 +34,7 @@ const REPLAY_CAP = 256 * 1024;
 export const MAX_ATTEMPTS = 4;
 
 export function relay(client: Socket, head: Buffer, who: string, target: Target, deps: RelayDeps, hooks: RelayHooks): void {
-  const { chooser, consumers, log } = deps;
+  const { chooser, consumers, log, meter } = deps;
   const where = `${who}: ${target.host}:${target.port}`;
   const exclude = new Set<string>();
   let buffered: Buffer[] = head.length > 0 ? [head] : [];
@@ -60,9 +61,12 @@ export function relay(client: Socket, head: Buffer, who: string, target: Target,
     upstream = socket;
     outletName = outlet.name;
     for (const chunk of buffered) socket.write(chunk);
+    // Проигранное считаем один раз — на первом выходе, не на каждом повторе.
+    if (attempts === 1) meter?.add(who, outlet.name, target.host, bufferedBytes, 0);
     socket.on('data', (chunk: Buffer) => {
       if (replayable) { replayable = false; buffered = []; }
       down += chunk.length;
+      meter?.add(who, outlet.name, target.host, 0, chunk.length);
       if (!client.write(chunk)) socket.pause();
     });
     socket.on('drain', () => client.resume());
@@ -110,6 +114,7 @@ export function relay(client: Socket, head: Buffer, who: string, target: Target,
       if (bufferedBytes > REPLAY_CAP) { replayable = false; buffered = []; }
       else buffered.push(chunk);
     }
+    if (upstream) meter?.add(who, outletName, target.host, chunk.length, 0);
     if (upstream && !upstream.write(chunk)) client.pause();
   });
   client.on('drain', () => upstream?.resume());

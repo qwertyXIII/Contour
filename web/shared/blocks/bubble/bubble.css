@@ -1,0 +1,155 @@
+/*
+ * Блок bubble: реплика в переписке третьих лиц — по референсам владельца
+ * (~/dev/Alter-UI/refs, 2026-09-29; ADR-0068 Alter'а): сплошная заливка без
+ * обводки, крупное скругление, сверху мелкая строка «кто · когда» — как подпись
+ * над заголовком карточки в образцах.
+ *
+ * Цвет — по автору, и нашу сторону подписывает КАЖДАЯ реплика: «Alter» и «ты» в
+ * чужом чате различать обязательно.
+ *   собеседник — приподнятая поверхность (белая на светлом, серая на тёмном);
+ *   Alter      — акцент, как его голос в разговоре;
+ *   ты сам     — контраст (чёрная на светлом, белая на тёмном): вмешательство
+ *                владельца редкое и главное — его видно первым.
+ *
+ *   bubble_from_{contact|agent|owner} · bubble_kind_silence (отметка, не реплика)
+ *   __head → __who · __time · __text
+ *   __media — микс с media: фото и видео мозаикой (media_view_mosaic), плашки
+ *             файлов (media_view_rows); __media_round — кружок, превью круглое;
+ *             __media_wide — мозаика из нескольких: реплика во всю свою ширину
+ *   __voice — микс с voice-note: голосовое волной, под ним — расшифровка (__text)
+ *   __file  — вложение строкой: значок и факты (то, что не открывается)
+ *
+ * Вложения — цветом реплики (currentColor): плашка и волна на акценте Alter'а —
+ * белые, на контрасте владельца — цвета контраста. Крупная плитка мозаики — со
+ * стороны хвоста: у Alter'а и владельца справа (--media-lead-end).
+ */
+.bubble {
+  --bubble-bg: var(--color-raised);
+  --bubble-fg: var(--color-text);
+
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-width: 0;
+  margin: 0;
+  padding: var(--space-3) var(--space-4) var(--space-3);
+  border-radius: var(--radius-l);
+  background: var(--bubble-bg);
+  color: var(--bubble-fg);
+  font-size: var(--text-body);
+  line-height: 1.42;
+  user-select: text;
+  -webkit-user-select: text;
+}
+
+/* Хвост — угол со стороны говорящего; с той же стороны — крупная плитка вложений. */
+.bubble_from_contact {
+  border-end-start-radius: var(--radius-xs);
+}
+
+.bubble_from_agent {
+  --bubble-bg: var(--color-accent);
+  --bubble-fg: var(--color-on-accent);
+  --media-lead-end: 1;
+  border-end-end-radius: var(--radius-xs);
+}
+
+.bubble_from_owner {
+  --bubble-bg: var(--color-contrast);
+  --bubble-fg: var(--color-on-contrast);
+  --media-lead-end: 1;
+  border-end-end-radius: var(--radius-xs);
+}
+
+/* Подпись — цветом самой реплики, приглушённо: на акценте и на контрасте серого нет. */
+.bubble__head {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-3);
+  margin: 0;
+  font-size: var(--text-caption);
+  font-weight: var(--weight-semibold);
+  letter-spacing: var(--tracking-caps);
+  line-height: 1.3;
+  text-transform: uppercase;
+  opacity: .64;
+}
+
+.bubble__who {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.bubble__time {
+  flex: 0 0 auto;
+  margin-inline-start: auto;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0;
+}
+
+.bubble__text {
+  margin: 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+/*
+ * Вложение в реплике — в её полях, скругление поменьше: карточка в карточке.
+ * Блок media меряет себя контейнером (inline-size) и своей ширины реплике не даёт:
+ * фото или плашка при коротком тексте сжались бы до ширины подписи «кто · когда».
+ * Поэтому вложение просит ширину само (--bubble-media-w), не шире реплики.
+ */
+.bubble__media {
+  --media-radius: var(--radius-m);
+  --media-max-h: 280px;
+
+  margin-block: var(--space-1);
+  contain-intrinsic-inline-size: var(--bubble-media-w, 264px);
+}
+
+/*
+ * Мозаика из нескольких — шире одного фото: мелкие квадраты в 264 px были бы
+ * с ноготь. Реплика встаёт во всю свою ширину (не шире min(84%, 560px) переписки).
+ */
+.bubble__media_wide {
+  --bubble-media-w: 340px;
+}
+
+/* Кружок — круглым и меньше фото: это лицо говорящего, а не снимок. */
+.bubble__media_round {
+  --media-radius: var(--radius-full);
+  --media-max-h: 200px;
+  --bubble-media-w: 200px;
+}
+
+/* Голосовое — с тем же просветом над расшифровкой, что у фото над подписью. */
+.bubble__voice {
+  margin-block: var(--space-1);
+}
+
+/* Вложение, которое не открывается, строкой: значок и факты. */
+.bubble__file {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0;
+  font-size: var(--text-small);
+  font-weight: var(--weight-medium);
+  overflow-wrap: anywhere;
+  --icon-size: var(--icon-s);
+}
+
+/* «Не ответил» — не реплика: тихая строка посередине, без подложки. */
+.bubble_kind_silence {
+  --bubble-bg: transparent;
+  --bubble-fg: var(--color-text-faint);
+
+  display: block;
+  padding: var(--space-1) var(--space-4);
+  font-size: var(--text-small);
+  text-align: center;
+}
+
+.bubble_kind_silence .bubble__time {
+  margin-inline-start: var(--space-2);
+}

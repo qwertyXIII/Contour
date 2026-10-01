@@ -1,0 +1,146 @@
+/*
+ * Элемент chart__plot: поле графика и его SVG. Метки — по правилам dataviz:
+ * столбик не толще 24px, скругление 4px только у конца с данными, между
+ * соседними сегментами и столбиками — зазор 2px цветом фона; линия 2px,
+ * точка ≥ 8px с кольцом цвета фона; заливка площади — 10%; сетка и оси —
+ * сплошные волоски на шаг от фона. Цвет ряда — --mark-color на метке.
+ */
+.chart__plot {
+  position: relative;
+  height: calc(var(--chart-h) + var(--chart-axis));
+  min-width: 0;
+  border-radius: var(--radius-s);
+  touch-action: pan-y;
+}
+
+.chart__plot:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 4px;
+}
+
+.chart__svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+
+.chart__grid {
+  stroke: var(--chart-grid);
+  stroke-width: 1;
+  shape-rendering: crispEdges;
+}
+
+.chart__baseline {
+  stroke: var(--chart-base);
+  stroke-width: 1;
+  shape-rendering: crispEdges;
+}
+
+.chart__tick {
+  fill: var(--color-text-muted);
+  font-size: var(--text-caption);
+  font-variant-numeric: tabular-nums;
+}
+
+.chart__col {
+  transition: opacity var(--duration-fast) ease;
+}
+
+/* Навели на столбец — остальные отходят на второй план. */
+.chart__svg_focus .chart__col {
+  opacity: .45;
+}
+
+.chart__svg_focus .chart__col_active {
+  opacity: 1;
+}
+
+.chart__bar {
+  fill: var(--mark-color);
+  transform-box: fill-box;
+  transform-origin: 50% 100%;
+}
+
+/* Внахлёст: передний столбик отделён от заднего кольцом цвета фона. */
+.chart__bar_front {
+  stroke: var(--chart-surface);
+  stroke-width: 2;
+  paint-order: stroke;
+}
+
+.chart__line {
+  fill: none;
+  stroke: var(--mark-color);
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.chart__area {
+  fill: var(--mark-color);
+  fill-opacity: .1;
+}
+
+.chart__dot {
+  fill: var(--mark-color);
+  stroke: var(--chart-surface);
+  stroke-width: 2;
+}
+
+.chart__cross {
+  stroke: var(--chart-base);
+  stroke-width: 1;
+  shape-rendering: crispEdges;
+}
+
+.chart__label {
+  fill: var(--color-text-muted);
+  font-size: var(--text-caption);
+  font-weight: var(--weight-semibold);
+}
+
+.chart__leader {
+  stroke: var(--chart-grid);
+  stroke-width: 1;
+}
+
+/* Первое появление: столбики растут от оси, линии прорисовываются. */
+.chart_intro .chart__bar {
+  animation: chart-grow var(--duration-slow) var(--ease-out) both;
+  animation-delay: calc(var(--i, 0) * 30ms);
+}
+
+.chart_intro .chart__line {
+  stroke-dasharray: 1 2;
+  animation: chart-draw 900ms var(--ease-out) both;
+}
+
+.chart_intro .chart__area,
+.chart_intro .chart__dot,
+.chart_intro .chart__label {
+  animation: chart-fade 600ms var(--ease-out) 400ms both;
+}
+
+@keyframes chart-grow {
+  from { scale: 1 0; }
+}
+
+@keyframes chart-draw {
+  from { stroke-dashoffset: 1.02; }
+  to { stroke-dashoffset: 0; }
+}
+
+@keyframes chart-fade {
+  from { opacity: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .chart_intro .chart__bar,
+  .chart_intro .chart__line,
+  .chart_intro .chart__area,
+  .chart_intro .chart__dot,
+  .chart_intro .chart__label {
+    animation: none;
+  }
+}

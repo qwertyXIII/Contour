@@ -1,0 +1,92 @@
+/*
+ * Цветовые роли.
+ *
+ * Каждая роль задана ОДИН раз парой light-dark(светлая, тёмная). Какая половина
+ * сработает, решает color-scheme элемента: его ставит блок theme. Поэтому
+ * светлый кусок внутри тёмной страницы — это один класс, а не второй набор
+ * переменных, и новая роль не может «забыть» про одну из тем.
+ *
+ * Правило для блоков: цвет берётся только отсюда (или из accent.css). Голый
+ * цвет в блоке — это цвет, который не переключится вместе с темой.
+ *
+ * ⚠️ Мягкие тона (-soft, -line) заданы своими парами, а не через
+ * color-mix(var(--color-ok) …): смешивать light-dark() внутри color-mix браузеры
+ * умеют не одинаково, а пара работает везде, где работает light-dark().
+ */
+:root {
+  color-scheme: light dark;
+
+  /* Фон и поверхности */
+  --color-bg: light-dark(#f2f2f5, #000000);
+  --color-bg-elevated: light-dark(#ffffff, #151517);
+  --color-surface: light-dark(#ffffff, rgba(255, 255, 255, .06));
+  /* Та же поверхность, но непрозрачная (белая / .06 белого поверх чёрного): ею рисуют кольца и зазоры меток графиков. */
+  --color-surface-solid: light-dark(#ffffff, #0f0f0f);
+  --color-surface-hover: light-dark(#f8f8fa, rgba(255, 255, 255, .09));
+  --color-surface-pressed: light-dark(#ececf0, rgba(255, 255, 255, .12));
+  /* Выбранный сегмент переключателя: приподнят над дорожкой. */
+  --color-raised: light-dark(#ffffff, rgba(255, 255, 255, .17));
+  /*
+   * Поле ввода. На тёмном — колодец, чуть утопленный в то, на чём лежит; на
+   * светлом — белое поле с рамкой: серый колодец на сером фоне выглядит грязно.
+   */
+  --color-well: light-dark(#ffffff, rgba(0, 0, 0, .35));
+  --color-overlay: light-dark(rgba(20, 20, 28, .34), rgba(0, 0, 0, .64));
+  /* Стекло поверх фото: кнопки над постером — фон темы насквозь, с размытием под ним. */
+  --color-glass: light-dark(rgba(255, 255, 255, .6), rgba(28, 28, 30, .5));
+  --color-glass-strong: light-dark(rgba(255, 255, 255, .8), rgba(44, 44, 48, .7));
+
+  /* Нейтральные заливки: 1 — фон меток, 2 — наведение, 3 — дорожки */
+  --color-fill-1: light-dark(rgba(20, 20, 30, .05), rgba(255, 255, 255, .08));
+  --color-fill-2: light-dark(rgba(20, 20, 30, .08), rgba(255, 255, 255, .12));
+  --color-fill-3: light-dark(rgba(20, 20, 30, .14), rgba(255, 255, 255, .20));
+
+  /* Границы */
+  --color-border: light-dark(rgba(20, 20, 30, .09), rgba(255, 255, 255, .10));
+  --color-border-strong: light-dark(rgba(20, 20, 30, .18), rgba(255, 255, 255, .24));
+
+  /* Текст */
+  --color-text: light-dark(#121216, #ffffff);
+  --color-text-muted: light-dark(rgba(18, 18, 22, .62), rgba(255, 255, 255, .58));
+  --color-text-faint: light-dark(rgba(18, 18, 22, .40), rgba(255, 255, 255, .38));
+
+  /* Контраст: белая круглая кнопка на тёмном, чёрная — на светлом */
+  --color-contrast: light-dark(#121216, #ffffff);
+  --color-contrast-hover: light-dark(#2c2c33, #e6e6ec);
+  --color-on-contrast: light-dark(#ffffff, #1a1a1a);
+
+  /* Состояния: основной тон, мягкий фон, линия */
+  --color-ok: light-dark(#1f9a4b, #6ee787);
+  --color-ok-soft: light-dark(rgba(31, 154, 75, .12), rgba(52, 199, 89, .18));
+  --color-ok-line: light-dark(rgba(31, 154, 75, .30), rgba(110, 231, 135, .30));
+  --color-danger: light-dark(#d4372c, #ff8b83);
+  --color-danger-soft: light-dark(rgba(212, 55, 44, .10), rgba(255, 69, 58, .18));
+  --color-danger-line: light-dark(rgba(212, 55, 44, .34), rgba(255, 69, 58, .38));
+  --color-warn: light-dark(#a15f00, #ffc266);
+  --color-warn-soft: light-dark(rgba(214, 138, 0, .14), rgba(255, 159, 10, .18));
+  --color-warn-line: light-dark(rgba(214, 138, 0, .34), rgba(255, 194, 102, .32));
+  /* info — он же «идёт вызов инструмента» у кольца (бывший --tool) */
+  --color-info: light-dark(#1769c4, #7cc8ff);
+  --color-info-soft: light-dark(rgba(23, 105, 196, .10), rgba(124, 200, 255, .16));
+  --color-info-line: light-dark(rgba(23, 105, 196, .30), rgba(124, 200, 255, .30));
+
+  /* Тени: на тёмном почти не видны — глубину там дают граница и стекло */
+  --color-shadow: light-dark(rgba(20, 20, 40, .10), rgba(0, 0, 0, .55));
+
+  /* Постоянные: не зависят от темы по смыслу */
+  --color-on-brand: #ffffff;          /* текст на фирменном цвете канала, аватаре */
+  --color-knob: #ffffff;              /* ручка ползунка и тумблера */
+  --color-scrim: rgba(0, 0, 0, .9);   /* подложка просмотра картинки */
+  --color-on-media: #ffffff;          /* текст и значки поверх фото и видео */
+  --color-media-bg: #000000;          /* поле вокруг видео, у которого другая пропорция */
+  --color-media-shade: rgba(0, 0, 0, .46);  /* подложка счётчика, длительности, «+5» на фото */
+  --color-media-shade-strong: rgba(0, 0, 0, .64);  /* та же подложка под курсором и пальцем */
+  --gradient-media-foot: linear-gradient(to top, rgba(0, 0, 0, .66), rgba(0, 0, 0, 0));  /* низ видео под кнопками */
+  --color-mask: #000000;              /* непрозрачная часть маски, не цвет */
+  --hued-light: .74 .11;              /* светлота и хрома цветных аватаров, */
+  --hued-dark: .52 .12;               /* оттенок приходит данными */
+  --gradient-hue: conic-gradient(#ff5f57, #ffbd2e, #28c840, #33c7ff, #7c5cff, #ff5fd2, #ff5f57);
+  /* Все оттенки по порядку HSV — полоса и круг пикера: точные, а не «красивые», иначе ручка встанет не на свой цвет. */
+  --gradient-hue-strip: linear-gradient(to right, #f00, #ff0, #0f0, #0ff, #00f, #f0f, #f00);
+  --gradient-hue-wheel: conic-gradient(from 90deg, #f00, #ff0, #0f0, #0ff, #00f, #f0f, #f00);
+}

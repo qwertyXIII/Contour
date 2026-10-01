@@ -1,0 +1,146 @@
+/*
+ * Блок heatmap: календарь активности, как у GitHub. Столбец — неделя, строка —
+ * день недели, цвет — сколько в этот день: один оттенок от пустого к полному
+ * (последовательная шкала dataviz), пять ступеней, легенда «меньше — больше».
+ *
+ *   <figure class="heatmap" data-start="2025-10-06" data-values="0,3,1,…" data-unit="сообщение|сообщения|сообщений">
+ *     <figcaption class="heatmap__title">Разговоры с Alter'ом</figcaption>
+ *   </figure>
+ *
+ * Сетку, подписи, легенду и сводку по месяцам (для скринридера) строит
+ * компонент Heatmap. Оттенок — --heat-color (по умолчанию акцент графиков).
+ */
+.heatmap {
+  --heat-cell: 12px;
+  --heat-gap: 3px;
+  --heat-color: var(--color-chart-accent);
+  --heat-empty: var(--color-fill-1);
+
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-width: 0;
+  margin: 0;
+}
+
+.heatmap__title {
+  color: var(--color-text);
+  font-size: var(--text-small);
+  font-weight: var(--weight-semibold);
+}
+
+.heatmap__scroll {
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  padding-bottom: var(--space-1);
+  scrollbar-width: thin;
+}
+
+.heatmap__body {
+  display: grid;
+  grid-template-columns: auto auto;
+  gap: 4px var(--space-2);
+  width: max-content;
+}
+
+.heatmap__months {
+  display: grid;
+  grid-column: 2;
+  grid-auto-columns: var(--heat-cell);
+  gap: var(--heat-gap);
+  height: 14px;
+}
+
+.heatmap__month,
+.heatmap__day {
+  color: var(--color-text-muted);
+  font-size: var(--text-caption);
+  line-height: var(--heat-cell);
+  white-space: nowrap;
+}
+
+.heatmap__days {
+  display: grid;
+  grid-column: 1;
+  grid-template-rows: repeat(7, var(--heat-cell));
+  gap: var(--heat-gap);
+}
+
+.heatmap__grid {
+  display: grid;
+  grid-column: 2;
+  grid-template-rows: repeat(7, var(--heat-cell));
+  grid-auto-columns: var(--heat-cell);
+  gap: var(--heat-gap);
+  border-radius: 4px;
+}
+
+.heatmap__grid:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 4px;
+}
+
+.heatmap__cell {
+  border-radius: 3px;
+  background: var(--heat-empty);
+}
+
+.heatmap__cell_level_1 { background: color-mix(in oklch, var(--heat-color) 28%, var(--heat-empty)); }
+.heatmap__cell_level_2 { background: color-mix(in oklch, var(--heat-color) 52%, var(--heat-empty)); }
+.heatmap__cell_level_3 { background: color-mix(in oklch, var(--heat-color) 76%, var(--heat-empty)); }
+.heatmap__cell_level_4 { background: var(--heat-color); }
+
+.heatmap__cell_active {
+  outline: 2px solid var(--color-text);
+  outline-offset: 1px;
+}
+
+.heatmap__foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2) var(--space-4);
+  color: var(--color-text-muted);
+  font-size: var(--text-caption);
+}
+
+.heatmap__scale {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--heat-gap);
+}
+
+.heatmap__scale .heatmap__cell {
+  width: var(--heat-cell);
+  height: var(--heat-cell);
+}
+
+.heatmap__tip {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 2;
+  padding: var(--space-1) var(--space-2);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-s);
+  background: var(--color-bg-elevated);
+  box-shadow: var(--shadow-m);
+  color: var(--color-text-muted);
+  font-size: var(--text-caption);
+  white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
+  translate: var(--tip-x, 0) var(--tip-y, 0);
+  transition: opacity var(--duration-fast) ease;
+}
+
+.heatmap__tip_shown {
+  opacity: 1;
+}
+
+.heatmap__tip-value {
+  color: var(--color-text);
+  font-weight: var(--weight-semibold);
+}

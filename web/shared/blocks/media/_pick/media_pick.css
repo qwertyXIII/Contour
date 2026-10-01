@@ -1,0 +1,28 @@
+/*
+ * media_pick: сетка для выбора — «какое фото поставить человеку». Нажатие
+ * выбирает (компонент шлёт media:pick { value } — data-value плитки), просмотра
+ * нет. Выбранная сейчас — aria-pressed="true": рамка акцента внутри плитки
+ * (снаружи её обрезала бы сетка).
+ *
+ *   <div class="media media_pick"><div class="media__track">
+ *     <button class="media__item" type="button" data-value="17" aria-pressed="true" aria-label="…">
+ *       <img class="media__image" src="…" alt="">
+ *     </button> …
+ *   </div></div>
+ */
+.media_pick .media__item {
+  cursor: pointer;
+}
+
+.media_pick .media__item::after {
+  position: absolute;
+  inset: 0;
+  border: 3px solid transparent;
+  content: '';
+  pointer-events: none;
+  transition: border-color var(--duration-fast) ease;
+}
+
+.media_pick .media__item[aria-pressed='true']::after {
+  border-color: var(--color-accent);
+}

@@ -1,0 +1,22 @@
+/*
+ * Блок typing: Alter занят ответом. Точки (блок dots) и чем именно он занят —
+ * это приезжает потоком событий и бывает пустым.
+ *
+ *   <div class="typing"><span class="dots dots_size_l">…</span><span class="typing__what">Смотрю календарь</span></div>
+ *
+ * Цвет — --typing-fg от того, на чём лежит (в открытой панели чата — серый,
+ * как всё служебное), иначе текущий.
+ */
+.typing {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: var(--space-8);
+  color: var(--typing-fg, currentColor);
+}
+
+.typing__what {
+  color: var(--typing-what-fg, color-mix(in srgb, currentColor 62%, transparent));
+  font-size: var(--text-body);
+  font-weight: var(--weight-medium);
+}

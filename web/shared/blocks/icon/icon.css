@@ -1,0 +1,38 @@
+/*
+ * Блок icon: значок из спрайта assets/icons/sprite.svg.
+ *
+ *   <svg class="icon" aria-hidden="true"><use href="./assets/icons/sprite.svg#settings"/></svg>
+ *
+ * В символах спрайта только геометрия: цвет, толщину и скругления линий
+ * наследуют через <use> отсюда. Поэтому толщина — модификатор, а цвет —
+ * currentColor родителя.
+ *
+ * Размер родитель задаёт переменной --icon-size (кнопка, строка, поле),
+ * а не селектором «иконка внутри кнопки»: блок не знает, где лежит.
+ *
+ * Движение — модификатор режима, оживляет компонент MotionIcon:
+ *   icon_motion_hover — один проход при наведении, тапе или фокусе
+ *   icon_motion_hold  — повторяется, пока курсор над элементом или палец прижат
+ *   icon_motion_loop  — всегда · icon_motion_once — один раз при появлении
+ * Что именно двигается, размечено в спрайте (элемент icon__part).
+ */
+.icon {
+  flex: 0 0 auto;
+  display: inline-block;
+  width: var(--icon-size, var(--icon-m));
+  height: var(--icon-size, var(--icon-m));
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.9;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  vertical-align: middle;
+}
+
+.icon_size_s { --icon-size: var(--icon-s); }
+.icon_size_m { --icon-size: var(--icon-m); }
+.icon_size_l { --icon-size: var(--icon-l); }
+.icon_size_xl { --icon-size: 40px; }
+
+.icon_weight_light { stroke-width: 1.5; }
+.icon_weight_bold { stroke-width: 2.4; }

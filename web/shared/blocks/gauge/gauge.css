@@ -1,0 +1,98 @@
+/*
+ * Блок gauge: доля от предела кольцом — калории дня, заполнение диска,
+ * лимит расходов. Дорожка — светлый шаг того же тона, что и заливка
+ * (правило «метра»): состояние читается по всему кольцу.
+ *
+ *   <div class="gauge" style="--gauge: .62" role="img" aria-label="Калории: 62% дневной нормы">
+ *     <svg class="gauge__svg" viewBox="0 0 120 120" aria-hidden="true">
+ *       <circle class="gauge__track" cx="60" cy="60" r="52" pathLength="100"/>
+ *       <circle class="gauge__bar" cx="60" cy="60" r="52" pathLength="100"/>
+ *     </svg>
+ *     <span class="gauge__center"><span class="gauge__value">62%</span><span class="gauge__label">калории</span></span>
+ *   </div>
+ *
+ *   gauge_view_arc (три четверти круга, разрыв снизу) · gauge_size_{s|l} · gauge_tone_{ok|warn|danger}
+ *   Доля — данные: --gauge от 0 до 1.
+ *   Размер — --gauge-size; его может задать и родитель (tile__figure — по месту),
+ *   поэтому здесь он только запасной, а не объявлен на самом блоке.
+ */
+.gauge {
+  --gauge-box: var(--gauge-size, 140px);
+  --gauge-stroke: 10;
+  --gauge-color: var(--color-chart-accent);
+  --gauge-track: var(--color-accent-soft);
+  --gauge-sweep: 100;
+
+  position: relative;
+  display: inline-grid;
+  flex: 0 0 auto;
+  place-items: center;
+  width: var(--gauge-box);
+  height: var(--gauge-box);
+}
+
+.gauge_size_s { --gauge-size: 96px; --gauge-stroke: 12; }
+.gauge_size_l { --gauge-size: 200px; --gauge-stroke: 8; }
+
+.gauge_tone_ok { --gauge-color: var(--color-ok); --gauge-track: var(--color-ok-soft); }
+.gauge_tone_warn { --gauge-color: var(--color-warn); --gauge-track: var(--color-warn-soft); }
+.gauge_tone_danger { --gauge-color: var(--color-danger); --gauge-track: var(--color-danger-soft); }
+
+.gauge__svg {
+  grid-area: 1 / 1;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  transform: rotate(-90deg);
+}
+
+.gauge__track,
+.gauge__bar {
+  fill: none;
+  stroke-width: var(--gauge-stroke);
+  stroke-linecap: round;
+}
+
+.gauge__track {
+  stroke: var(--gauge-track);
+  stroke-dasharray: var(--gauge-sweep) 100;
+}
+
+.gauge__bar {
+  stroke: var(--gauge-color);
+  /* При нуле скруглённый конец рисовал бы точку — прячем штрих совсем. */
+  stroke-opacity: clamp(0, calc(var(--gauge, 0) * 1000), 1);
+  stroke-dasharray: calc(var(--gauge, 0) * var(--gauge-sweep)) 100;
+  transition: stroke-dasharray var(--duration-slow) var(--ease-out);
+}
+
+/* Три четверти круга: начало слева внизу, разрыв снизу — как у спидометра. */
+.gauge_view_arc {
+  --gauge-sweep: 75;
+}
+
+.gauge_view_arc .gauge__svg {
+  transform: rotate(135deg);
+}
+
+.gauge__center {
+  display: flex;
+  grid-area: 1 / 1;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-half);
+  text-align: center;
+}
+
+.gauge__value {
+  font-size: calc(var(--gauge-box) * .22);
+  font-weight: var(--weight-light);
+  line-height: 1;
+  letter-spacing: var(--tracking-hero);
+}
+
+.gauge__label {
+  color: var(--color-text-muted);
+  font-size: var(--text-caption);
+  font-weight: var(--weight-medium);
+}

@@ -1,0 +1,120 @@
+/*
+ * Блок dial: круговой регулятор — термостат, температура, таймер. Риски-
+ * капсулы по дуге в 270° (как кольцо Alter'а), до значения — акцент и длиннее,
+ * дальше — тихие. В центре число тонким весом, ручка — точка на дуге.
+ *
+ *   <div class="dial">
+ *     <input class="dial__input visually-hidden" type="range" min="16" max="28" step="0.5" value="22" data-unit="°" aria-label="Тепло">
+ *     <div class="dial__face" aria-hidden="true"></div>          ← риски и ручку строит Dial
+ *     <div class="dial__center"><span class="dial__value">22°</span><span class="dial__label">Тепло</span></div>
+ *   </div>
+ *
+ *   dial_size_{s|l} · dial_tone_info (холод: кондиционер, вода)
+ *   Угол значения — --dial-angle (ставит Dial); риски — __tick, до значения __tick_active.
+ */
+.dial {
+  --dial-size: 240px;
+  --dial-color: var(--color-accent);
+  --dial-angle: 0deg;
+
+  position: relative;
+  display: inline-grid;
+  flex: 0 0 auto;
+  place-items: center;
+  width: var(--dial-size);
+  height: var(--dial-size);
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.dial_size_s { --dial-size: 168px; }
+.dial_size_l { --dial-size: 300px; }
+.dial_tone_info { --dial-color: var(--color-info); }
+
+.dial__face {
+  position: relative;
+  grid-area: 1 / 1;
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  cursor: grab;
+  touch-action: none;
+}
+
+.dial_dragging .dial__face {
+  cursor: grabbing;
+}
+
+.dial__ticks {
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+
+/*
+ * Риска рисуется от внешнего края внутрь; тихая показывает только внешний
+ * отрезок (dasharray), активная — всю длину. Так длина меняется переходом.
+ */
+.dial__tick {
+  stroke: var(--color-fill-3);
+  stroke-width: 3;
+  stroke-linecap: round;
+  stroke-dasharray: 7 40;
+  transition: stroke var(--duration-fast) ease, stroke-dasharray var(--duration-normal) var(--ease-out);
+}
+
+.dial__tick_active {
+  stroke: var(--dial-color);
+  stroke-dasharray: 14 40;
+}
+
+.dial__knob {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: calc(var(--dial-size) * .06);
+  height: calc(var(--dial-size) * .06);
+  margin: calc(var(--dial-size) * -.03);
+  border-radius: 50%;
+  background: var(--color-contrast);
+  box-shadow: 0 0 0 4px var(--color-bg), var(--shadow-m);
+  transform: rotate(var(--dial-angle)) translateY(calc(var(--dial-size) * -.3));
+  transition: transform var(--duration-fast) var(--ease-out);
+}
+
+.dial_dragging .dial__knob {
+  transition: none;
+}
+
+.dial__center {
+  display: flex;
+  grid-area: 1 / 1;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-1);
+  pointer-events: none;
+}
+
+.dial__value {
+  font-size: calc(var(--dial-size) * .22);
+  font-weight: var(--weight-light);
+  line-height: 1;
+  letter-spacing: var(--tracking-hero);
+}
+
+.dial__label {
+  color: var(--color-text-muted);
+  font-size: var(--text-small);
+  font-weight: var(--weight-medium);
+}
+
+.dial:has(.dial__input:focus-visible) .dial__face {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 4px;
+}
+
+.dial:has(.dial__input:disabled) {
+  opacity: .45;
+  pointer-events: none;
+}

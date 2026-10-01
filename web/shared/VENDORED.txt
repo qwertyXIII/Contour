@@ -1,0 +1,2 @@
+Копия дизайн-системы Alter (public/shared), 2026-10-01.
+Не править здесь — обновлять: bash scripts/vendor-alter-ui.sh

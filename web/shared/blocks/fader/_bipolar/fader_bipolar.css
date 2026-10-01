@@ -1,0 +1,17 @@
+/* Двуполярный: заливка от нуля к значению, ноль отмечен риской. */
+.fader_bipolar .fader__fill {
+  bottom: calc(var(--fader-start, .5) * 100%);
+  height: calc(var(--fader-size, 0) * 100%);
+}
+
+.fader_bipolar .fader__track::after {
+  content: "";
+  position: absolute;
+  bottom: calc(var(--fader-zero, .5) * 100%);
+  left: 50%;
+  width: 14px;
+  height: 2px;
+  border-radius: var(--radius-full);
+  background: var(--color-border-strong);
+  transform: translate(-50%, 50%);
+}

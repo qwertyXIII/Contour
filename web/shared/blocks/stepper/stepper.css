@@ -1,0 +1,98 @@
+/*
+ * Блок stepper: целое число с шагом — «сколько дней хранить», «сколько
+ * подтверждений до тишины». Нативный number, кнопки только двигают его.
+ *
+ *   <div class="stepper">
+ *     <button class="stepper__button stepper__button_action_down" type="button" aria-label="Меньше">…</button>
+ *     <input class="stepper__input" type="number" min="0" max="30" step="1" value="3">
+ *     <span class="stepper__unit">дн.</span>   ← необязательно
+ *     <button class="stepper__button stepper__button_action_up" type="button" aria-label="Больше">…</button>
+ *   </div>
+ */
+.stepper {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  height: var(--control-h-m);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-full);
+  background: var(--color-well);
+  overflow: hidden;
+  transition: border-color var(--duration-fast) ease, box-shadow var(--duration-fast) ease;
+}
+
+.stepper:focus-within {
+  border-color: var(--color-focus);
+  box-shadow: 0 0 0 3px var(--color-accent-soft);
+}
+
+.stepper__button {
+  display: grid;
+  flex: 0 0 auto;
+  place-items: center;
+  width: var(--control-h-m);
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--color-text);
+  cursor: pointer;
+  --icon-size: var(--icon-s);
+  transition: background-color var(--duration-fast) ease, color var(--duration-fast) ease;
+}
+
+@media (hover: hover) {
+  .stepper__button:hover {
+    background: var(--color-fill-1);
+  }
+}
+
+.stepper__button:active {
+  background: var(--color-fill-2);
+}
+
+.stepper__button:disabled {
+  color: var(--color-text-faint);
+  cursor: default;
+  background: transparent;
+}
+
+.stepper__button:focus-visible {
+  outline: none;
+  background: var(--color-fill-2);
+}
+
+.stepper__input {
+  width: var(--stepper-width, 4ch);
+  min-width: 0;
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-size: var(--text-field);
+  font-weight: var(--weight-semibold);
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+
+.stepper__input:focus-visible {
+  outline: none;
+}
+
+.stepper__input::-webkit-inner-spin-button,
+.stepper__input::-webkit-outer-spin-button {
+  margin: 0;
+  -webkit-appearance: none;
+}
+
+.stepper__unit {
+  padding-inline-end: var(--space-1);
+  color: var(--color-text-muted);
+  font-size: var(--text-small);
+}

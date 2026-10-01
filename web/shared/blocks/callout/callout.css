@@ -1,0 +1,61 @@
+/*
+ * Блок callout: заметка на экране, которую нельзя пропустить, — «ключи не
+ * заданы», «канал молчит», «проверка прошла».
+ *
+ *   __icon (микс с icon) · __body → __title · __text · __actions
+ *   callout_tone_{info|ok|warn|danger|accent}
+ */
+.callout {
+  --callout-bg: var(--color-fill-1);
+  --callout-line: transparent;
+  --callout-fg: var(--color-text-muted);
+
+  display: flex;
+  gap: var(--space-3);
+  min-width: 0;
+  padding: var(--row-pad-y) var(--row-pad-x);
+  border: 1px solid var(--callout-line);
+  border-radius: var(--radius-l);
+  background: var(--callout-bg);
+  color: var(--color-text);
+}
+
+.callout_tone_info { --callout-bg: var(--color-info-soft); --callout-line: var(--color-info-line); --callout-fg: var(--color-info); }
+.callout_tone_ok { --callout-bg: var(--color-ok-soft); --callout-line: var(--color-ok-line); --callout-fg: var(--color-ok); }
+.callout_tone_warn { --callout-bg: var(--color-warn-soft); --callout-line: var(--color-warn-line); --callout-fg: var(--color-warn); }
+.callout_tone_danger { --callout-bg: var(--color-danger-soft); --callout-line: var(--color-danger-line); --callout-fg: var(--color-danger); }
+.callout_tone_accent { --callout-bg: var(--color-accent-soft); --callout-line: var(--color-accent-line); --callout-fg: var(--color-accent-text); }
+
+.callout__icon {
+  margin-top: 1px;
+  color: var(--callout-fg);
+}
+
+.callout__body {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
+.callout__title {
+  margin: 0;
+  font-size: var(--text-body);
+  font-weight: var(--weight-semibold);
+  line-height: 1.35;
+}
+
+.callout__text {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: var(--text-small);
+  line-height: var(--leading-normal);
+}
+
+.callout__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-top: var(--space-2);
+}

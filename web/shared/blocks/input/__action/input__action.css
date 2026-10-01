@@ -1,0 +1,49 @@
+/*
+ * Элемент input__action: кнопка внутри поля — очистить, показать секрет,
+ * микрофон. Поведение kind_clear / kind_reveal даёт компонент Input.
+ */
+.input__actions {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  margin-inline-end: calc(4px - var(--input-pad));
+}
+
+.input__action {
+  display: grid;
+  place-items: center;
+  width: calc(var(--input-h) - 10px);
+  height: calc(var(--input-h) - 10px);
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--input-action-fg);
+  cursor: pointer;
+  --icon-size: var(--icon-m);
+  transition: background-color var(--duration-fast) ease, color var(--duration-fast) ease,
+    transform var(--duration-press) var(--ease-out);
+}
+
+@media (hover: hover) {
+  .input__action:hover {
+    background: var(--color-fill-1);
+    color: var(--input-fg);
+  }
+}
+
+.input__action:active {
+  transform: scale(.9);
+  color: var(--color-accent);
+}
+
+/* Очистить — только когда есть что очищать. */
+.input__action_kind_clear {
+  display: none;
+  --icon-size: var(--icon-s);
+}
+
+.input_filled .input__action_kind_clear {
+  display: grid;
+}

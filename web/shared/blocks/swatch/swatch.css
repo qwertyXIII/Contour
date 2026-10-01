@@ -1,0 +1,89 @@
+/*
+ * Блок swatch: выбор цвета — готовый образец или свой.
+ *
+ *   <label class="swatch" style="--swatch-color: #0a84ff">
+ *     <input class="swatch__input visually-hidden" type="radio" name="accent" value="#0a84ff">
+ *     <span class="swatch__color" aria-hidden="true"></span>
+ *   </label>
+ *
+ *   swatch_custom — внутри видимый <input type="color" class="swatch__picker">
+ *   swatch_size_{s|l}   24 · 40 (по умолчанию 32)
+ *
+ * Цвет образца — данные, поэтому приходит переменной, а не модификатором.
+ * Образец-кнопка (<button class="swatch">, без radio) — действие «поставить
+ * этот цвет», как у готовых цветов пикера.
+ */
+.swatch {
+  --swatch-size: 32px;
+
+  position: relative;
+  display: inline-grid;
+  flex: 0 0 auto;
+  width: var(--swatch-size);
+  height: var(--swatch-size);
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: none;
+  cursor: pointer;
+}
+
+.swatch_size_s { --swatch-size: 24px; }
+.swatch_size_l { --swatch-size: 40px; }
+
+.swatch__color {
+  grid-area: 1 / 1;
+  border-radius: 50%;
+  background: var(--swatch-color, var(--color-accent));
+  box-shadow: inset 0 0 0 1px var(--color-border);
+  transition: transform var(--duration-press) var(--ease-out);
+}
+
+.swatch:active .swatch__color {
+  transform: scale(var(--press-scale-strong));
+}
+
+/* Кольцо выбора — outline с зазором: зазор прозрачный, фон под ним любой. */
+.swatch__input:checked + .swatch__color {
+  outline: 2px solid var(--color-text);
+  outline-offset: 2px;
+}
+
+.swatch__input:focus-visible + .swatch__color {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 2px;
+}
+
+.swatch__picker {
+  grid-area: 1 / 1;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: var(--gradient-hue);
+  cursor: pointer;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+.swatch__picker::-webkit-color-swatch-wrapper {
+  padding: 3px;
+}
+
+.swatch__picker::-webkit-color-swatch {
+  border: 0;
+  border-radius: 50%;
+}
+
+.swatch__picker::-moz-color-swatch {
+  border: 0;
+  border-radius: 50%;
+}
+
+.swatch_custom:has(.swatch__picker:focus-visible) {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 2px;
+}

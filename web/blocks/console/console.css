@@ -1,0 +1,52 @@
+/*
+ * Блок console: рамка страницы панели Contour — ширина, поля, шапка.
+ * Остальное собрано из блоков дизайн-системы Alter'а (/shared/).
+ *
+ *   <div class="console"> <header class="bar console__head">…</header> … </div>
+ *   console_login — вход: карточка по центру экрана
+ *   __head — шапка (липнет сверху при прокрутке)
+ *   __grid — сетка карточек: одна колонка на телефоне, две и три шире
+ */
+.console {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+  max-width: 1120px;
+  margin-inline: auto;
+  padding: var(--space-6) var(--space-4) var(--space-12);
+}
+
+.console_login {
+  justify-content: center;
+  min-height: 100dvh;
+  max-width: 420px;
+}
+
+.console__head {
+  position: sticky;
+  top: 0;
+  z-index: var(--z-raised);
+  padding-block: var(--space-2);
+  background: var(--color-bg);
+}
+
+.console__grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--space-4);
+}
+
+/* Метрики — по две в ряд даже на телефоне: столбиком из четырёх они занимают весь экран. */
+.console__grid_wide {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-3);
+}
+
+@media (min-width: 768px) {
+  .console { padding-inline: var(--space-8); }
+  .console__grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+@media (min-width: 1024px) {
+  .console__grid_wide { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+}

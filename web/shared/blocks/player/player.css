@@ -1,0 +1,197 @@
+/*
+ * Блок player: вид музыкального плеера — виджет, экран «Сейчас играет», ТВ.
+ * Вид ничем не владеет: состояние приходит от сеанса (data-session), команды
+ * уходят ему; компонент Player обновляет только те элементы, что есть в
+ * разметке вида.
+ *
+ *   <div class="player player_view_strip" data-session="home">
+ *     <div class="player__art"><svg class="icon">…#music</svg><img class="player__cover" alt="" hidden></div>
+ *     <div class="player__meta"><p class="player__title">…</p><p class="player__artist"></p></div>
+ *     <div class="player__controls">
+ *       <button class="button … " data-command="toggle">…</button>
+ *       <button class="button … " data-command="next">…</button>
+ *     </div>
+ *     <div class="player__line" aria-hidden="true"></div>
+ *   </div>
+ *
+ *   __art › __cover · __body · __meta › __source · __title · __artist ·
+ *   __timeline › __seek (+ range range_view_thin) · __times › __time_kind_{now|total} ·
+ *   __line (тонкая полоса без ручки) · __controls · __play · __badge (повтор трека) ·
+ *   __next («Дальше: …») · __sound › __volume (+ range) · __queue › __track (+ row) ·
+ *   __track-time · __now (эквалайзер текущего, _paused) · __hint
+ *
+ *   player_view_{strip|square|wide|full|tv} · от JS: player_playing · player_idle
+ *   кнопки — data-command: toggle · prev · next · shuffle · repeat · mute
+ */
+.player {
+  --player-bg: var(--color-surface);
+  --player-border: var(--color-border);
+  --player-pad: var(--space-3);
+  --player-gap: var(--space-3);
+  --player-muted: var(--color-text-muted);
+  --player-radius: var(--radius-xl);
+
+  position: relative;
+  display: grid;
+  gap: var(--player-gap);
+  min-width: 0;
+  height: 100%;
+  padding: var(--player-pad);
+  border: 1px solid var(--player-border);
+  border-radius: var(--player-radius);
+  background: var(--player-bg);
+  color: var(--color-text);
+  overflow: hidden;
+  -webkit-backdrop-filter: blur(var(--blur-glass));
+  backdrop-filter: blur(var(--blur-glass));
+}
+
+/* Обложка; пока её нет — значок на заглушке. Скругление вложенного: радиус плеера − отступ. */
+.player__art {
+  position: relative;
+  display: grid;
+  place-items: center;
+  aspect-ratio: 1;
+  border-radius: calc(var(--player-radius) - var(--player-pad));
+  background: var(--color-fill-2);
+  color: var(--color-text-faint);
+  overflow: hidden;
+  --icon-size: 38%;
+}
+
+.player__cover {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.player__body {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.player__meta {
+  display: grid;
+  align-content: center;
+  gap: var(--space-half);
+  min-width: 0;
+}
+
+.player__source {
+  margin: 0;
+  color: var(--player-muted);
+  font-size: var(--text-caption);
+  font-weight: var(--weight-semibold);
+  letter-spacing: var(--tracking-caps);
+  text-transform: uppercase;
+}
+
+.player__title,
+.player__artist,
+.player__next {
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.player__title {
+  font-size: var(--text-body);
+  font-weight: var(--weight-semibold);
+  line-height: var(--leading-snug);
+}
+
+.player__artist {
+  color: var(--player-muted);
+  font-size: var(--text-small);
+  font-weight: var(--weight-medium);
+}
+
+.player__next {
+  color: var(--player-muted);
+  font-size: var(--text-caption);
+  font-weight: var(--weight-medium);
+}
+
+.player__timeline {
+  display: grid;
+  gap: var(--space-half);
+}
+
+.player__times {
+  display: flex;
+  justify-content: space-between;
+  color: var(--player-muted);
+  font-size: var(--text-caption);
+  font-weight: var(--weight-semibold);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Тонкая полоса без ручки: сколько прошло — там, где перематывать негде. */
+.player__line {
+  height: 3px;
+  border-radius: var(--radius-full);
+  background: var(--color-fill-2);
+  overflow: hidden;
+}
+
+.player__line::after {
+  display: block;
+  width: var(--player-progress, 0%);
+  height: 100%;
+  border-radius: inherit;
+  background: var(--color-accent);
+  content: '';
+}
+
+.player__controls {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-1);
+}
+
+/* «Повторять трек» — единичка в углу кнопки повтора. */
+.player__badge {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  display: grid;
+  min-width: 15px;
+  height: 15px;
+  place-items: center;
+  border-radius: var(--radius-full);
+  background: var(--color-on-accent);
+  color: var(--color-accent);
+  font-size: 10px;
+  font-weight: var(--weight-bold);
+  line-height: 1;
+}
+
+.player__sound {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--player-muted);
+  --icon-size: var(--icon-s);
+}
+
+.player__volume {
+  flex: 1 1 auto;
+}
+
+.player__hint {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0;
+  color: var(--player-muted);
+  font-size: var(--text-lead);
+  font-weight: var(--weight-medium);
+  --icon-size: var(--icon-m);
+}

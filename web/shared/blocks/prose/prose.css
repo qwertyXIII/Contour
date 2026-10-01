@@ -1,0 +1,105 @@
+/*
+ * Блок prose: текст из разметки (Markdown) — заголовки, абзацы, списки, цитаты,
+ * таблицы, код. Рисует компонент markdown (components/markdown/markdown.js):
+ * корень получает класс prose, внутри — обычные теги HTML, поэтому стили — по
+ * тегам внутри блока, а не по элементам. Цвета — токены темы: блок живёт и на
+ * светлом экране, и на тёмной подложке просмотра.
+ *
+ *   <div class="prose"><h1>…</h1><p>…</p><pre><code class="code code_block">…</code></pre></div>
+ *
+ * Элементы: __table (обёртка таблицы — листается вбок), __image (подпись вместо
+ * картинки: картинок в чужом тексте нет — адрес сказал бы, что файл открыли).
+ */
+.prose {
+  font-size: var(--text-body);
+  line-height: var(--leading-normal);
+  overflow-wrap: anywhere;
+}
+
+.prose > :first-child { margin-top: 0; }
+.prose > :last-child { margin-bottom: 0; }
+
+.prose :is(h1, h2, h3, h4, h5, h6) {
+  margin: 1.4em 0 .5em;
+  font-weight: var(--weight-semibold);
+  line-height: var(--leading-title);
+  letter-spacing: var(--tracking-title);
+}
+
+.prose h1 { font-size: var(--text-title); }
+.prose h2 { font-size: var(--text-lead); }
+.prose :is(h3, h4, h5, h6) { font-size: var(--text-body); }
+
+.prose :is(p, ul, ol, blockquote, pre, .prose__table) {
+  margin: 0 0 .8em;
+}
+
+.prose :is(ul, ol) {
+  padding-left: 1.4em;
+}
+
+.prose li + li { margin-top: .25em; }
+.prose li > :is(ul, ol) { margin: .25em 0 0; }
+
+.prose a {
+  color: var(--color-accent);
+  text-decoration: underline;
+  text-underline-offset: .15em;
+}
+
+.prose blockquote {
+  padding-left: var(--space-3);
+  border-left: 3px solid var(--color-fill-3);
+  color: var(--color-text-muted);
+}
+
+.prose hr {
+  margin: 1.2em 0;
+  border: 0;
+  border-top: 1px solid var(--color-border);
+}
+
+/* Строчный код в тексте: переносится, иначе длинный путь увёл бы строку за край. */
+.prose :not(pre) > code {
+  padding: .1em .35em;
+  border-radius: var(--radius-xs);
+  background: var(--color-fill-2);
+  font-family: var(--font-mono);
+  font-size: .88em;
+  overflow-wrap: anywhere;
+}
+
+/* Блок кода — сам блок code (code_block): цвета подсветки — у него. */
+.prose pre > code {
+  font-size: var(--text-caption);
+}
+
+.prose__table {
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+}
+
+.prose table {
+  border-collapse: collapse;
+  font-size: var(--text-caption);
+}
+
+.prose :is(th, td) {
+  padding: var(--space-1) var(--space-2);
+  border: 1px solid var(--color-border);
+  text-align: left;
+  vertical-align: top;
+}
+
+.prose th {
+  background: var(--color-fill-1);
+  font-weight: var(--weight-semibold);
+}
+
+.prose__image {
+  color: var(--color-text-muted);
+  font-style: italic;
+}
+
+.prose__image::before { content: '[картинка: '; }
+.prose__image::after { content: ']'; }

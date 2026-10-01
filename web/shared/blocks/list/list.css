@@ -1,0 +1,63 @@
+/*
+ * Блок list: столбик однородных пунктов, обычно — строк row.
+ *
+ *   list                 — разделители между пунктами (список внутри карточки)
+ *   list_view_cards      — каждый пункт отдельной карточкой, с промежутком
+ *   list_view_menu       — строки-кнопки row_interactive без разделителей
+ *   list_view_links      — строки-кнопки row_interactive с разделителями: книга
+ *                          людей по буквам, где нажимают строку целиком
+ *
+ * Список — контейнер для @container: строки внутри подстраиваются под его
+ * ширину (row_wrap), а не под ширину экрана.
+ */
+.list {
+  --list-divider: 1px solid var(--color-border);
+  --list-item-pad: var(--row-pad-y);
+
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  container-type: inline-size;
+}
+
+.list__item {
+  min-width: 0;
+  padding-block: var(--list-item-pad);
+}
+
+.list__item + .list__item {
+  border-top: var(--list-divider);
+}
+
+/* Внутри карточки её собственный отступ обрамляет список: крайним пунктам свой не нужен. */
+.list__item:first-child {
+  padding-top: 0;
+}
+
+.list__item:last-child {
+  padding-bottom: 0;
+}
+
+.list_view_cards {
+  --list-divider: 0;
+  --list-item-pad: 0;
+  gap: var(--list-gap);
+}
+
+.list_view_menu {
+  --list-divider: 0;
+  --list-item-pad: 0;
+  gap: var(--space-half);
+}
+
+/* Строки-переходы с разделителями — книга людей: линия между пунктами, как у
+   списка в карточке, а отступ пункта отдан строке-кнопке — он у неё вместе с
+   подсветкой нажатия (два отступа подряд удвоили бы высоту строки). По бокам
+   строка не отступает: аватар стоит на линии заголовка раздела, как в образце. */
+.list_view_links {
+  --list-item-pad: 0;
+  --row-inset: 0px;
+}

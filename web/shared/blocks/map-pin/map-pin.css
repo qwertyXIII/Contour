@@ -1,0 +1,75 @@
+/*
+ * Блок map-pin: метка на карте — наш блок у любого провайдера (у Яндекса v3
+ * метка — DOM-элемент, так что облик один). Центр метки — точка на карте.
+ *
+ *   <span class="map-pin map-pin_kind_end map__pin" data-at="82.92,55.04">
+ *     <svg class="icon map-pin__icon">…#pin</svg>
+ *     <span class="map-pin__label">Стоматолог · 16:30</span>
+ *   </span>
+ *
+ *   map-pin_kind_{start|end|me} · __icon · __label
+ */
+.map-pin {
+  --pin-size: 32px;
+  --pin-bg: var(--color-surface-solid);
+  --pin-fg: var(--color-text);
+
+  position: relative; /* на карте map__pin делает её absolute — map импортирован позже */
+  display: inline-grid;
+  width: var(--pin-size);
+  height: var(--pin-size);
+  place-items: center;
+  border: 2px solid var(--color-knob);
+  border-radius: 50%;
+  background: var(--pin-bg);
+  color: var(--pin-fg);
+  box-shadow: var(--shadow-m);
+  --icon-size: var(--icon-s);
+}
+
+.map-pin_kind_end {
+  --pin-bg: var(--color-accent);
+  --pin-fg: var(--color-on-accent);
+}
+
+/* «Я здесь»: точка без значка, вокруг расходится круг. */
+.map-pin_kind_me {
+  --pin-size: 18px;
+  --pin-bg: var(--color-info);
+}
+
+.map-pin_kind_me::after {
+  position: absolute;
+  inset: -6px;
+  border-radius: 50%;
+  background: var(--color-info-soft);
+  animation: map-pin-ripple var(--duration-loop) var(--ease-out) infinite;
+  content: '';
+}
+
+/* Подпись справа от метки: на карте её читают вместе с точкой. */
+.map-pin__label {
+  position: absolute;
+  top: 50%;
+  left: calc(100% + var(--space-2));
+  padding: var(--space-half) var(--space-2);
+  border-radius: var(--radius-full);
+  background: var(--color-surface-solid);
+  color: var(--color-text);
+  box-shadow: var(--shadow-s);
+  font-size: var(--text-caption);
+  font-weight: var(--weight-semibold);
+  white-space: nowrap;
+  translate: 0 -50%;
+}
+
+@keyframes map-pin-ripple {
+  from { opacity: .9; scale: .6; }
+  to { opacity: 0; scale: 1.6; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .map-pin_kind_me::after {
+    animation: none;
+  }
+}

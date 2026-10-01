@@ -1,0 +1,251 @@
+/*
+ * Элемент composer__attachments: полоса превью выбранных файлов над строкой ввода.
+ * Не влезает — листается вбок; пустая — не видна. Строит её компонент Composer
+ * (components/composer/preview.js); разметка одна, вид — по модификатору:
+ *
+ *   <ul class="composer__attachments" aria-label="Приложено">
+ *     <li class="composer__attachment composer__attachment_kind_photo composer__attachment_uploading">
+ *       <span class="thumb composer__preview">
+ *         <svg class="icon composer__type">…</svg>         ← значок под картинкой: виден, пока её нет
+ *         <img class="thumb__image composer__image">       ← фото; у видео — <video> (+ __image_loading до кадра)
+ *         <span class="composer__duration">0:12</span>      ← видео
+ *         <button class="composer__retry">↻</button>       ← только когда не ушло
+ *       </span>
+ *       <span class="composer__about">                     ← только файл
+ *         <span class="composer__name">…</span><span class="composer__meta"><span class="composer__state">Не ушло · </span>2,4 МБ</span>
+ *       </span>
+ *       <div class="progress progress_size_s composer__progress">…</div>    ← пока закачивается
+ *       <button class="composer__remove">✕</button>
+ *     </li>
+ *   </ul>
+ *
+ *   __attachment_kind_{photo|video|file} · __attachment_uploading (затемнено, ход внизу) ·
+ *   __attachment_failed (рамка цвета отказа, «повторить» по центру превью)
+ *   --composer-tile — сторона превью · --composer-remove — кружок ✕
+ */
+.composer__attachments {
+  --composer-tile: calc(var(--control-h-l) + var(--space-3));
+  --composer-remove: 22px;
+
+  display: flex;
+  flex: 1 0 100%;
+  gap: var(--space-2);
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  scrollbar-width: none;
+}
+
+.composer__attachments::-webkit-scrollbar {
+  display: none;
+}
+
+.composer__attachments:not(:has(.composer__attachment)) {
+  display: none;
+}
+
+.composer__attachment {
+  position: relative;
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: var(--space-3);
+  height: var(--composer-tile);
+  border-radius: var(--radius-m);
+  overflow: hidden;
+  animation: composer-attach-in var(--duration-normal) var(--ease-out);
+}
+
+@keyframes composer-attach-in {
+  from {
+    opacity: 0;
+    transform: scale(.92);
+  }
+}
+
+/* Не ушло — рамкой по краю: видно и на фото, и на плашке. */
+.composer__attachment_failed::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border: 2px solid var(--color-danger);
+  border-radius: inherit;
+  pointer-events: none;
+}
+
+/* Плашка файла: значок, имя, размер; справа — место под ✕. */
+.composer__attachment_kind_file {
+  max-width: calc(var(--composer-tile) * 3.6);
+  padding-inline-end: calc(var(--composer-remove) + var(--space-3));
+  background: var(--color-fill-1);
+}
+
+/* ── Превью ────────────────────────────────────────────────────────── */
+
+.composer__preview {
+  --thumb-size: var(--composer-tile);
+
+  border-radius: inherit;
+}
+
+/* Затемнение, пока закачивается и когда не ушло: поверх картинки, под кнопками. */
+.composer__preview::after {
+  content: "";
+  grid-area: 1 / 1;
+  place-self: stretch;
+  background: var(--color-media-shade);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--duration-fast) ease;
+}
+
+.composer__attachment_uploading .composer__preview::after,
+.composer__attachment_failed .composer__preview::after {
+  opacity: 1;
+}
+
+/* У плашки файла под затемнением только значок — на светлой теме оно лишь мутит. */
+.composer__attachment_kind_file .composer__preview::after {
+  display: none;
+}
+
+.composer__type {
+  grid-area: 1 / 1;
+}
+
+.composer__attachment_failed .composer__type {
+  visibility: hidden;
+}
+
+.composer__image {
+  transition: opacity var(--duration-fast) ease;
+}
+
+.composer__image_loading {
+  opacity: 0;
+}
+
+.composer__duration {
+  z-index: 1;
+  grid-area: 1 / 1;
+  place-self: start;
+  margin: var(--space-1);
+  padding: 0 var(--space-1);
+  border-radius: var(--radius-xs);
+  background: var(--color-media-shade-strong);
+  color: var(--color-on-media);
+  font-size: var(--text-caption);
+  font-weight: var(--weight-semibold);
+  font-variant-numeric: tabular-nums;
+  line-height: 1.5;
+}
+
+.composer__duration:empty {
+  display: none;
+}
+
+.composer__retry {
+  z-index: 1;
+  display: none;
+  grid-area: 1 / 1;
+  place-items: center;
+  width: calc(var(--composer-tile) * .6);
+  aspect-ratio: 1;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-full);
+  background: var(--color-danger);
+  color: var(--color-on-media);
+  cursor: pointer;
+  --icon-size: var(--icon-m);
+  transition: transform var(--duration-press) var(--ease-out);
+}
+
+.composer__attachment_failed .composer__retry {
+  display: grid;
+}
+
+.composer__retry:active {
+  transform: scale(.9);
+}
+
+/* ── Имя и размер (плашка файла) ───────────────────────────────────── */
+
+.composer__about {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-half);
+  min-width: 0;
+}
+
+.composer__name {
+  overflow: hidden;
+  color: var(--color-text);
+  font-size: var(--text-small);
+  font-weight: var(--weight-semibold);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.composer__meta {
+  color: var(--color-text-muted);
+  font-size: var(--text-caption);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.composer__state {
+  display: none;
+  color: var(--color-danger);
+}
+
+.composer__attachment_failed .composer__state {
+  display: inline;
+}
+
+/* ── Ход закачки и «убрать» ────────────────────────────────────────── */
+
+.composer__progress {
+  position: absolute;
+  right: var(--space-2);
+  bottom: var(--space-2);
+  left: var(--space-2);
+  display: none;
+  width: auto;
+}
+
+.composer__attachment_uploading .composer__progress {
+  display: block;
+}
+
+.composer__remove {
+  position: absolute;
+  top: var(--space-1);
+  right: var(--space-1);
+  display: grid;
+  place-items: center;
+  width: var(--composer-remove);
+  height: var(--composer-remove);
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-full);
+  background: var(--color-media-shade-strong);
+  color: var(--color-on-media);
+  cursor: pointer;
+  --icon-size: calc(var(--composer-remove) * .6);
+  transition: transform var(--duration-press) var(--ease-out);
+}
+
+/* Палец больше кружка: место нажатия — шире видимого. */
+.composer__remove::before {
+  content: "";
+  position: absolute;
+  inset: calc(-1 * var(--space-2));
+}
+
+.composer__remove:active {
+  transform: scale(.88);
+}

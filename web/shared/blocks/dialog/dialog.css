@@ -1,0 +1,125 @@
+/*
+ * Блок dialog: вопрос, который нельзя обойти, или форма поверх экрана.
+ * Нативный <dialog> + showModal(): ловушка фокуса, Esc и возврат фокуса —
+ * от браузера.
+ *
+ * На телефоне — лист снизу (палец достаёт), на десктопе — окно по центру.
+ * Это единственное место, где блок сам решает про положение: диалог живёт в
+ * верхнем слое, и родителя, который бы его разместил, у него нет.
+ *
+ *   __grip · __head (микс с bar) · __close · __body · __foot
+ *   dialog_size_{s|l}
+ *
+ * Фото и видео во весь экран — не диалог, а блок viewer.
+ *
+ * ⚠️ С 2026-09-30 вопросы и формы на телефоне — лист (sheet sheet_view_surface
+ * sheet_modal, ADR-0065 Alter'а): упоры, жест, закрытие смахиванием. Этот блок —
+ * прежнее окно; держится, пока его зовёт правка экрана главного.
+ */
+.dialog {
+  --dialog-w: 520px;
+
+  width: 100%;
+  max-width: 100%;
+  max-height: calc(100dvh - var(--space-6));
+  margin: auto 0 0;
+  padding: 0;
+  border: 1px solid var(--color-border);
+  border-bottom: 0;
+  border-radius: var(--radius-xl) var(--radius-xl) 0 0;
+  background: var(--color-bg-elevated);
+  color: var(--color-text);
+  box-shadow: var(--shadow-l);
+  overscroll-behavior: contain;
+}
+
+.dialog[open] {
+  display: flex;
+  flex-direction: column;
+  animation: dialog-rise var(--duration-normal) var(--ease-out);
+}
+
+.dialog::backdrop {
+  background: var(--color-overlay, rgba(0, 0, 0, .5));
+  -webkit-backdrop-filter: blur(var(--blur-overlay, 6px));
+  backdrop-filter: blur(var(--blur-overlay, 6px));
+}
+
+.dialog[open]::backdrop {
+  animation: dialog-fade var(--duration-normal) ease;
+}
+
+.dialog_size_s { --dialog-w: 400px; }
+.dialog_size_l { --dialog-w: 720px; }
+
+.dialog__grip {
+  flex: 0 0 auto;
+  width: 40px;
+  height: 5px;
+  margin: var(--space-2) auto 0;
+  border-radius: var(--radius-full);
+  background: var(--color-fill-3);
+}
+
+.dialog__head {
+  flex: 0 0 auto;
+  padding: var(--space-3) var(--space-5) var(--space-1);
+}
+
+.dialog__body {
+  flex: 1 1 auto;
+  min-height: 0;
+  padding: var(--space-2) var(--space-5) var(--space-5);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  container-type: inline-size;
+}
+
+/* Телефон: кнопки столбиком во всю ширину, главная сверху (первая в разметке). */
+.dialog__foot {
+  display: flex;
+  flex: 0 0 auto;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-5) calc(var(--space-5) + env(safe-area-inset-bottom, 0px));
+  border-top: 1px solid var(--color-border);
+}
+
+@media (min-width: 768px) {
+  .dialog {
+    width: min(var(--dialog-w), calc(100% - var(--space-12)));
+    margin: auto;
+    border-bottom: 1px solid var(--color-border);
+    border-radius: var(--radius-xl);
+  }
+
+  .dialog[open] {
+    animation-name: dialog-pop;
+  }
+
+  .dialog__grip {
+    display: none;
+  }
+
+  .dialog__head {
+    padding-top: var(--space-5);
+  }
+
+  .dialog__foot {
+    flex-direction: row-reverse;
+    justify-content: flex-start;
+    padding-bottom: var(--space-4);
+  }
+}
+
+@keyframes dialog-rise {
+  from { transform: translateY(100%); }
+}
+
+@keyframes dialog-pop {
+  from { opacity: 0; transform: translateY(8px) scale(.97); }
+}
+
+@keyframes dialog-fade {
+  from { opacity: 0; }
+}

@@ -1,0 +1,92 @@
+/*
+ * Блок avatar: человек — фото или инициалы.
+ *
+ *   avatar_size_{s|m|l|xl|2xl}   28 · 40 · 56 · 88 · 120 (2xl — шапка masthead, крупно по центру)
+ *   avatar_hued              цвет от оттенка --avatar-hue (данные: номер карточки)
+ *   avatar_view_poster       постер шапки masthead_view_poster: на всё место родителя,
+ *                            без скругления, буквы крупно (--avatar-poster-letters),
+ *                            выше середины на --avatar-poster-shift
+ *   __image · __status (__status_tone_ok)
+ */
+.avatar {
+  --avatar-size: 40px;
+
+  position: relative;
+  display: inline-grid;
+  flex: 0 0 auto;
+  place-items: center;
+  width: var(--avatar-size);
+  height: var(--avatar-size);
+  border-radius: 50%;
+  background: var(--avatar-bg, var(--color-fill-2));
+  color: var(--avatar-fg, var(--color-text));
+  font-size: calc(var(--avatar-size) * .38);
+  font-weight: var(--weight-semibold);
+  letter-spacing: -.01em;
+  line-height: 1;
+  user-select: none;
+}
+
+.avatar_size_s { --avatar-size: 28px; }
+.avatar_size_m { --avatar-size: 40px; }
+.avatar_size_l { --avatar-size: 56px; }
+.avatar_size_xl { --avatar-size: 88px; }
+.avatar_size_2xl { --avatar-size: 120px; }
+
+.avatar_hued {
+  --avatar-bg: light-dark(
+    oklch(var(--hued-light) var(--avatar-hue, 30)),
+    oklch(var(--hued-dark) var(--avatar-hue, 30))
+  );
+  --avatar-fg: var(--color-on-brand);
+}
+
+/*
+ * Постер: то же фото или те же буквы с оттенком — только во всё место, которое
+ * даёт родитель (шапка-постер), без круга. Круглым его делает шапка, когда
+ * сжимает в полосу. Без фото у заливки — мягкий свет сверху, чтобы крупный цвет
+ * не выглядел плашкой; буквы — по центру, как у круга: сжатый постер — это круг
+ * из середины.
+ */
+.avatar_view_poster {
+  --avatar-size: 100%;
+
+  width: 100%;
+  height: 100%;
+  border-radius: 0;
+  background-image: radial-gradient(120% 70% at 50% 25%, color-mix(in oklab, var(--color-on-brand) 16%, transparent), transparent 70%);
+  /* Буквы выше середины на --avatar-poster-shift: там середина круга, в который постер сжимается. */
+  padding-bottom: calc(var(--avatar-poster-shift, 0px) * 2);
+  font-size: var(--avatar-poster-letters, clamp(72px, 40cqi, 200px));
+  font-weight: var(--weight-bold);
+  letter-spacing: -.03em;
+}
+
+/*
+ * Фото — на весь круг поверх букв: абсолютно, а не ячейкой сетки. Ячейкой
+ * портретное фото получало высоту по своей пропорции и круг становился овалом.
+ */
+.avatar__image {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  border-radius: inherit;
+  object-fit: cover;
+}
+
+.avatar__status {
+  position: absolute;
+  z-index: 1;
+  right: 2%;
+  bottom: 2%;
+  width: 26%;
+  height: 26%;
+  border-radius: 50%;
+  background: var(--color-text-faint);
+  box-shadow: 0 0 0 2px var(--color-bg);
+}
+
+.avatar__status_tone_ok {
+  background: var(--color-ok);
+}

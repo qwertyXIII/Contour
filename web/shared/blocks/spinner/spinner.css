@@ -1,0 +1,18 @@
+/* Блок spinner: идёт работа, конец неизвестен. Цвет — currentColor родителя. */
+.spinner {
+  display: inline-block;
+  flex: 0 0 auto;
+  width: var(--spinner-size, 20px);
+  height: var(--spinner-size, 20px);
+  border: var(--spinner-line, 2px) solid color-mix(in srgb, currentColor 22%, transparent);
+  border-top-color: currentColor;
+  border-radius: 50%;
+  animation: spinner-turn var(--duration-spin) linear infinite;
+}
+
+.spinner_size_s { --spinner-size: 16px; }
+.spinner_size_l { --spinner-size: 32px; --spinner-line: 3px; }
+
+@keyframes spinner-turn {
+  to { transform: rotate(1turn); }
+}

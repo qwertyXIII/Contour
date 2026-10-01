@@ -1,0 +1,57 @@
+/*
+ * Элемент icon__part: подвижная часть значка — язычок колокольчика, крышка
+ * урны, стрелка. Размечается в спрайте: класс движения плюс параметры
+ * переменными прямо на части.
+ *
+ *   <path class="icon__part icon__part_motion_swing" style="--o: 12px 18.5px; --a: 22deg" d="…"/>
+ *
+ *   --o          ось поворота и масштаба в координатах сетки 24 (по умолчанию центр)
+ *   --a          угол · --x, --y сдвиг · --s, --sx, --sy масштаб
+ *   --delay      задержка — так части двигаются по очереди (--delay-loop — своя для «всегда»)
+ *   --dur        длительность прохода · --count сколько проходов за один запуск
+ *   --ease-hold  кривая, пока держат (у вращения — равномерная, чтобы круги сливались)
+ *
+ * Сама часть стоит на месте. Движение включает блок:
+ *   icon_playing — идёт запуск (ставит компонент MotionIcon: наведение, тап, фокус, событие icon:play);
+ *   icon_motion_hold + icon_playing — проход повторяется, пока держат;
+ *   icon_motion_loop — всегда, с паузой между проходами у «событийных» движений.
+ */
+.icon__part {
+  transform-box: var(--box, view-box);
+  transform-origin: var(--o, 12px 12px);
+}
+
+.icon_playing .icon__part {
+  animation-name: var(--motion, none);
+  animation-duration: var(--dur, 700ms);
+  animation-timing-function: var(--ease, var(--ease-out));
+  animation-delay: var(--delay, 0ms);
+  animation-iteration-count: var(--count, 1);
+  animation-fill-mode: both;
+}
+
+/* Пока держат: тот же проход без конца. Отпустили — компонент даёт доиграть текущий круг. */
+.icon_motion_hold.icon_playing .icon__part {
+  animation-timing-function: var(--ease-hold, var(--ease, var(--ease-out)));
+  animation-iteration-count: infinite;
+}
+
+.icon_motion_loop .icon__part {
+  animation-name: var(--motion-loop, none);
+  animation-duration: var(--dur-loop, calc(var(--dur, 700ms) * 2.5));
+  animation-timing-function: var(--ease-loop, var(--ease, var(--ease-in-out)));
+  animation-delay: var(--delay-loop, var(--delay, 0ms));
+  animation-iteration-count: infinite;
+  animation-fill-mode: both;
+}
+
+/*
+ * Меньше движения: запуски по наведению выключены, значок просто стоит.
+ * Постоянное движение остаётся — его ставят туда, где оно и есть смысл
+ * (загрузка, запись), как у спиннера.
+ */
+@media (prefers-reduced-motion: reduce) {
+  .icon_playing .icon__part {
+    animation-name: none;
+  }
+}

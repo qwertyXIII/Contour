@@ -1,0 +1,36 @@
+/*
+ * Блок toaster: слой уведомлений. Слой, а не блок в потоке, поэтому сам
+ * себя позиционирует — исключение из правила «положение задаёт родитель»,
+ * как и диалог.
+ *
+ * На телефоне — сверху: снизу лежит панель чата. На десктопе — справа внизу.
+ * Наполняет компонент Toaster по событию toast:show.
+ */
+.toaster {
+  --toast-from: -10px;
+
+  position: fixed;
+  z-index: var(--z-toast);
+  top: calc(env(safe-area-inset-top, 0px) + var(--space-3));
+  right: var(--space-3);
+  left: var(--space-3);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-2);
+  pointer-events: none;
+}
+
+@media (min-width: 768px) {
+  .toaster {
+    --toast-from: 10px;
+
+    top: auto;
+    right: var(--space-6);
+    bottom: var(--space-6);
+    left: auto;
+    flex-direction: column-reverse;
+    align-items: flex-end;
+    width: min(400px, calc(100% - var(--space-12)));
+  }
+}

@@ -1,0 +1,53 @@
+/*
+ * Блок badge: короткий статус или метка рядом с тем, к чему относится.
+ * Смысл передаётся словом, цвет только помогает: «ошибка», а не красная точка.
+ *
+ *   badge_tone_{ok|danger|warn|info|accent}   badge_view_outline   badge_live
+ *   __dot · __icon (микс с icon)
+ */
+.badge {
+  --badge-bg: var(--color-fill-1);
+  --badge-fg: var(--color-text-muted);
+
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: var(--space-1);
+  height: 22px;
+  padding: 0 var(--space-2);
+  border-radius: var(--radius-full);
+  background: var(--badge-bg);
+  color: var(--badge-fg);
+  font-size: var(--text-caption);
+  font-weight: var(--weight-semibold);
+  line-height: 1;
+  white-space: nowrap;
+  --icon-size: 14px;
+}
+
+.badge_tone_ok { --badge-bg: var(--color-ok-soft); --badge-fg: var(--color-ok); }
+.badge_tone_danger { --badge-bg: var(--color-danger-soft); --badge-fg: var(--color-danger); }
+.badge_tone_warn { --badge-bg: var(--color-warn-soft); --badge-fg: var(--color-warn); }
+.badge_tone_info { --badge-bg: var(--color-info-soft); --badge-fg: var(--color-info); }
+.badge_tone_accent { --badge-bg: var(--color-accent-soft); --badge-fg: var(--color-accent-text); }
+
+.badge_view_outline {
+  background: transparent;
+  box-shadow: inset 0 0 0 1px var(--color-border-strong);
+}
+
+.badge__dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+/* Идёт прямо сейчас: точка дышит. */
+.badge_live .badge__dot {
+  animation: badge-pulse var(--duration-loop) ease-in-out infinite;
+}
+
+@keyframes badge-pulse {
+  50% { opacity: .3; }
+}

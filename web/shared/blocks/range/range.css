@@ -1,0 +1,137 @@
+/*
+ * Блок range: ползунок. Число подбирается на глаз и на слух — значение видно
+ * сразу (field__value), заливка дорожки идёт до ручки.
+ *
+ *   <div class="range">
+ *     <input class="range__input" type="range" min="0" max="100" value="40">
+ *     <div class="range__labels"><span>0</span><span>100</span></div>   ← необязательно
+ *   </div>
+ *
+ * Заливку ведёт компонент Range: пишет долю в --range-fill на корне блока.
+ * Без JS дорожка залита наполовину — ползунок работает, выглядит проще.
+ *
+ *   range_tone_{ok|danger}
+ *   range_view_thin — тонкая дорожка и маленькая ручка (перемотка видео и
+ *   музыки); цель для пальца остаётся высокой (--range-hit)
+ *
+ * Загруженная часть (видео, звук по сети) — --range-buffer: доля дорожки
+ * светлее пустой; её пишет хозяин ползунка, у простого ползунка её нет.
+ * Своя дорожка целиком (оттенок и яркость у пикера цвета) — --range-track-bg.
+ */
+.range {
+  --range-fill: 50%;
+  --range-color: var(--color-accent);
+  --range-track: 6px;
+  --range-knob: var(--knob-size);
+  --range-buffer: 0%;
+  --range-buffer-color: var(--color-fill-3);
+  --range-empty: var(--color-fill-3);
+
+  display: block;
+  width: 100%;
+  min-width: 0;
+}
+
+.range_tone_ok { --range-color: var(--color-ok); }
+.range_tone_danger { --range-color: var(--color-danger); }
+
+.range_view_thin {
+  --range-track: 4px;
+  --range-knob: 14px;
+  --range-hit: 28px;
+}
+
+.range__input {
+  display: block;
+  width: 100%;
+  height: var(--range-hit, var(--range-knob));
+  margin: 0;
+  background: transparent;
+  cursor: pointer;
+  /* В приложении жесты на странице запрещены — ползунок ловит палец сам. */
+  touch-action: pan-x;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+.range__input:focus-visible {
+  outline: none;
+}
+
+.range__input:disabled {
+  opacity: .45;
+  cursor: default;
+}
+
+/* WebKit / Blink */
+.range__input::-webkit-slider-runnable-track {
+  height: var(--range-track);
+  border-radius: var(--radius-full);
+  background: var(--range-track-bg, linear-gradient(to right,
+    var(--range-color) var(--range-fill),
+    var(--range-buffer-color) var(--range-fill) var(--range-buffer),
+    var(--range-empty) var(--range-buffer)));
+}
+
+.range__input::-webkit-slider-thumb {
+  width: var(--range-knob);
+  height: var(--range-knob);
+  margin-top: calc((var(--range-track) - var(--range-knob)) / 2);
+  border: 0;
+  border-radius: 50%;
+  background: var(--color-knob);
+  box-shadow: var(--shadow-knob);
+  transition: transform var(--duration-press) var(--ease-out), box-shadow var(--duration-fast) ease;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+.range__input:active::-webkit-slider-thumb {
+  transform: scale(1.08);
+}
+
+/* Тонкая ручка под пальцем заметно растёт — видно, что её держат. */
+.range_view_thin .range__input:active::-webkit-slider-thumb {
+  transform: scale(1.45);
+}
+
+.range__input:focus-visible::-webkit-slider-thumb {
+  box-shadow: var(--shadow-knob), 0 0 0 4px var(--color-accent-line);
+}
+
+/* Firefox */
+.range__input::-moz-range-track {
+  height: var(--range-track);
+  border-radius: var(--radius-full);
+  background: var(--range-track-bg, linear-gradient(to right, var(--range-buffer-color) var(--range-buffer), var(--range-empty) var(--range-buffer)));
+}
+
+.range__input::-moz-range-progress {
+  height: var(--range-track);
+  border-radius: var(--radius-full);
+  background: var(--range-color);
+}
+
+.range__input::-moz-range-thumb {
+  width: var(--range-knob);
+  height: var(--range-knob);
+  border: 0;
+  border-radius: 50%;
+  background: var(--color-knob);
+  box-shadow: var(--shadow-knob);
+}
+
+.range__input:focus-visible::-moz-range-thumb {
+  box-shadow: var(--shadow-knob), 0 0 0 4px var(--color-accent-line);
+}
+
+.range__labels {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-2);
+  margin-top: var(--space-1);
+  color: var(--color-text-faint);
+  font-size: var(--text-caption);
+  font-weight: var(--weight-medium);
+  font-variant-numeric: tabular-nums;
+}

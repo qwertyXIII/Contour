@@ -1,0 +1,29 @@
+/*
+ * widgets_editing: правка раскладки. Виджеты покачиваются (как на iPhone),
+ * их содержимое не нажимается, виджет тянется сразу, а пальцем по виджету
+ * страница не прокручивается. Большие качаются меньше — край идёт одинаково.
+ */
+.widgets_editing .widgets__item {
+  cursor: grab;
+  touch-action: none;
+  animation: widgets-jiggle 300ms ease-in-out var(--jiggle-delay, 0ms) infinite alternate;
+}
+
+.widgets_editing .widgets__item_lifted,
+.widgets_editing .widgets__item_picked {
+  animation: none;
+}
+
+@keyframes widgets-jiggle {
+  from { rotate: calc(var(--jiggle) * -1); }
+  to { rotate: var(--jiggle); }
+}
+
+/* Меньше движения: вместо качания — пунктир вокруг виджетов. */
+@media (prefers-reduced-motion: reduce) {
+  .widgets_editing .widgets__item {
+    animation: none;
+    outline: 1px dashed var(--color-border-strong);
+    outline-offset: 2px;
+  }
+}

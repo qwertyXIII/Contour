@@ -1,0 +1,120 @@
+/*
+ * Блок fader: вертикальный ползунок. Два вида:
+ *   по умолчанию     — толстая таблетка, как в пункте управления iOS: свет, шторы, громкость;
+ *   fader_view_track — тонкая дорожка с ручкой: ряд таких — микшер, эквалайзер, цепочка эффектов.
+ *
+ * Внутри нативный range (visually-hidden): стрелки, фокус и скринридер — от
+ * него. Облик и палец — компонент Fader: пишет долю в --fader-value (0…1).
+ *
+ *   <div class="fader">
+ *     <input class="fader__input visually-hidden" type="range" min="0" max="100" value="60" aria-label="Свет">
+ *     <div class="fader__track" aria-hidden="true">
+ *       <div class="fader__fill"></div>
+ *       <svg class="icon fader__icon">…</svg>   ← у таблетки
+ *       <div class="fader__knob"></div>        ← у дорожки
+ *     </div>
+ *     <output class="fader__value">60%</output>
+ *     <span class="fader__label">Свет</span>
+ *   </div>
+ *
+ *   fader_view_track · fader_tone_accent · fader_size_{s|l} · fader_horizontal · fader_fill (на всю клетку виджета)
+ *   fader_bipolar — ноль посередине (−100…+100): заливка от нуля, а не от низа
+ *   fader_covered — заливка дошла до значка (значок меняет цвет) · fader_dragging — тянут пальцем
+ */
+.fader {
+  --fader-value: .5;
+  --fader-w: 76px;
+  --fader-h: 200px;
+  --fader-radius: var(--radius-xl);
+  --fader-fill: var(--color-contrast);
+  --fader-on-fill: var(--color-on-contrast);
+
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-2);
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.fader_size_s { --fader-w: 56px; --fader-h: 150px; --fader-radius: var(--radius-l); }
+.fader_size_l { --fader-w: 92px; --fader-h: 260px; --fader-radius: var(--radius-2xl); }
+
+.fader_tone_accent {
+  --fader-fill: var(--color-accent);
+  --fader-on-fill: var(--color-on-accent);
+}
+
+.fader__track {
+  position: relative;
+  width: var(--fader-w);
+  height: var(--fader-h);
+  overflow: hidden;
+  border-radius: var(--fader-radius);
+  background: var(--color-fill-2);
+  cursor: ns-resize;
+  touch-action: none;
+  transition: transform var(--duration-normal) var(--ease-out);
+}
+
+.fader__fill {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  height: calc(var(--fader-value) * 100%);
+  background: var(--fader-fill);
+  transition: height var(--duration-fast) ease, width var(--duration-fast) ease;
+}
+
+.fader__icon {
+  position: absolute;
+  bottom: var(--space-4);
+  left: 50%;
+  color: var(--color-text-muted);
+  transform: translateX(-50%);
+  --icon-size: var(--icon-l);
+  transition: color var(--duration-fast) ease;
+}
+
+.fader_covered .fader__icon {
+  color: var(--fader-on-fill);
+}
+
+.fader__knob {
+  display: none;
+}
+
+.fader__value {
+  color: var(--color-text);
+  font-size: var(--text-small);
+  font-weight: var(--weight-semibold);
+  font-variant-numeric: tabular-nums;
+}
+
+.fader__label {
+  color: var(--color-text-muted);
+  font-size: var(--text-caption);
+  font-weight: var(--weight-medium);
+  text-align: center;
+}
+
+/* Тянут: чуть крупнее, заливка идёт за пальцем без запаздывания. */
+.fader_dragging .fader__track {
+  transform: scale(1.03);
+}
+
+.fader_dragging .fader__fill,
+.fader_dragging .fader__knob {
+  transition: none;
+}
+
+.fader:has(.fader__input:focus-visible) .fader__track {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 3px;
+}
+
+.fader:has(.fader__input:disabled) {
+  opacity: .45;
+  pointer-events: none;
+}

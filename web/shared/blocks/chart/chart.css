@@ -1,0 +1,150 @@
+/*
+ * Блок chart: график из таблицы данных. Автор пишет обычную <table> — она и
+ * источник, и таблица-двойник для скринридера и для «показать таблицей».
+ * Рисует компонент Chart; без JS таблица остаётся таблицей.
+ *
+ *   <figure class="chart chart_form_stacked" data-unit=" ₽">
+ *     <div class="chart__head"><figcaption class="chart__title">Траты по неделям</figcaption>
+ *       <button class="button button_size_s button_view_ghost chart__toggle" type="button">Таблица</button></div>
+ *     <table class="chart__table">
+ *       <thead><tr><th>Неделя</th><th>Еда</th><th data-series="3">Такси</th></tr></thead>
+ *       <tbody><tr><th>1</th><td>4200</td><td>900</td></tr>…</tbody>
+ *     </table>
+ *   </figure>
+ *
+ *   chart_form_{line|area|stacked|grouped|layered}
+ *   data-series у заголовка столбца — постоянный цвет ряда (цвет у сущности, а не у места)
+ *   Ставит JS: chart_enhanced · chart_intro (первое появление) · chart_view_table · __data (обёртка таблицы)
+ *
+ *   --chart-h — высота поля графика (подписи оси X — сверх неё)
+ *   --chart-surface — фон под графиком: им рисуются зазоры и кольца меток
+ */
+.chart {
+  --chart-h: 180px;
+  --chart-axis: 22px;
+  --chart-surface: var(--color-surface-solid);
+  --chart-grid: var(--color-border);
+  --chart-base: var(--color-border-strong);
+
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  min-width: 0;
+  margin: 0;
+}
+
+.chart__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.chart__title {
+  min-width: 0;
+  color: var(--color-text);
+  font-size: var(--text-small);
+  font-weight: var(--weight-semibold);
+}
+
+.chart__legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1) var(--space-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* Ключ легенды — кнопка: щелчок прячет ряд, цвета остальных не меняются. */
+.chart__key {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 0;
+  border: 0;
+  background: none;
+  color: var(--color-text-muted);
+  font: inherit;
+  font-size: var(--text-caption);
+  font-weight: var(--weight-medium);
+  cursor: pointer;
+}
+
+.chart__key[aria-pressed="false"] {
+  opacity: .4;
+}
+
+.chart__key:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+.chart__swatch {
+  flex: 0 0 auto;
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+  background: var(--key-color);
+}
+
+.chart__swatch_kind_line {
+  width: 14px;
+  height: 2px;
+  border-radius: 1px;
+}
+
+/*
+ * Таблица-источник. Компонент кладёт её в __data: с графиком обёртка видна
+ * только скринридеру (таблицу нельзя сжать уже содержимого — обрезает
+ * обёртка), в «таблицей» — видна и прокручивается вбок, если широка.
+ */
+.chart__table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--text-small);
+  font-variant-numeric: tabular-nums;
+}
+
+.chart__data {
+  min-width: 0;
+  overflow-x: auto;
+}
+
+.chart_enhanced .chart__data {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.chart_view_table .chart__data {
+  position: static;
+  width: auto;
+  height: auto;
+  overflow-x: auto;
+  clip-path: none;
+  white-space: normal;
+}
+
+.chart_view_table .chart__plot,
+.chart_view_table .chart__legend {
+  display: none;
+}
+
+.chart__cell {
+  padding: var(--space-1) var(--space-2);
+  border-bottom: 1px solid var(--color-border);
+  color: var(--color-text);
+  text-align: end;
+}
+
+.chart__cell_head {
+  color: var(--color-text-muted);
+  font-weight: var(--weight-medium);
+  text-align: start;
+}

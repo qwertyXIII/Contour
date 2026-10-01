@@ -2,6 +2,7 @@ import { ConfigError, loadConfig } from '../config.ts';
 import { errorText, log } from '../log.ts';
 import { Learner } from './learn.ts';
 import { Lists } from './lists.ts';
+import { Overrides } from './overrides.ts';
 import { startDns, type Decide } from './server.ts';
 import { makeTunnelProbe, readToken } from './tunnel-probe.ts';
 
@@ -28,8 +29,16 @@ try {
   const viaTunnel = token ? makeTunnelProbe({ host: config.http.listen, port: config.http.port, user: 'contour-dns', token }) : null;
   const learner = lan.learn && viaTunnel ? new Learner({ upstream: lan.upstream, dir: lan.dataDir, budgetMs: lan.probeBudgetMs, log: dnsLog, viaTunnel }) : null;
 
-  // Список — сразу через VPN; остальное — самообучение (или напрямую, если выключено).
+  const overrides = new Overrides(lan.dataDir);
+  const panelName = config.panel.enabled ? config.panel.name : null;
+
+  // Имя панели — наш адрес; ручное решение из панели — сильнее всего; список —
+  // сразу через VPN; остальное — самообучение (или напрямую, если выключено).
   const decide: Decide = async (name) => {
+    const n = name.toLowerCase().replace(/\.$/, '');
+    if (panelName && n === panelName) return { tunnel: true };
+    const manual = overrides.match(n);
+    if (manual) return { tunnel: manual === 'tunnel' };
     if (lists.match(name)) return { tunnel: true };
     if (!learner) return { tunnel: false };
     const d = await learner.decide(name);

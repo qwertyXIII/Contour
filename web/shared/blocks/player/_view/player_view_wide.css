@@ -1,0 +1,36 @@
+/*
+ * Широкий — виджет 4×2: обложка слева во всю высоту, справа название,
+ * перемотка со временем, кнопки и «Дальше: …». Клетка 4×2 на телефоне
+ * невысокая (~150px), поэтому правая колонка — контейнер по высоте: не
+ * влезает — сначала уходит «Дальше», потом время.
+ */
+.player_view_wide {
+  grid-template-columns: auto minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr);
+}
+
+.player_view_wide .player__art {
+  height: 100%;
+}
+
+.player_view_wide .player__controls {
+  justify-content: flex-start;
+  margin-inline-start: calc(var(--space-2) * -1);
+}
+
+.player_view_wide .player__body {
+  gap: var(--space-1);
+  container-type: size;
+}
+
+.player_view_wide .player__seek {
+  --range-hit: 20px;
+}
+
+@container (max-height: 150px) {
+  .player_view_wide .player__next { display: none; }
+}
+
+@container (max-height: 118px) {
+  .player_view_wide .player__times { display: none; }
+}

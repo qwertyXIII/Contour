@@ -1,0 +1,103 @@
+/*
+ * Блок radio: один из списка, когда вариантов больше, чем влезает в segmented,
+ * или у каждого нужна пояснительная строка. Разметка — как у checkbox,
+ * отметка — точка ::after, выбранный — кольцо акцента.
+ *
+ *   <label class="radio">
+ *     <input class="radio__input visually-hidden" type="radio" name="mode">
+ *     <span class="radio__box" aria-hidden="true"></span>
+ *     <span class="radio__body"><span class="radio__text">…</span><span class="radio__hint">…</span></span>
+ *   </label>
+ *
+ * Группа — <fieldset class="field"> с <legend class="field__label field__label_legend">.
+ * Варианты крупными карточками — блок choice.
+ */
+.radio {
+  display: inline-flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  cursor: pointer;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.radio__box {
+  position: relative;
+  flex: 0 0 auto;
+  width: var(--check-size);
+  height: var(--check-size);
+  margin-top: calc((var(--text-body) * 1.4 - var(--check-size)) / 2);
+  border: 1.5px solid var(--color-border-strong);
+  border-radius: 50%;
+  background: var(--color-well);
+  transition:
+    border-color var(--duration-fast) ease,
+    background-color var(--duration-fast) ease,
+    transform var(--duration-press) var(--ease-out);
+}
+
+.radio:not(:has(.radio__body)) .radio__box {
+  margin-top: 0;
+}
+
+.radio__box::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  width: 44%;
+  height: 44%;
+  margin: auto;
+  border-radius: 50%;
+  background: var(--color-on-accent);
+  transform: scale(0);
+  transition: transform var(--duration-normal) var(--ease-out);
+}
+
+@media (hover: hover) {
+  .radio:hover .radio__box {
+    border-color: var(--color-accent);
+  }
+}
+
+.radio:active .radio__box {
+  transform: scale(.9);
+}
+
+.radio__input:checked + .radio__box {
+  border-color: var(--color-accent);
+  background: var(--color-accent);
+}
+
+.radio__input:checked + .radio__box::after {
+  transform: scale(1);
+}
+
+.radio__input:focus-visible + .radio__box {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 2px;
+}
+
+.radio:has(.radio__input:disabled) {
+  opacity: .45;
+  cursor: default;
+  pointer-events: none;
+}
+
+.radio__body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-half);
+  min-width: 0;
+}
+
+.radio__text {
+  font-size: var(--text-body);
+  font-weight: var(--weight-medium);
+  line-height: 1.4;
+}
+
+.radio__hint {
+  color: var(--color-text-muted);
+  font-size: var(--text-small);
+  line-height: 1.4;
+}

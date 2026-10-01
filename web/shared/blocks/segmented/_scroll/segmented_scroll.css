@@ -1,0 +1,18 @@
+/*
+ * segmented_scroll: вариантов больше, чем влезает в ширину (пять режимов на
+ * телефоне) — сегменты прокручиваются вбок, а не наезжают подписями друг на
+ * друга. Плашка едет вместе с содержимым: компонент учитывает прокрутку.
+ */
+.segmented_scroll {
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  scrollbar-width: none;
+}
+
+.segmented_scroll::-webkit-scrollbar {
+  display: none;
+}
+
+.segmented_scroll .segmented__option {
+  flex: 0 0 auto;
+}

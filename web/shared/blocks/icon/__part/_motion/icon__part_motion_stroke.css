@@ -1,0 +1,112 @@
+/*
+ * Движения линией и светом. Для draw, dash и eq у части должен стоять
+ * pathLength="1" — длины считаются в долях линии.
+ *   draw   — линия дорисовывается от начала пути (галочка, график, буква)
+ *   dash   — отрезок бежит по линии (маршрут, ветер); --dash — его длина
+ *   eq     — столбик эквалайзера: сжимается до --s и растёт обратно;
+ *            --eq-shift -.5 — от середины, 0 — от начала пути
+ *   appear — проявиться (дуги вайфая по очереди); в цикле — мерцать
+ *   flash  — вспышка молнии
+ *   blip   — мигать как индикатор (запись, курсор, лампочки роутера)
+ */
+.icon__part_motion_draw {
+  --motion: icon-draw;
+  --motion-loop: icon-draw-loop;
+  --dur: 650ms;
+  --ease: ease-out;
+  --ease-loop: ease-in-out;
+}
+
+.icon__part_motion_dash {
+  --motion: icon-dash;
+  --motion-loop: icon-dash;
+  --dur: 1200ms;
+  --ease: linear;
+  --dur-loop: var(--dur);
+}
+
+.icon__part_motion_eq {
+  --motion: icon-eq;
+  --motion-loop: icon-eq;
+  --dur: 900ms;
+  --ease: ease-in-out;
+  --count: 2;
+  --dur-loop: var(--dur);
+}
+
+.icon__part_motion_appear {
+  --motion: icon-appear;
+  --motion-loop: icon-appear-loop;
+  --dur: 450ms;
+  --ease: ease-out;
+  --dur-loop: 1.8s;
+  --ease-loop: ease-in-out;
+}
+
+.icon__part_motion_flash {
+  --motion: icon-flash;
+  --motion-loop: icon-flash-loop;
+  --dur: 700ms;
+  --ease: linear;
+  --dur-loop: 2.4s;
+}
+
+.icon__part_motion_blip {
+  --motion: icon-blip;
+  --motion-loop: icon-blip;
+  --dur: 900ms;
+  --ease: linear;
+  --count: 2;
+  --dur-loop: var(--dur);
+}
+
+@keyframes icon-draw {
+  from { stroke-dasharray: 1 2; stroke-dashoffset: 1.02; }
+  to { stroke-dasharray: 1 2; stroke-dashoffset: 0; }
+}
+
+@keyframes icon-draw-loop {
+  0% { stroke-dasharray: 1 2; stroke-dashoffset: 1.02; }
+  40%, 80% { stroke-dasharray: 1 2; stroke-dashoffset: 0; }
+  100% { stroke-dasharray: 1 2; stroke-dashoffset: -1.02; }
+}
+
+/* Период узора равен длине линии, поэтому конец круга совпадает с началом. */
+@keyframes icon-dash {
+  from { stroke-dasharray: var(--dash, .35) calc(1 - var(--dash, .35)); stroke-dashoffset: 1; }
+  to { stroke-dasharray: var(--dash, .35) calc(1 - var(--dash, .35)); stroke-dashoffset: 0; }
+}
+
+/* Штрих длиной --s, сдвинутый на середину: скругления концов не сплющиваются. */
+@keyframes icon-eq {
+  0%, 100% { stroke-dasharray: 1 2; stroke-dashoffset: 0; }
+  50% { stroke-dasharray: var(--s, .35) 2; stroke-dashoffset: calc((1 - var(--s, .35)) * var(--eq-shift, -.5)); }
+}
+
+@keyframes icon-appear {
+  from { opacity: 0; scale: .7; }
+  to { opacity: 1; scale: 1; }
+}
+
+@keyframes icon-appear-loop {
+  0%, 100% { opacity: .2; }
+  30%, 55% { opacity: 1; }
+}
+
+@keyframes icon-flash {
+  0%, 24%, 50%, 100% { opacity: 1; }
+  12% { opacity: .15; }
+  36% { opacity: .3; }
+}
+
+@keyframes icon-flash-loop {
+  0%, 10%, 22%, 100% { opacity: 1; }
+  5% { opacity: .15; }
+  15% { opacity: .3; }
+}
+
+@keyframes icon-blip {
+  0%, 49% { opacity: 1; }
+  50%, 99% { opacity: .15; }
+  100% { opacity: 1; }
+}

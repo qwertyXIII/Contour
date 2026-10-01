@@ -1,0 +1,361 @@
+/*
+ * Блок viewer: просмотр фото и видео во весь экран. Нативный <dialog> в
+ * верхнем слое: фокус, Esc и возврат фокуса — от браузера. Разметку строит
+ * компонент Viewer, один на страницу; открывает его блок media событием.
+ *
+ *   __shade · __track › __slide › __picture › __thumb + __image | video (+ __video) · __spinner (+ spinner)
+ *   __bar › __count + __close · __foot › __caption + __credit · __nav (_dir_*)
+ *   __flyer › __picture (снимок в полёте) · viewer_bare (рамка спрятана касанием)
+ *   __picture_ready (картинка в пропорции снимка пришла — плитка под ней не видна)
+ *   viewer_pulling (смахивают вниз) · viewer_flying (фото летит из плитки или в неё)
+ *   viewer_appearing (открыт не полётом — проявляется сам)
+ *
+ * Всегда тёмный — фото смотрят на чёрном. Листается лентой со scroll-snap;
+ * смахнуть вниз — закрыть: компонент пишет сдвиг в --viewer-pull, а
+ * прозрачность подложки — в --viewer-fade; назад их возвращает пружина
+ * (utils/motion.js), поэтому своих переходов у ленты и подложки нет.
+ */
+.viewer {
+  --viewer-pull: 0px;
+  --viewer-fade: 1;
+  --viewer-edge: var(--space-3);
+
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  max-width: none;
+  height: 100%;
+  max-height: none;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--color-on-media);
+  color-scheme: dark;
+  overflow: hidden;
+  overscroll-behavior: contain;
+}
+
+.viewer[open] {
+  display: block;
+}
+
+/*
+ * Своё появление — только у просмотра, открытого не полётом (viewer_appearing
+ * ставит JS при открытии). Не на самом [open]: там его гасил viewer_flying, и
+ * снятый на посадке полёта он запускал появление заново — кадр, где весь
+ * просмотр прозрачен и сквозь него видна сетка (моргание, iPhone владельца).
+ */
+.viewer_appearing[open] {
+  animation: viewer-in var(--duration-normal) ease;
+}
+
+/* Подложку рисует __shade: её прозрачность меняется, пока смахивают. */
+.viewer::backdrop {
+  background: transparent;
+}
+
+.viewer__shade {
+  position: absolute;
+  inset: 0;
+  background: var(--color-media-bg);
+  opacity: var(--viewer-fade);
+}
+
+.viewer__track {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  overflow-x: auto;
+  overflow-y: hidden;
+  overscroll-behavior: contain;
+  scroll-snap-type: x mandatory;
+  scrollbar-width: none;
+  /* Вбок листает браузер, вниз — компонент (смахнуть, чтобы закрыть). */
+  touch-action: pan-x;
+  translate: 0 var(--viewer-pull);
+}
+
+.viewer__track::-webkit-scrollbar {
+  display: none;
+}
+
+.viewer__slide {
+  position: relative;
+  display: grid;
+  flex: 0 0 100%;
+  /* Ячейка определённого размера: иначе height: 100% у картинки — это «auto». */
+  grid-template: minmax(0, 1fr) / minmax(0, 1fr);
+  height: 100%;
+  place-items: center;
+  padding: env(safe-area-inset-top, 0px) env(safe-area-inset-right, 0px) env(safe-area-inset-bottom, 0px) env(safe-area-inset-left, 0px);
+  scroll-snap-align: center;
+  scroll-snap-stop: always;
+  container-type: size;
+}
+
+/*
+ * Кадр снимка — в пропорции снимка (--ratio пишет JS), вписан в слайд, как
+ * contain. Внутри — картинка плитки на своём месте (__thumb: плитка — обрезка
+ * снимка по центру, её размер в долях кадра пишет JS) и поверх — пришедшая
+ * картинка (__image), проявляется, когда нарисована: края дорисовываются, а
+ * ничего не сдвигается.
+ */
+.viewer__picture {
+  position: relative;
+  width: min(100cqw, 100cqh * var(--ratio, 1));
+  aspect-ratio: var(--ratio, 1);
+  overflow: hidden;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+}
+
+.viewer__thumb {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  display: block;
+  object-fit: cover;
+  translate: -50% -50%;
+}
+
+.viewer__image {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  opacity: 0;
+  transition: opacity var(--duration-fast) ease;
+}
+
+.viewer__picture_ready .viewer__image {
+  opacity: 1;
+}
+
+/* Видео вписывается в слайд по своей пропорции: блоку video нужна ширина. */
+.viewer__video {
+  width: min(100cqw, 100cqh * var(--ratio, 1.778));
+  --video-radius: 0;
+}
+
+/* Крупный файл ещё идёт: крутится блок spinner (микс с __spinner). */
+.viewer__spinner {
+  position: absolute;
+  inset: 0;
+  margin: auto;
+}
+
+/* Рамка: сверху счётчик и «закрыть», снизу подпись — поверх картинки, на затемнении. */
+.viewer__bar,
+.viewer__foot {
+  position: absolute;
+  right: 0;
+  left: 0;
+  transition: opacity var(--duration-fast) ease;
+}
+
+.viewer__bar {
+  top: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: calc(env(safe-area-inset-top, 0px) + var(--viewer-edge)) var(--viewer-edge) var(--space-6);
+  background: linear-gradient(to bottom, var(--color-media-shade), transparent);
+}
+
+.viewer__count {
+  padding-inline: var(--space-2);
+  font-size: var(--text-lead);
+  font-weight: var(--weight-semibold);
+  font-variant-numeric: tabular-nums;
+}
+
+.viewer__foot {
+  bottom: 0;
+  display: grid;
+  gap: var(--space-1);
+  padding: var(--space-8) var(--space-5) calc(env(safe-area-inset-bottom, 0px) + var(--space-5));
+  background: var(--gradient-media-foot);
+  pointer-events: none;
+}
+
+.viewer__caption {
+  margin: 0;
+  font-size: var(--text-body);
+  font-weight: var(--weight-medium);
+  line-height: var(--leading-snug);
+}
+
+.viewer__credit {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: var(--text-caption);
+}
+
+.viewer__caption:empty,
+.viewer__credit:empty {
+  display: none;
+}
+
+.viewer__nav {
+  position: absolute;
+  top: 50%;
+  display: none;
+  translate: 0 -50%;
+}
+
+.viewer__nav_dir_prev { left: var(--viewer-edge); }
+.viewer__nav_dir_next { right: var(--viewer-edge); }
+
+@media (hover: hover) {
+  .viewer__nav {
+    display: inline-flex;
+    transition: opacity var(--duration-fast) ease;
+  }
+
+  .viewer__nav:disabled {
+    opacity: 0;
+  }
+}
+
+.viewer__end {
+  display: flex;
+  gap: var(--space-2);
+}
+
+/*
+ * Звук, текст, документ: колонка по центру слайда. Цвета — те же «на медиа»,
+ * что у рамки: слайд лежит на тёмной подложке просмотра в любой теме.
+ */
+.viewer__sound,
+.viewer__file {
+  display: grid;
+  justify-items: center;
+  gap: var(--space-4);
+  width: min(100%, 420px);
+  padding-inline: var(--space-6);
+  text-align: center;
+}
+
+.viewer__glyph {
+  display: grid;
+  width: 112px;
+  height: 112px;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--color-fill-2);
+  color: var(--color-on-media);
+  --icon-size: var(--icon-l);
+}
+
+.viewer__glyph_size_l {
+  width: 144px;
+  height: 144px;
+  border-radius: var(--radius-xl);
+}
+
+.viewer__name {
+  margin: 0;
+  font-size: var(--text-lead);
+  font-weight: var(--weight-semibold);
+  line-height: var(--leading-snug);
+  overflow-wrap: anywhere;
+}
+
+.viewer__meta {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: var(--text-caption);
+}
+
+.viewer__wave {
+  --wave-h: 56px;
+
+  justify-content: space-between;
+  width: 100%;
+  cursor: pointer;
+  touch-action: none;
+}
+
+.viewer__wave .waveform__bar {
+  flex: 1 1 0;
+  width: auto;
+  max-width: 5px;
+  background: rgba(255, 255, 255, .28);
+}
+
+.viewer__wave .waveform__bar_played {
+  background: var(--color-accent);
+}
+
+.viewer__controls {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+}
+
+.viewer__time {
+  min-width: 7ch;
+  color: var(--color-text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Текст — читается здесь: своя прокрутка, ширина строки — для чтения. */
+.viewer__text {
+  align-self: stretch;
+  width: min(100%, 680px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: calc(var(--space-8) * 2) var(--space-5) var(--space-8);
+  touch-action: pan-y;
+}
+
+.viewer__text-body {
+  margin-top: var(--space-4);
+  font-size: var(--text-body);
+  line-height: var(--leading-normal);
+  overflow-wrap: anywhere;
+}
+
+/* Простой текст — как написан: переносы строк и пробелы — часть текста. */
+.viewer__text_as_plain .viewer__text-body {
+  white-space: pre-wrap;
+}
+
+/* Код — строками как есть, длинные уезжают вбок (своя прокрутка), не ломаются. */
+.viewer__code {
+  margin: 0;
+}
+
+.viewer__code .code_block {
+  overflow-x: auto;
+  white-space: pre;
+  overflow-wrap: normal;
+}
+
+.viewer__slide_broken .viewer__glyph {
+  opacity: .5;
+}
+
+/* «О файле» открыт: рамка уходит, просмотр приподнят (--viewer-pull < 0). */
+.viewer_lifted .viewer__bar,
+.viewer_lifted .viewer__foot,
+.viewer_lifted .viewer__nav {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.viewer_bare .viewer__bar,
+.viewer_bare .viewer__foot,
+.viewer_bare .viewer__nav {
+  opacity: 0;
+  pointer-events: none;
+}
+
+@keyframes viewer-in {
+  from { opacity: 0; }
+}

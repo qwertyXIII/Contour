@@ -1,0 +1,226 @@
+/*
+ * Блок media: фото и видео вместе — сетка, лента, альбом, одно крупно.
+ * Нажатие на плитку открывает просмотр во весь экран (блок viewer).
+ *
+ *   <div class="media" role="group" aria-label="Поездка, 12 фото">
+ *     <div class="media__track">
+ *       <button class="media__item" type="button" style="--ratio: 1.5"
+ *               data-full="fjord-2400.jpg" data-caption="Фьорд утром" aria-label="Фото: фьорд">
+ *         <img class="media__image" src="fjord-600.jpg" alt="" loading="lazy" decoding="async">
+ *       </button>
+ *       <button class="media__item media__item_kind_video" type="button" data-src="clip.mp4" …>
+ *         <img class="media__image" src="poster.jpg" alt="" loading="lazy">
+ *         <span class="media__play"><svg class="icon"><use href="…#play"/></svg></span>
+ *         <span class="media__duration">0:10</span>
+ *       </button>
+ *     </div>
+ *   </div>
+ *
+ * Вид — модификатором: без него квадратная сетка; media_view_carousel — лента
+ * с прилипанием к центру; media_view_album — мозаика по пропорциям, как альбом
+ * в мессенджере; media_view_single — одно крупно, в своей пропорции;
+ * media_pick — сетка для выбора (нажатие выбирает, просмотра нет).
+ *
+ * --ratio — ширина / высота числом (1.5, 0.75): её знает сервер, и по ней
+ * раскладываются альбом и одно крупно до загрузки картинки.
+ *
+ * От JS: media_enhanced · __item_loading · __item_broken · __count · __dots ·
+ * __dot (_current) · __nav (_dir_prev|_dir_next) · __more («+5»).
+ */
+.media {
+  --media-gap: var(--space-half);
+  --media-radius: var(--radius-m);
+  --media-cols: 3;
+  --media-max-h: 480px;
+
+  position: relative;
+  min-width: 0;
+  container-type: inline-size;
+}
+
+.media__track {
+  display: grid;
+  grid-template-columns: repeat(var(--media-cols), minmax(0, 1fr));
+  gap: var(--media-gap);
+  border-radius: var(--media-radius);
+  overflow: hidden;
+}
+
+@container (min-width: 480px) {
+  .media__track { --media-cols: 4; }
+}
+
+@container (min-width: 720px) {
+  .media__track { --media-cols: 6; }
+}
+
+.media__item {
+  position: relative;
+  display: block;
+  min-width: 0;
+  aspect-ratio: 1;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: var(--color-fill-1);
+  color: var(--color-text-faint);
+  font: inherit;
+  overflow: hidden;
+  cursor: zoom-in;
+  -webkit-tap-highlight-color: transparent;
+  --icon-size: var(--icon-l);
+}
+
+/* Рамка фокуса — внутри плитки: снаружи её обрезала бы лента. */
+.media__item:focus-visible {
+  outline-offset: -3px;
+}
+
+.media__image {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: opacity var(--duration-normal) ease, scale var(--duration-slow) var(--ease-out), filter var(--duration-fast) ease;
+}
+
+@media (hover: hover) {
+  .media__item:hover .media__image {
+    scale: 1.03;
+  }
+}
+
+.media__item:active .media__image {
+  filter: brightness(.86);
+}
+
+/* Картинка ещё идёт — видна заглушка, пришла — проявляется. */
+.media__item_loading .media__image {
+  opacity: 0;
+}
+
+.media__item_broken {
+  display: grid;
+  place-items: center;
+  cursor: default;
+}
+
+.media__item_broken .media__image {
+  display: none;
+}
+
+/* Видео: кнопка в центре и длительность в углу — поверх постера. */
+.media__play {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  width: var(--media-play, 44px);
+  height: var(--media-play, 44px);
+  margin: auto;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--color-media-shade);
+  color: var(--color-on-media);
+  -webkit-backdrop-filter: blur(var(--blur-glass));
+  backdrop-filter: blur(var(--blur-glass));
+  --icon-size: var(--icon-m);
+}
+
+.media__duration {
+  position: absolute;
+  right: var(--space-1);
+  bottom: var(--space-1);
+  padding: 1px var(--space-1);
+  border-radius: var(--radius-xs);
+  background: var(--color-media-shade);
+  color: var(--color-on-media);
+  font-size: var(--text-caption);
+  font-weight: var(--weight-semibold);
+  font-variant-numeric: tabular-nums;
+  line-height: 1.4;
+}
+
+/*
+ * Плитка без превью — голосовое, документ, ссылка: серая плашка, значок по виду
+ * файла и название (две строки), под ним — длительность у звука.
+ */
+.media__item_kind_file {
+  display: grid;
+  grid-template-rows: 1fr auto auto;
+  align-items: center;
+  justify-items: center;
+  gap: var(--space-1);
+  padding: var(--space-3) var(--space-2) var(--space-2);
+  background: var(--color-fill-2);
+  color: var(--color-text);
+  cursor: pointer;
+  text-align: center;
+}
+
+.media__item_kind_file:active {
+  background: var(--color-fill-3);
+}
+
+.media__glyph {
+  display: grid;
+  place-items: center;
+  color: var(--color-text-muted);
+  --icon-size: var(--icon-l);
+}
+
+.media__name {
+  display: -webkit-box;
+  max-width: 100%;
+  overflow: hidden;
+  font-size: var(--text-caption);
+  font-weight: var(--weight-medium);
+  line-height: var(--leading-snug);
+  overflow-wrap: anywhere;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.media__meta {
+  color: var(--color-text-muted);
+  font-size: var(--text-caption);
+  font-variant-numeric: tabular-nums;
+}
+
+/*
+ * Во всю ширину места — поля тела панели отдаются сетке (--bleed-x): лента,
+ * как в галерее телефона. Скругления по краям нет — краёв у ленты нет.
+ */
+.media_bleed {
+  margin-inline: calc(var(--bleed-x, 0px) * -1);
+}
+
+.media_bleed .media__track {
+  border-radius: 0;
+}
+
+/* Последняя видимая плитка альбома, за которой ещё есть: «+5». */
+.media__more {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  background: var(--color-media-shade);
+  color: var(--color-on-media);
+  font-size: var(--text-title);
+  font-weight: var(--weight-medium);
+  letter-spacing: var(--tracking-title);
+}
+
+/* Одно крупно: в своей пропорции, не выше --media-max-h — тогда уже. */
+.media_view_single .media__track {
+  display: block;
+  overflow: visible;
+}
+
+.media_view_single .media__item {
+  width: 100%;
+  max-width: calc(var(--media-max-h) * var(--ratio, 1.333));
+  aspect-ratio: var(--ratio, 1.333);
+  border-radius: var(--media-radius);
+  --media-play: 56px;
+}

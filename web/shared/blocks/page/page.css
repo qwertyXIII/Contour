@@ -1,0 +1,67 @@
+/*
+ * Блок page: база документа. Токены живут в tokens/ и импортируются раньше
+ * всех блоков; здесь только то, что касается страницы целиком.
+ */
+.page {
+  min-height: 100vh;
+  min-height: 100dvh;
+  margin: 0;
+  background: var(--color-bg);
+  color: var(--color-text);
+  font-family: var(--font-sans);
+  font-size: var(--text-body);
+  line-height: var(--leading-normal);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  -webkit-tap-highlight-color: transparent;
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
+.page *,
+.page *::before,
+.page *::after {
+  box-sizing: border-box;
+}
+
+/*
+ * page_app — документ ровно в окно приложения, без прокрутки: телефонная
+ * оболочка держит высоту сама (--page-height). На iPhone это 100vh окна «с экрана
+ * Домой», под клавиатурой — ужатая видимая область. min-height базы здесь снят:
+ * 100dvh перебил бы ужатие, документ стал бы выше видимого, и iOS начала бы
+ * его прокручивать — «телепорт» ленты под клавиатурой.
+ */
+.page_app {
+  height: var(--page-height, 100vh);
+  min-height: 0;
+  overflow: hidden;
+  overscroll-behavior: none;
+  touch-action: none;
+}
+
+/* Системные полосы прокрутки — тонкие и в цветах темы; своя полоса «где мы» — блок scroller. */
+.page {
+  scrollbar-color: var(--color-fill-3) transparent;
+}
+
+.page * {
+  scrollbar-width: thin;
+}
+
+/*
+ * `hidden` обязан побеждать display любого блока: `.row { display: flex }`
+ * иначе перебивает [hidden] из стилей браузера, и скрытое остаётся на экране.
+ * Класс + атрибут сильнее одиночного класса блока — этого хватает без !important.
+ */
+.page [hidden] {
+  display: none;
+}
+
+.page :focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 2px;
+}
+
+.page ::selection {
+  background: var(--color-accent-soft);
+}

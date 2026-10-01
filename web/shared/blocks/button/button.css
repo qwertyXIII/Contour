@@ -1,0 +1,128 @@
+/*
+ * Блок button: всё, на что нажимают ради действия. Переход — это link.
+ *
+ *   button_view_{primary|contrast|secondary|ghost|danger|on-accent|media|glass} — _view/
+ *   button_size_{s|m|l}     button_shape_round     button_wide     button_loading
+ *   aria-pressed="true"     — кнопка-переключатель во включённом положении
+ *
+ *   __icon (микс с icon) · __text · __spinner (микс со spinner)
+ *
+ * Модификаторы не переписывают свойства, а задают переменные (--button-bg …):
+ * наведение и нажатие написаны один раз и работают для любого вида.
+ * Форма — таблетка: как поле чата, чипы и круглые кнопки нынешнего приложения.
+ */
+.button {
+  --button-bg: var(--color-surface);
+  --button-bg-hover: var(--color-surface-hover);
+  --button-bg-active: var(--color-surface-pressed);
+  --button-fg: var(--color-text);
+  --button-border: var(--color-border);
+  --button-h: var(--control-h-m);
+  --button-pad: var(--control-pad-x);
+  --button-font: var(--text-lead);
+
+  position: relative;
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  min-width: var(--button-h);
+  height: var(--button-h);
+  margin: 0;
+  padding: 0 var(--button-pad);
+  border: 1px solid var(--button-border);
+  border-radius: var(--radius-full);
+  background: var(--button-bg);
+  color: var(--button-fg);
+  font: inherit;
+  font-size: var(--button-font);
+  font-weight: var(--weight-semibold);
+  line-height: 1;
+  white-space: nowrap;
+  text-decoration: none;
+  cursor: pointer;
+  user-select: none;
+  -webkit-user-select: none;
+  transition:
+    transform var(--duration-press) var(--ease-out),
+    background-color var(--duration-fast) ease,
+    border-color var(--duration-fast) ease,
+    color var(--duration-fast) ease,
+    opacity var(--duration-fast) ease;
+}
+
+@media (hover: hover) {
+  .button:hover {
+    background-color: var(--button-bg-hover);
+  }
+}
+
+.button:active {
+  background-color: var(--button-bg-active);
+  transform: scale(var(--press-scale));
+}
+
+.button:disabled,
+.button[aria-disabled="true"] {
+  opacity: .45;
+  cursor: default;
+  pointer-events: none;
+}
+
+/* Кнопка-переключатель: включённое положение — акцент. */
+.button[aria-pressed="true"] {
+  --button-bg: var(--color-accent);
+  --button-bg-hover: var(--color-accent-hover);
+  --button-bg-active: var(--color-accent-pressed);
+  --button-fg: var(--color-on-accent);
+  --button-border: transparent;
+}
+
+/* Размеры */
+.button_size_s {
+  --button-h: var(--control-h-s);
+  --button-pad: var(--space-3);
+  --button-font: var(--text-small);
+  --icon-size: var(--icon-s);
+}
+
+.button_size_l {
+  --button-h: var(--control-h-l);
+  --button-pad: var(--space-6);
+}
+
+/* Круглая: только значок, подпись — в aria-label. */
+.button_shape_round {
+  width: var(--button-h);
+  padding: 0;
+}
+
+.button_wide {
+  display: flex;
+  width: 100%;
+}
+
+.button__text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Занята: подпись прячется, ширина остаётся — кнопка не прыгает. */
+.button__spinner {
+  position: absolute;
+  inset: 0;
+  margin: auto;
+  color: var(--button-fg);
+  opacity: 0;
+}
+
+.button_loading {
+  color: transparent;
+  pointer-events: none;
+}
+
+.button_loading .button__spinner {
+  opacity: 1;
+}

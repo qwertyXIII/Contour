@@ -1,0 +1,64 @@
+/*
+ * Модификатор datestrip_view_text: дни словами — «18 · Пятница», выбранный
+ * подчёркнут чертой акцента, которая переезжает. Для недели в шапке экрана.
+ * Всё меняется переменными блока — вложенных селекторов глубже двух нет.
+ */
+.datestrip_view_text {
+  --day-bg: transparent;
+  --day-past-bg: transparent;
+  --day-past-fg: var(--color-text-faint);
+  --day-selected-bg: transparent;
+  --day-selected-fg: var(--color-text);
+  /* Кольцо у одной цифры словами превращается в овал: фокус обводит весь день,
+     сегодня — цвет числа. */
+  --day-date-focus: none;
+  --day-today-mark: none;
+
+  gap: var(--space-5);
+  padding: 0;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.datestrip_view_text .datestrip__day {
+  flex: 0 0 auto;
+  align-items: flex-start;
+  gap: 0;
+  min-width: 0;
+  padding-bottom: var(--space-3);
+}
+
+.datestrip_view_text .datestrip__date {
+  order: -1;
+  width: auto;
+  height: auto;
+  color: var(--day-date-fg, var(--color-text-faint));
+  font-size: var(--text-small);
+  font-weight: var(--weight-medium);
+}
+
+.datestrip_view_text .datestrip__day_today {
+  --day-date-fg: var(--color-accent-text);
+}
+
+.datestrip_view_text .datestrip__day:has(.datestrip__input:focus-visible) {
+  border-radius: var(--radius-xs);
+  outline: 2px solid var(--color-focus);
+  outline-offset: 4px;
+}
+
+.datestrip_view_text .datestrip__weekday {
+  color: var(--color-text-faint);
+  font-size: var(--text-lead);
+  font-weight: var(--weight-medium);
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.datestrip_view_text .datestrip__thumb {
+  top: auto;
+  bottom: 0;
+  height: 2px;
+  border-radius: var(--radius-full);
+  background: var(--color-accent);
+  transform: translateX(var(--thumb-x, 0));
+}

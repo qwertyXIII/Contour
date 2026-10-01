@@ -1,0 +1,198 @@
+/*
+ * Движения сдвигом на --x/--y (в единицах сетки 24).
+ *   nudge — толкнуть и вернуть с отскоком (стрелки, шеврон, ручка)
+ *   hop   — подпрыгнуть с приседанием; ось --o ставят в основание (точки, человек)
+ *   drop  — упасть сверху и отскочить (метка карты, закладка, стрела в мишень)
+ *   slide — уехать, постоять, вернуться (ползунки, тумблер, крышка)
+ *   fly   — улететь и вернуться с другой стороны (отправить, самолёт)
+ *   shake — трясти по горизонтали (ошибка, «нет»)
+ *   bob   — плавно качаться на месте (облако, наушники, машина)
+ *   scan  — ходить туда-обратно через место (луч сканера, зрачок, лупа)
+ *   fall  — падать сквозь место и таять (дождь, снег, капля из воронки)
+ *   float — подниматься и таять (пар, «з-з-з»)
+ */
+.icon__part_motion_nudge {
+  --motion: icon-nudge;
+  --motion-loop: icon-nudge-loop;
+  --dur: 650ms;
+  --ease: ease-in-out;
+}
+
+.icon__part_motion_hop {
+  --motion: icon-hop;
+  --motion-loop: icon-hop-loop;
+  --dur: 650ms;
+  --ease: ease-in-out;
+}
+
+.icon__part_motion_drop {
+  --motion: icon-drop;
+  --motion-loop: icon-drop-loop;
+  --dur: 850ms;
+}
+
+.icon__part_motion_slide {
+  --motion: icon-slide;
+  --motion-loop: icon-slide;
+  --dur: 1300ms;
+  --ease: ease-in-out;
+  --dur-loop: 2.6s;
+}
+
+.icon__part_motion_fly {
+  --motion: icon-fly;
+  --motion-loop: icon-fly-loop;
+  --dur: 900ms;
+  --dur-loop: 2.2s;
+}
+
+.icon__part_motion_shake {
+  --motion: icon-shake;
+  --motion-loop: icon-shake-loop;
+  --dur: 600ms;
+  --ease: ease-in-out;
+}
+
+.icon__part_motion_bob {
+  --motion: icon-bob;
+  --motion-loop: icon-bob;
+  --dur: 1100ms;
+  --ease: ease-in-out;
+  --dur-loop: 2.2s;
+}
+
+.icon__part_motion_scan {
+  --motion: icon-scan;
+  --motion-loop: icon-scan;
+  --dur: 1400ms;
+  --dur-loop: 2.4s;
+}
+
+.icon__part_motion_fall {
+  --motion: icon-fall;
+  --motion-loop: icon-fall;
+  --dur: 900ms;
+  --ease: linear;
+  --count: 2;
+  --dur-loop: var(--dur);
+}
+
+.icon__part_motion_float {
+  --motion: icon-float;
+  --motion-loop: icon-float;
+  --dur: 1500ms;
+  --ease: ease-out;
+  --count: 2;
+  --dur-loop: var(--dur);
+}
+
+@keyframes icon-nudge {
+  0%, 100% { translate: 0 0; }
+  30% { translate: var(--x, 0px) var(--y, 0px); }
+  55% { translate: calc(var(--x, 0px) * -.2) calc(var(--y, 0px) * -.2); }
+  78% { translate: calc(var(--x, 0px) * .06) calc(var(--y, 0px) * .06); }
+}
+
+@keyframes icon-nudge-loop {
+  0%, 45%, 100% { translate: 0 0; }
+  13% { translate: var(--x, 0px) var(--y, 0px); }
+  25% { translate: calc(var(--x, 0px) * -.2) calc(var(--y, 0px) * -.2); }
+  35% { translate: calc(var(--x, 0px) * .06) calc(var(--y, 0px) * .06); }
+}
+
+@keyframes icon-hop {
+  0%, 100% { translate: 0 0; scale: 1; }
+  12% { translate: 0 0; scale: 1.08 .9; }
+  40% { translate: 0 var(--y, -3px); scale: .96 1.05; }
+  66% { translate: 0 0; scale: 1.05 .94; }
+  82% { scale: .99 1.01; }
+}
+
+@keyframes icon-hop-loop {
+  0%, 40%, 100% { translate: 0 0; scale: 1; }
+  5% { translate: 0 0; scale: 1.08 .9; }
+  16% { translate: 0 var(--y, -3px); scale: .96 1.05; }
+  26% { translate: 0 0; scale: 1.05 .94; }
+  33% { scale: .99 1.01; }
+}
+
+@keyframes icon-drop {
+  0% { translate: var(--x, 0px) var(--y, -6px); opacity: 0; animation-timing-function: cubic-bezier(.55, 0, 1, .45); }
+  15% { opacity: 1; }
+  50% { translate: 0 0; animation-timing-function: cubic-bezier(0, .55, .45, 1); }
+  66% { translate: calc(var(--x, 0px) * .15) calc(var(--y, -6px) * .15); animation-timing-function: cubic-bezier(.55, 0, 1, .45); }
+  80% { translate: 0 0; animation-timing-function: ease-out; }
+  90% { translate: 0 calc(var(--y, -6px) * .04); }
+  100% { translate: 0 0; }
+}
+
+@keyframes icon-drop-loop {
+  0% { translate: var(--x, 0px) var(--y, -6px); opacity: 0; animation-timing-function: cubic-bezier(.55, 0, 1, .45); }
+  7% { opacity: 1; }
+  22% { translate: 0 0; animation-timing-function: cubic-bezier(0, .55, .45, 1); }
+  29% { translate: calc(var(--x, 0px) * .15) calc(var(--y, -6px) * .15); animation-timing-function: cubic-bezier(.55, 0, 1, .45); }
+  36%, 88% { translate: 0 0; opacity: 1; }
+  100% { translate: 0 0; opacity: 0; }
+}
+
+@keyframes icon-slide {
+  0%, 100% { translate: 0 0; }
+  30%, 70% { translate: var(--x, 0px) var(--y, 0px); }
+}
+
+@keyframes icon-fly {
+  0% { translate: 0 0; opacity: 1; animation-timing-function: cubic-bezier(.5, 0, .9, .5); }
+  42% { translate: var(--x, 6px) var(--y, 0px); opacity: 0; }
+  43% { translate: calc(var(--x, 6px) * -1) calc(var(--y, 0px) * -1); opacity: 0; animation-timing-function: cubic-bezier(.1, .5, .4, 1); }
+  100% { translate: 0 0; opacity: 1; }
+}
+
+@keyframes icon-fly-loop {
+  0% { translate: 0 0; opacity: 1; animation-timing-function: cubic-bezier(.5, 0, .9, .5); }
+  17% { translate: var(--x, 6px) var(--y, 0px); opacity: 0; }
+  18% { translate: calc(var(--x, 6px) * -1) calc(var(--y, 0px) * -1); opacity: 0; animation-timing-function: cubic-bezier(.1, .5, .4, 1); }
+  42%, 100% { translate: 0 0; opacity: 1; }
+}
+
+@keyframes icon-shake {
+  0%, 100% { translate: 0 0; }
+  12% { translate: calc(var(--x, 1.5px) * -1) 0; }
+  26% { translate: var(--x, 1.5px) 0; }
+  40% { translate: calc(var(--x, 1.5px) * -.7) 0; }
+  54% { translate: calc(var(--x, 1.5px) * .45) 0; }
+  68% { translate: calc(var(--x, 1.5px) * -.2) 0; }
+  82% { translate: calc(var(--x, 1.5px) * .05) 0; }
+}
+
+@keyframes icon-shake-loop {
+  0%, 40%, 100% { translate: 0 0; }
+  5% { translate: calc(var(--x, 1.5px) * -1) 0; }
+  10% { translate: var(--x, 1.5px) 0; }
+  16% { translate: calc(var(--x, 1.5px) * -.7) 0; }
+  22% { translate: calc(var(--x, 1.5px) * .45) 0; }
+  28% { translate: calc(var(--x, 1.5px) * -.2) 0; }
+  34% { translate: calc(var(--x, 1.5px) * .05) 0; }
+}
+
+@keyframes icon-bob {
+  0%, 100% { translate: 0 0; }
+  50% { translate: var(--x, 0px) var(--y, -1.5px); }
+}
+
+@keyframes icon-scan {
+  0%, 50%, 100% { translate: 0 0; animation-timing-function: ease-out; }
+  25% { translate: var(--x, 0px) var(--y, 5px); animation-timing-function: ease-in; }
+  75% { translate: calc(var(--x, 0px) * -1) calc(var(--y, 5px) * -1); animation-timing-function: ease-in; }
+}
+
+@keyframes icon-fall {
+  0% { translate: calc(var(--x, 0px) * -1) calc(var(--y, 3px) * -1); opacity: 0; }
+  25%, 70% { opacity: 1; }
+  100% { translate: var(--x, 0px) var(--y, 3px); opacity: 0; }
+}
+
+@keyframes icon-float {
+  0% { translate: 0 var(--y, 2px); opacity: 0; scale: .9; }
+  30% { opacity: 1; }
+  100% { translate: var(--x, 0px) calc(var(--y, 2px) * -1.5); opacity: 0; scale: 1; }
+}

@@ -13,6 +13,13 @@ import { runMihomo, type MihomoHandle } from './outlets/mihomo.ts';
 import { prepareOutlets } from './outlets/outlet.ts';
 import { Resolver } from './outlets/resolver.ts';
 import { Chooser } from './select/chooser.ts';
+import { Auth } from './panel/auth.ts';
+import { Devices } from './panel/devices.ts';
+import { createPanel, type Panel } from './panel/server.ts';
+import { Sites } from './panel/sites.ts';
+import type { SpeedResult } from './panel/speedtest.ts';
+import { PanelState } from './panel/state.ts';
+import { Meter } from './stats/meter.ts';
 
 /**
  * Точка входа Contour.
@@ -46,7 +53,10 @@ async function main(): Promise<void> {
     const secret = randomBytes(24).toString('hex');
     mkdirSync(config.mihomo.dir, { recursive: true, mode: 0o700 });
     const configPath = path.join(config.mihomo.dir, 'config.yaml');
-    writeFileSync(configPath, buildMihomoConfig({ outlets: prepared.mihomo, controller: config.mihomo.controller, secret }), { mode: 0o600 });
+    // Подписки mihomo качает через первый ядерный выход: сайт подписки отсюда может быть закрыт.
+    const kernel = prepared.outlets.find((o) => !prepared.mihomo.some((m) => m.outlet === o));
+    const fetchVia = kernel ? { ...kernel.socks } : null;
+    writeFileSync(configPath, buildMihomoConfig({ outlets: prepared.mihomo, controller: config.mihomo.controller, secret, fetchVia }), { mode: 0o600 });
     chmodSync(configPath, 0o600);
     mihomo = runMihomo({ ...config.mihomo, configPath, secret, log });
     try {
@@ -80,8 +90,14 @@ async function main(): Promise<void> {
   consumers.load();
   consumers.startFlushing();
 
-  const server = await startHttpInlet({ ...config.http, chooser, consumers, log });
-  const lanServers = config.lan.enabled ? startLanInlet(config.lan, { chooser, consumers, log }) : [];
+  const meter = new Meter({ dir: '/var/lib/contour', log });
+  meter.start();
+  const server = await startHttpInlet({ ...config.http, chooser, consumers, log, meter });
+  const panel = config.panel.enabled ? startPanel(config, { outlets, meter, dial }) : null;
+  const panelHosts = new Set([config.panel.name, config.lan.address]);
+  const lanServers = config.lan.enabled
+    ? startLanInlet(config.lan, { chooser, consumers, log, meter }, panel ? { hosts: panelHosts, take: panel.take } : null)
+    : [];
   log.info('Contour готов');
 
   let stopping = false;
@@ -91,6 +107,8 @@ async function main(): Promise<void> {
     log.info(`${signal}: останавливаюсь`);
     health.stop();
     consumers.stop();
+    meter.stop();
+    panel?.server.close();
     server.close();
     server.closeAllConnections();
     for (const s of lanServers) s.close();
@@ -99,6 +117,24 @@ async function main(): Promise<void> {
   };
   process.on('SIGTERM', () => shutdown('SIGTERM'));
   process.on('SIGINT', () => shutdown('SIGINT'));
+}
+
+function startPanel(config: ReturnType<typeof loadConfig>, live: { outlets: ReturnType<typeof prepareOutlets>['outlets']; meter: Meter; dial: ReturnType<typeof makeDial> }): Panel {
+  const speeds = new Map<string, SpeedResult>();
+  const devices = new Devices(config.panel.dataDir);
+  const auth = new Auth(config.panel.passwordFile, config.panel.dataDir);
+  if (!auth.configured()) log.warn(`панель: нет пароля (${config.panel.passwordFile}) — войти нельзя; задать: sudo bash deploy/panel-password.sh`);
+  const state = new PanelState({ config, outlets: live.outlets, meter: live.meter, devices, speeds });
+  const sites = new Sites({ dnsDir: config.lan.dataDir, own: config.lan.domains });
+  return createPanel({
+    listen: config.panel.listen,
+    port: config.panel.port,
+    log: log.child({ src: 'panel' }),
+    auth, state, devices, sites, speeds,
+    meter: live.meter,
+    outlets: live.outlets,
+    dial: live.dial,
+  });
 }
 
 main().catch((error: unknown) => {

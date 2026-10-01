@@ -1,0 +1,140 @@
+/*
+ * Блок checkbox: отметить пункт; применяется по «Сохранить» или вместе с
+ * формой. Для «включить сразу» — switch.
+ *
+ *   <label class="checkbox">
+ *     <input class="checkbox__input visually-hidden" type="checkbox">
+ *     <span class="checkbox__box" aria-hidden="true">
+ *       <svg class="icon checkbox__mark checkbox__mark_kind_check"><use href="…#check"/></svg>
+ *       <svg class="icon checkbox__mark checkbox__mark_kind_dash"><use href="…#minus"/></svg>
+ *     </span>
+ *     <span class="checkbox__body"><span class="checkbox__text">…</span><span class="checkbox__hint">…</span></span>
+ *   </label>
+ *
+ *   checkbox_view_round (круглый — выбор в списке) · checkbox_invalid · checkbox_strike (чеклист)
+ *   Без __body — голый квадрат для строки списка (внутри <label class="row"> — span, не label).
+ *
+ * Состояние «частично» (:indeterminate) ставится только из JS — у HTML нет
+ * такого атрибута. Группу «выбрать все» ведёт компонент CheckboxGroup.
+ */
+.checkbox {
+  --check-radius: var(--radius-xs);
+  --check-border: var(--color-border-strong);
+
+  display: inline-flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  cursor: pointer;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.checkbox_view_round {
+  --check-radius: 50%;
+}
+
+.checkbox_invalid {
+  --check-border: var(--color-danger);
+}
+
+.checkbox__box {
+  display: grid;
+  flex: 0 0 auto;
+  place-items: center;
+  width: var(--check-size);
+  height: var(--check-size);
+  /* Выравнивание по первой строке подписи, какой бы высоты она ни была. */
+  margin-top: calc((var(--text-body) * 1.4 - var(--check-size)) / 2);
+  border: 1.5px solid var(--check-border);
+  border-radius: var(--check-radius);
+  background: var(--color-well);
+  color: var(--color-on-accent);
+  transition:
+    background-color var(--duration-fast) ease,
+    border-color var(--duration-fast) ease,
+    transform var(--duration-press) var(--ease-out);
+}
+
+/* Без подписи выравнивать не по чему. */
+.checkbox:not(:has(.checkbox__body)) .checkbox__box {
+  margin-top: 0;
+}
+
+@media (hover: hover) {
+  .checkbox:hover .checkbox__box {
+    border-color: var(--color-accent);
+  }
+}
+
+.checkbox:active .checkbox__box {
+  transform: scale(.9);
+}
+
+/* Галочка дорисовывается: штрих «выезжает» по длине линии. */
+.checkbox__mark {
+  grid-area: 1 / 1;
+  --icon-size: calc(var(--check-size) - 4px);
+  stroke-width: 3;
+  stroke-dasharray: 24;
+  stroke-dashoffset: 24;
+  opacity: 0;
+  transition: stroke-dashoffset var(--duration-normal) var(--ease-out), opacity var(--duration-press) ease;
+}
+
+.checkbox__input:checked + .checkbox__box,
+.checkbox__input:indeterminate + .checkbox__box {
+  border-color: var(--color-accent);
+  background: var(--color-accent);
+}
+
+.checkbox:has(.checkbox__input:checked) .checkbox__mark_kind_check,
+.checkbox:has(.checkbox__input:indeterminate) .checkbox__mark_kind_dash {
+  stroke-dashoffset: 0;
+  opacity: 1;
+}
+
+/* «Частично» главнее «отмечено»: галочка уступает черте. */
+.checkbox:has(.checkbox__input:indeterminate) .checkbox__mark_kind_check {
+  opacity: 0;
+}
+
+.checkbox__input:focus-visible + .checkbox__box {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 2px;
+}
+
+.checkbox:has(.checkbox__input:disabled) {
+  opacity: .45;
+  cursor: default;
+  pointer-events: none;
+}
+
+.checkbox__body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-half);
+  min-width: 0;
+}
+
+.checkbox__text {
+  font-size: var(--text-body);
+  font-weight: var(--weight-medium);
+  line-height: 1.4;
+}
+
+.checkbox__hint {
+  color: var(--color-text-muted);
+  font-size: var(--text-small);
+  line-height: 1.4;
+}
+
+.checkbox_invalid .checkbox__hint {
+  color: var(--color-danger);
+}
+
+/* Чеклист: отмеченное зачёркнуто и притихло — сделано. */
+.checkbox_strike:has(.checkbox__input:checked) .checkbox__text {
+  color: var(--color-text-muted);
+  text-decoration: line-through;
+  text-decoration-color: var(--color-text-faint);
+}

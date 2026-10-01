@@ -41,7 +41,10 @@ function sniff(kind: 'tls' | 'http', buf: Buffer): Sniffed | null {
   return host ? { name: host } : { reject: 'нет Host' };
 }
 
-function serve(kind: 'tls' | 'http', port: number, client: Socket, lan: LanConfig, deps: RelayDeps): void {
+/** Панель: какие Host её, и куда отдать сокет. */
+export type PanelHook = { hosts: Set<string>; take: (socket: Socket, head: Buffer) => void };
+
+function serve(kind: 'tls' | 'http', port: number, client: Socket, lan: LanConfig, deps: RelayDeps, panel: PanelHook | null = null): void {
   const { log } = deps;
   const from = client.remoteAddress ?? '?';
   const who = `lan:${from.replace(/^::ffff:/, '')}`;
@@ -63,6 +66,11 @@ function serve(kind: 'tls' | 'http', port: number, client: Socket, lan: LanConfi
     if ('reject' in r) {
       log.debug(`${who}: :${port} — ${r.reject}`);
       client.destroy();
+      return;
+    }
+    // http на имя панели или на сам адрес — это панель, а не сайт.
+    if (kind === 'http' && panel && panel.hosts.has(r.name)) {
+      panel.take(client, buf);
       return;
     }
     // Какие сайты вести, решает DNS (списки и самообучение меняются на ходу),
@@ -103,12 +111,12 @@ async function listen(server: net.Server, address: string, port: number, log: Lo
 /** Тот же разбор для тестов — порт 443 в тесте не взять. */
 export const serveForTest = serve;
 
-export function startLanInlet(lan: LanConfig, deps: RelayDeps): net.Server[] {
+export function startLanInlet(lan: LanConfig, deps: RelayDeps, panel: PanelHook | null = null): net.Server[] {
   const servers: net.Server[] = [];
   // Слушаем внутренние порты; на них пакеты к address:443/80 переадресует таблица
   // nft от contour-addr (сами :443/:80 на всех адресах держит nginx).
   for (const [kind, port, listenPort] of [['tls', 443, lan.tlsPort], ['http', 80, lan.httpPort]] as const) {
-    const server = net.createServer((client) => serve(kind, port, client, lan, deps));
+    const server = net.createServer((client) => serve(kind, port, client, lan, deps, panel));
     void listen(server, lan.address, listenPort, deps.log);
     servers.push(server);
   }

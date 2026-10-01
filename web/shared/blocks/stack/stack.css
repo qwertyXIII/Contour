@@ -1,0 +1,29 @@
+/*
+ * Блок stack: столбик с ровным промежутком. Блоки не ставят себе внешних
+ * отступов — расстояние между ними задаёт тот, кто их складывает.
+ *
+ *   stack_gap_{xs|s|m|l|xl|2xl|3xl}   4 · 8 · 12 · 16 (по умолчанию) · 24 · 32 · 48
+ *   stack_align_{start|center|end}    поперёк; без него — во всю ширину
+ *   __fill — микс на ребёнке: во всю ширину и в выровненном столбике (картинка,
+ *            ряд колонок — у контейнера запроса своей ширины нет, иначе — ноль)
+ */
+.stack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--stack-gap, var(--space-4));
+  min-width: 0;
+}
+
+.stack_gap_xs { --stack-gap: var(--space-1); }
+.stack_gap_s { --stack-gap: var(--space-2); }
+.stack_gap_m { --stack-gap: var(--space-3); }
+.stack_gap_l { --stack-gap: var(--space-4); }
+.stack_gap_xl { --stack-gap: var(--space-6); }
+.stack_gap_2xl { --stack-gap: var(--space-8); }
+.stack_gap_3xl { --stack-gap: var(--space-12); }
+
+.stack_align_start { align-items: flex-start; }
+.stack_align_center { align-items: center; }
+.stack_align_end { align-items: flex-end; }
+
+.stack__fill { align-self: stretch; }

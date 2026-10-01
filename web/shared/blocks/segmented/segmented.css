@@ -1,0 +1,124 @@
+/*
+ * Блок segmented: один из двух–четырёх вариантов, видны все сразу — тема,
+ * режим, период. Группа radio с общим name.
+ *
+ *   <div class="segmented" role="radiogroup" aria-label="Тема">
+ *     <label class="segmented__option">
+ *       <input class="segmented__input visually-hidden" type="radio" name="scheme" value="auto" checked>
+ *       <span class="segmented__label">Авто</span>
+ *     </label> …
+ *   </div>
+ *
+ *   segmented_wide (на всю ширину) · segmented_size_m (высота обычного контрола)
+ *   segmented_scroll (не влезает — прокрутка вбок, а не наезд подписей)
+ *   __icon (микс с icon внутри __label)
+ *
+ * Выбранный вариант подсвечивает одна плашка __thumb, которая переезжает под
+ * новый выбор. Её вставляет и двигает компонент Segmented (модификатор
+ * segmented_enhanced; размеры — --thumb-x / --thumb-w). Без JS подсвечен сам
+ * вариант — выглядит так же, только без переезда.
+ */
+.segmented {
+  --segmented-h: var(--control-h-s);
+
+  position: relative;
+  display: inline-flex;
+  gap: var(--space-half);
+  max-width: 100%;
+  padding: 3px;
+  border-radius: var(--radius-full);
+  background: var(--color-fill-1);
+  /* Плашка с z-index −1 ложится над фоном блока, но под подписями. */
+  isolation: isolate;
+}
+
+.segmented__thumb {
+  position: absolute;
+  top: 3px;
+  bottom: 3px;
+  left: 0;
+  z-index: -1;
+  width: var(--thumb-w, 0);
+  border-radius: var(--radius-full);
+  background: var(--color-raised);
+  box-shadow: var(--shadow-s);
+  transform: translateX(var(--thumb-x, 0));
+  pointer-events: none;
+}
+
+/* Ехать — только после первой расстановки: при загрузке плашка просто стоит на месте. */
+.segmented_ready .segmented__thumb {
+  transition:
+    transform var(--duration-normal) var(--ease-out),
+    width var(--duration-normal) var(--ease-out);
+}
+
+.segmented_wide {
+  display: flex;
+  width: 100%;
+}
+
+.segmented_wide .segmented__label {
+  padding-inline: var(--space-2);
+}
+
+.segmented_size_m {
+  --segmented-h: var(--control-h-m);
+}
+
+.segmented__option {
+  position: relative;
+  display: flex;
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+.segmented__label {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-1);
+  width: 100%;
+  height: calc(var(--segmented-h) - 6px);
+  padding: 0 var(--space-3);
+  border-radius: var(--radius-full);
+  color: var(--color-text-muted);
+  font-size: var(--text-small);
+  font-weight: var(--weight-semibold);
+  line-height: 1;
+  white-space: nowrap;
+  cursor: pointer;
+  user-select: none;
+  -webkit-user-select: none;
+  --icon-size: var(--icon-s);
+  transition: background-color var(--duration-fast) ease, color var(--duration-fast) ease,
+    box-shadow var(--duration-fast) ease;
+}
+
+@media (hover: hover) {
+  .segmented__label:hover {
+    color: var(--color-text);
+  }
+}
+
+.segmented__input:checked + .segmented__label {
+  background: var(--segmented-selected-bg, var(--color-raised));
+  color: var(--color-text);
+  box-shadow: var(--segmented-selected-shadow, var(--shadow-s));
+}
+
+/* Подсветку взяла на себя плашка — у самого варианта остаётся только цвет текста. */
+.segmented_enhanced {
+  --segmented-selected-bg: transparent;
+  --segmented-selected-shadow: none;
+}
+
+.segmented__input:focus-visible + .segmented__label {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 1px;
+}
+
+.segmented__input:disabled + .segmented__label {
+  opacity: .45;
+  cursor: default;
+}

@@ -1,0 +1,63 @@
+/*
+ * Блок transcript: переписка третьих лиц — представитель с посторонним, беседа.
+ * Мельче реплик своего разговора: здесь просматривают двадцать строк, чтобы
+ * понять, что происходило.
+ *
+ * Сторону реплики выбирает переписка (__item_side_*), цвет — сама реплика по
+ * автору (bubble). Смена говорящего — просвет шире (__item_turn): так видно, где
+ * кончилась мысль одного и началась другого.
+ *
+ *   __more (порция раньше) · __day (день; метка «где мы» у полосы прокрутки) ·
+ *   __item (+ _side_{end|center}, _turn) · __status (что сейчас, после последней)
+ */
+.transcript {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.transcript__more {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-1);
+  padding-block-end: var(--space-2);
+}
+
+/* День — тихая таблетка посередине, как чип в образцах. */
+.transcript__day {
+  align-self: center;
+  margin: var(--space-4) 0 var(--space-1);
+  padding: var(--space-1) var(--space-3);
+  border-radius: var(--radius-full);
+  background: var(--color-fill-1);
+  color: var(--color-text-muted);
+  font-size: var(--text-caption);
+  font-weight: var(--weight-semibold);
+  letter-spacing: var(--tracking-caps);
+  text-transform: uppercase;
+}
+
+.transcript__item {
+  align-self: flex-start;
+  max-width: min(84%, 560px);
+}
+
+.transcript__item_side_end {
+  align-self: flex-end;
+}
+
+.transcript__item_side_center {
+  align-self: center;
+  max-width: 100%;
+}
+
+.transcript__item_turn {
+  margin-block-start: var(--space-2);
+}
+
+.transcript__status {
+  align-self: center;
+  margin: var(--space-2) 0 0;
+}

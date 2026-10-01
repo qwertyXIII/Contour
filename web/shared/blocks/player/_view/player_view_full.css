@@ -1,0 +1,49 @@
+/*
+ * «Сейчас играет» — экран: крупная обложка, название, источник, перемотка,
+ * кнопки с «перемешать» и «повтор», громкость и очередь. Поверхности нет —
+ * это экран, а не плитка.
+ */
+.player_view_full {
+  --player-bg: transparent;
+  --player-border: transparent;
+  --player-pad: 0px;
+  --player-gap: var(--space-5);
+
+  align-content: start;
+  height: auto;
+  border-radius: 0;
+  overflow: visible;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+
+.player_view_full .player__art {
+  justify-self: center;
+  width: min(100%, 340px);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-l);
+  --icon-size: 30%;
+}
+
+.player_view_full .player__meta {
+  gap: var(--space-1);
+}
+
+.player_view_full .player__title {
+  font-size: var(--text-title);
+  font-weight: var(--weight-bold);
+  letter-spacing: var(--tracking-title);
+}
+
+.player_view_full .player__artist {
+  font-size: var(--text-lead);
+}
+
+.player_view_full .player__controls {
+  justify-content: space-between;
+}
+
+.player_view_full .player__play {
+  --button-h: 64px;
+  --icon-size: var(--icon-l);
+}

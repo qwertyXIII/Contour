@@ -1,0 +1,18 @@
+/*
+ * Элемент button__count: число на кнопке — «Меню ③», «Ждут ответа 3».
+ * Число — не цвет: оно само говорит, сколько.
+ */
+.button__count {
+  display: inline-grid;
+  flex: 0 0 auto;
+  place-items: center;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 var(--space-1);
+  border-radius: var(--radius-full);
+  background: var(--color-accent);
+  color: var(--color-on-accent);
+  font-size: var(--text-caption);
+  font-weight: var(--weight-bold);
+  line-height: 1;
+}

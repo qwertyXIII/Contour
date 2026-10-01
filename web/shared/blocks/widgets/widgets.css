@@ -1,0 +1,83 @@
+/*
+ * Блок widgets: сетка виджетов экрана. Клетки квадратные: высота строки равна
+ * ширине колонки. Колонок столько, сколько влезает по ширине контейнера:
+ * 4 (телефон), 6 от 560px, 8 от 840px. У каждого виджета свои координаты —
+ * пустые клетки можно оставлять.
+ *
+ *   <div class="widgets">
+ *     <div class="widgets__bar"><button class="button button_size_s widgets__toggle" type="button">Изменить</button></div>
+ *     <div class="widgets__grid">
+ *       <div class="widgets__item widgets__item_size_2x1" data-widget="home" data-title="Дом">…любой блок: tile, card, fader…</div>
+ *     </div>
+ *   </div>
+ *
+ *   __item_size_{1x1|2x1|1x2|2x2|4x1|4x2} — ширина × высота в клетках
+ *   Ставит компонент Widgets: widgets_placed (свои координаты: --col, --row) · widgets_editing ·
+ *   __item_lifted (тянут) · __item_picked (взят с клавиатуры) · __slot (куда ляжет)
+ *
+ * Без JS сетка укладывает виджеты сама по порядку разметки — так же плотно.
+ */
+.widgets {
+  --widgets-cols: 4;
+  --widgets-gap: var(--space-3);
+
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  min-width: 0;
+  container: widgets / inline-size;
+}
+
+.widgets__bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  min-height: var(--control-h-s);
+}
+
+.widgets__title {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: var(--text-small);
+  font-weight: var(--weight-semibold);
+}
+
+.widgets__toggle {
+  margin-inline-start: auto;
+}
+
+.widgets__grid {
+  --widgets-cell: calc((100cqw - var(--widgets-gap) * (var(--widgets-cols) - 1)) / var(--widgets-cols));
+
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(var(--widgets-cols), minmax(0, 1fr));
+  grid-template-rows: repeat(var(--widgets-rows, 1), var(--widgets-cell));
+  grid-auto-rows: var(--widgets-cell);
+  grid-auto-flow: row dense;
+  gap: var(--widgets-gap);
+  transition: min-height var(--duration-normal) var(--ease-out);
+}
+
+@container widgets (min-width: 560px) {
+  .widgets__grid {
+    --widgets-cols: 6;
+  }
+}
+
+@container widgets (min-width: 840px) {
+  .widgets__grid {
+    --widgets-cols: 8;
+  }
+}
+
+/* Куда ляжет виджет, пока его тянут. */
+.widgets__slot {
+  grid-column: var(--col, 1) / span var(--w, 1);
+  grid-row: var(--row, 1) / span var(--h, 1);
+  border: 2px dashed var(--color-border-strong);
+  border-radius: var(--radius-xl);
+  background: var(--color-fill-1);
+  pointer-events: none;
+}

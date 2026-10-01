@@ -1,0 +1,164 @@
+/*
+ * Вид media_view_mosaic — фото и видео одной реплики (лента разговора, переписка):
+ * всегда полный прямоугольник, без пустых клеток (владелец, 2026-10-01). Шаблон — по
+ * числу плиток, модификатором media_tiles_N (1…10; больше в реплике — несколько
+ * мозаик, это решает хозяин): первая — крупная, рядом мелкие квадраты; где крупная
+ * некрасива (2, 4, 6, 9) — ровная сетка.
+ *
+ *   1  ▣            одна — в своей пропорции (--ratio), в пределах 3:4…16:9
+ *   2  ▢▢           два квадрата
+ *   3  ▣▣▢          крупная 2×2 и две столбиком
+ *      ▣▣▢
+ *   4  ▢▢ / ▢▢      2×2
+ *   5  ▣▣▢▢         крупная 2×2 и четыре 2×2 рядом
+ *      ▣▣▢▢
+ *   6  ▢▢▢ / ▢▢▢    3×2
+ *   7  как 3, под ним ряд из четырёх
+ *   8  как 5, под ним ряд из трёх
+ *   9  ▢▢▢ ×3       3×3
+ *   10 как 3, под ним ряд из трёх и ряд из четырёх
+ *
+ *   <div class="media media_view_mosaic media_tiles_5" role="group" aria-label="Фото и видео: 5">
+ *     <div class="media__track">
+ *       <button class="media__item" type="button" …><img class="media__image" …></button> …
+ *     </div>
+ *   </div>
+ *
+ * Сетка — 12 колонок (делятся на 2, 3 и 4): плитка занимает 3, 4, 6 или 8 из них,
+ * строки — долями в тех же единицах, а общая пропорция (--media-shape) задана
+ * шаблоном: высота известна до картинок, лента не прыгает. Ряды разной высоты (7, 8,
+ * 10) — это ряды квадратов разного размера. Кадры режутся под клетку (object-fit:
+ * cover), целиком — в просмотре. Порядок плиток — порядок разметки: в нём же их
+ * листает просмотр.
+ *
+ * Сторона крупной — сторона говорящего, переменной от того, на чём реплика лежит:
+ *   --media-lead-end — 1: крупная у конца строки, справа (своя реплика); одна плитка
+ *     прижата туда же. 0 (по умолчанию) — у начала, слева. Мелкие обходят крупную в
+ *     обычном порядке чтения — зеркалится только место крупной.
+ * Одна плитка: --media-ratio-min / --media-ratio-max — пределы пропорции, не выше
+ * --media-max-h (его даёт место: message__media, bubble__media).
+ */
+.media_view_mosaic {
+  /* 3:4 — портрет телефона целиком; уже — столбик уже половины строки. */
+  --media-ratio-min: .75;
+  /* 16:9 — видео целиком; шире — полоска ниже двух строк текста. */
+  --media-ratio-max: 1.778;
+}
+
+.media_view_mosaic .media__track {
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  grid-template-rows: var(--media-rows, minmax(0, 1fr));
+  aspect-ratio: var(--media-shape, 1);
+}
+
+.media_view_mosaic .media__item {
+  grid-column: span var(--media-span, 4);
+  grid-row: span var(--media-span-rows, 1);
+  height: 100%;
+  aspect-ratio: auto;
+}
+
+/* Одна — в своей пропорции, но в пределах; узкая (портрет) встаёт к своей стороне. */
+.media_tiles_1 .media__track {
+  display: block;
+  aspect-ratio: auto;
+  overflow: visible;
+}
+
+.media_tiles_1 .media__item {
+  --media-fit: clamp(var(--media-ratio-min), var(--ratio, 1.333), var(--media-ratio-max));
+  --media-play: 56px;
+
+  width: 100%;
+  max-width: calc(var(--media-max-h) * var(--media-fit));
+  height: auto;
+  margin-inline-start: calc(var(--media-lead-end, 0) * (100% - min(100%, var(--media-max-h) * var(--media-fit))));
+  aspect-ratio: var(--media-fit);
+  border-radius: var(--media-radius);
+}
+
+.media_tiles_2 {
+  --media-shape: 2;
+}
+
+.media_tiles_2 .media__item,
+.media_tiles_4 .media__item {
+  --media-span: 6;
+}
+
+.media_tiles_3,
+.media_tiles_6 {
+  --media-rows: repeat(2, minmax(0, 1fr));
+  --media-shape: 3 / 2;
+}
+
+.media_tiles_4 {
+  --media-rows: repeat(2, minmax(0, 1fr));
+  --media-shape: 1;
+}
+
+.media_tiles_5 {
+  --media-rows: repeat(2, minmax(0, 1fr));
+  --media-shape: 2;
+}
+
+.media_tiles_7 {
+  --media-rows: repeat(2, minmax(0, 4fr)) minmax(0, 3fr);
+  --media-shape: 12 / 11;
+}
+
+.media_tiles_8 {
+  --media-rows: repeat(2, minmax(0, 3fr)) minmax(0, 4fr);
+  --media-shape: 6 / 5;
+}
+
+.media_tiles_9 {
+  --media-rows: repeat(3, minmax(0, 1fr));
+  --media-shape: 1;
+}
+
+.media_tiles_10 {
+  --media-rows: repeat(3, minmax(0, 4fr)) minmax(0, 3fr);
+  --media-shape: 4 / 5;
+}
+
+/* Мелкие: у 5 — четверть ширины, у 7 и 10 — нижний ряд из четырёх, у 8 — из трёх. */
+.media_tiles_5 .media__item,
+.media_tiles_7 .media__item,
+.media_tiles_10 .media__item {
+  --media-span: 3;
+}
+
+.media_tiles_7 .media__item:nth-child(-n + 3),
+.media_tiles_10 .media__item:nth-child(-n + 6) {
+  --media-span: 4;
+}
+
+.media_tiles_8 .media__item:nth-child(-n + 5) {
+  --media-span: 3;
+}
+
+/* Крупная: 2×2 мелких; у 3, 7 и 10 — две трети ширины, у 5 и 8 — половина. */
+.media_tiles_3 .media__item:first-child,
+.media_tiles_7 .media__item:first-child,
+.media_tiles_10 .media__item:first-child {
+  --media-span: 8;
+}
+
+.media_tiles_5 .media__item:first-child,
+.media_tiles_8 .media__item:first-child {
+  --media-span: 6;
+}
+
+/*
+ * Место крупной — явно: у начала или у конца первых двух строк; остальные плитки
+ * раскладываются вокруг сами, слева направо.
+ */
+.media_tiles_3 .media__item:first-child,
+.media_tiles_5 .media__item:first-child,
+.media_tiles_7 .media__item:first-child,
+.media_tiles_8 .media__item:first-child,
+.media_tiles_10 .media__item:first-child {
+  grid-column: calc(1 + var(--media-lead-end, 0) * (12 - var(--media-span))) / span var(--media-span);
+  grid-row: 1 / span 2;
+}

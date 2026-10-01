@@ -1,0 +1,124 @@
+/*
+ * Блок route: «сколько ехать» — откуда и куда, сколько по времени с учётом
+ * пробок, когда выезжать, чем добираться. Карта внутри — необязательный слот
+ * (__map › map): без неё тот же ответ читается строкой.
+ *
+ *   __stops › __stop (_kind_{start|end}) › __dot · __place · __note
+ *   __map · __modes (+ segmented) · __summary › __time · __delay (+ badge)
+ *   __advice · __facts (+ kv) · __options (+ list)
+ *
+ *   route_view_tv — телевизор и умный экран: крупно, карта слева, без кнопок
+ */
+.route {
+  display: grid;
+  gap: var(--space-4);
+  min-width: 0;
+}
+
+/* Откуда → куда: точки на одной линии, как на карте. */
+.route__stops {
+  position: relative;
+  display: grid;
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+.route__stops::before {
+  position: absolute;
+  top: var(--space-3);
+  bottom: var(--space-3);
+  left: 5px;
+  width: 2px;
+  border-radius: var(--radius-full);
+  background: var(--color-border-strong);
+  content: '';
+}
+
+.route__stop {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+.route__dot {
+  flex: 0 0 auto;
+  width: 12px;
+  height: 12px;
+  border: 2px solid var(--color-text-muted);
+  border-radius: 50%;
+  background: var(--color-bg-elevated);
+}
+
+.route__stop_kind_end .route__dot {
+  border-color: var(--color-accent);
+  background: var(--color-accent);
+}
+
+/* Сжимается адрес, а не название: «Стоматолог» важнее улицы. */
+.route__place {
+  flex: 0 0 auto;
+  max-width: 62%;
+  min-width: 0;
+  overflow: hidden;
+  font-weight: var(--weight-semibold);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.route__note {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--color-text-muted);
+  font-size: var(--text-small);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Время — одно главное число экрана: крупно и тонко. */
+.route__summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-2) var(--space-3);
+}
+
+.route__time {
+  font-size: var(--text-display);
+  font-weight: var(--weight-light);
+  line-height: var(--leading-tight);
+  letter-spacing: var(--tracking-hero);
+}
+
+.route__advice {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0;
+  color: var(--color-text-muted);
+  font-weight: var(--weight-medium);
+  --icon-size: var(--icon-s);
+}
+
+/* ТВ: карта слева во всю высоту, время крупнее, всё читается с дивана. */
+.route_view_tv {
+  grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
+  align-content: center;
+  gap: var(--space-4) var(--space-8);
+  min-height: 100%;
+}
+
+.route_view_tv .route__map {
+  grid-row: 1 / span 4;
+  align-self: stretch;
+}
+
+.route_view_tv .route__time {
+  font-size: var(--text-figure);
+}
+
+.route_view_tv .route__advice {
+  font-size: var(--text-lead);
+}

@@ -1,0 +1,147 @@
+/*
+ * Блок card: поверхность, на которой лежит содержимое — строка настроек,
+ * карточка человека, форма раздела. Сама ничего не раскладывает, кроме своих
+ * элементов; строку внутри неё строит row.
+ *
+ *   card_view_{glass|outline|solid|accent|dashed}
+ *   card_pad_{none|xs|s|l}   card_interactive (для a/button)
+ *   __head · __title · __subtitle · __body · __foot · __media · __well
+ *
+ * ⚠️ Не смешивать card с другим раскладывающим блоком на одном элементе
+ * (`card row`): оба задают display, и победит тот, что импортирован позже.
+ * Вкладывать: <a class="card card_interactive"><div class="row">…</div></a>.
+ */
+.card {
+  --card-bg: var(--color-surface);
+  --card-bg-hover: var(--color-surface-hover);
+  --card-bg-active: var(--color-surface-pressed);
+  --card-border: var(--color-border);
+  --card-radius: var(--radius-l);
+  --card-pad-y: var(--card-pad);
+  --card-pad-x: var(--card-pad);
+
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: var(--card-gap, var(--space-3));
+  min-width: 0;
+  margin: 0;
+  padding: var(--card-pad-y) var(--card-pad-x);
+  border: 1px solid var(--card-border);
+  border-radius: var(--card-radius);
+  background: var(--card-bg);
+  color: var(--card-fg, inherit);
+  font: inherit;
+  text-align: start;
+  text-decoration: none;
+}
+
+.card_view_glass {
+  -webkit-backdrop-filter: blur(var(--blur-glass));
+  backdrop-filter: blur(var(--blur-glass));
+}
+
+.card_view_outline {
+  --card-bg: transparent;
+  --card-bg-hover: var(--color-fill-1);
+}
+
+.card_view_solid {
+  --card-bg: var(--color-bg-elevated);
+  --card-bg-hover: var(--color-bg-elevated);
+  box-shadow: var(--shadow-m);
+}
+
+.card_view_accent {
+  --card-bg: var(--color-accent);
+  --card-bg-hover: var(--color-accent-hover);
+  --card-bg-active: var(--color-accent-pressed);
+  --card-border: transparent;
+  --card-fg: var(--color-on-accent);
+}
+
+/* Место под то, чего ещё нет: «добавить плитку», пустой слот. */
+.card_view_dashed {
+  --card-bg: transparent;
+  --card-bg-hover: var(--color-fill-1);
+  --card-border: var(--color-border-strong);
+  border-style: dashed;
+}
+
+.card_pad_none { --card-pad-y: 0; --card-pad-x: 0; }
+/* Меню из строк-кнопок: у строк свои отступы, карточке нужен только зазор. */
+.card_pad_xs { --card-pad-y: var(--space-1); --card-pad-x: var(--space-1); }
+.card_pad_s { --card-pad-y: var(--row-pad-y); --card-pad-x: var(--row-pad-x); }
+.card_pad_l { --card-pad-y: calc(var(--card-pad) + 6px); --card-pad-x: calc(var(--card-pad) + 6px); }
+
+.card_interactive {
+  width: 100%;
+  cursor: pointer;
+  transition: transform var(--duration-press) var(--ease-out), background-color var(--duration-fast) ease;
+}
+
+@media (hover: hover) {
+  .card_interactive:hover {
+    background-color: var(--card-bg-hover);
+  }
+}
+
+.card_interactive:active {
+  background-color: var(--card-bg-active);
+  transform: scale(.985);
+}
+
+.card__head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+.card__title {
+  margin: 0;
+  font-size: var(--text-lead);
+  font-weight: var(--weight-semibold);
+  line-height: 1.3;
+}
+
+.card__subtitle {
+  margin: var(--space-half) 0 0;
+  color: var(--color-text-muted);
+  font-size: var(--text-small);
+  line-height: 1.4;
+}
+
+.card__body {
+  min-width: 0;
+  margin: 0;
+  font-size: var(--text-body);
+  line-height: var(--leading-normal);
+}
+
+.card__foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+/* Картинка в край карточки. Радиус — правило вложенности минус рамка. */
+.card__media {
+  display: block;
+  width: calc(100% + 2 * var(--card-pad-x));
+  max-width: none;
+  margin: calc(-1 * var(--card-pad-y)) calc(-1 * var(--card-pad-x)) 0;
+  border-radius: calc(var(--card-radius) - 1px) calc(var(--card-radius) - 1px) 0 0;
+  aspect-ratio: 16 / 9;
+  object-fit: cover;
+  background: var(--color-fill-2);
+}
+
+/* Вложенная подложка вплотную к отступам: радиус = радиус карточки − отступ. */
+.card__well {
+  padding: var(--space-3);
+  border-radius: max(var(--radius-xs), calc(var(--card-radius) - var(--card-pad-x)));
+  background: var(--color-well);
+}

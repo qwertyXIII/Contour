@@ -1,0 +1,159 @@
+/*
+ * Блок scroller: своя полоса прокрутки поверх нативной — тонкая, как в macOS:
+ * появляется при прокрутке и тает, у курсора становится толще, ручку можно
+ * тянуть. Рядом с ручкой — подпись «где мы»: буква, месяц, год — из меток
+ * data-scroll-label в содержимом.
+ *
+ *   <div class="scroller" style="--scroller-h: 420px">
+ *     <div class="scroller__view" tabindex="0">
+ *       <h4 data-scroll-label="А">А</h4> …
+ *     </div>
+ *   </div>
+ *
+ * Прокрутка остаётся нативной: колесо, палец, клавиатура и скринридер — как
+ * обычно; своё — только облик полосы. Без JS видна системная полоса.
+ *
+ *   scroller_page — полоса всей страницы: пустой блок в любом месте body,
+ *   вид — сам документ, полоса прибита к правому краю окна
+ *
+ *   __view · от JS: __bar › __thumb · __label
+ *   от JS: scroller_enhanced · _active (прокручивают) · _dragging (тянут
+ *   ручку) · _telling (видна подпись) · _still (прокручивать нечего)
+ *   --thumb-size · --thumb-top — ставит JS на __bar и __label, не на корень:
+ *   корень — предок всего содержимого, переменная на нём пересчитывала бы
+ *   стили каждого узла внутри на каждом кадре прокрутки
+ */
+.scroller {
+  --scroller-h: 100%;
+  --thumb-w: 6px;
+  --thumb-size: 0px;
+  --thumb-top: 0px;
+
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  height: var(--scroller-h);
+}
+
+.scroller__view {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.scroller_enhanced .scroller__view {
+  scrollbar-width: none;
+}
+
+.scroller_enhanced .scroller__view::-webkit-scrollbar {
+  display: none;
+}
+
+.scroller__bar {
+  position: absolute;
+  top: var(--space-1);
+  right: 0;
+  bottom: var(--space-1);
+  width: 14px;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--duration-normal) ease;
+}
+
+.scroller_active .scroller__bar,
+.scroller_dragging .scroller__bar {
+  opacity: 1;
+  pointer-events: auto;
+  transition-duration: var(--duration-fast);
+}
+
+@media (hover: hover) {
+  .scroller:hover .scroller__bar {
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  .scroller__bar:hover {
+    --thumb-w: 9px;
+  }
+}
+
+.scroller_still .scroller__bar {
+  display: none;
+}
+
+.scroller__thumb {
+  position: absolute;
+  top: 0;
+  right: 3px;
+  width: var(--thumb-w);
+  height: var(--thumb-size);
+  border-radius: var(--radius-full);
+  background: var(--color-text-faint);
+  cursor: grab;
+  translate: 0 var(--thumb-top);
+  transition: width var(--duration-fast) var(--ease-out), background-color var(--duration-fast) ease;
+  touch-action: none;
+}
+
+/* Цель для пальца шире видимой ручки. */
+.scroller__thumb::before {
+  position: absolute;
+  inset: calc(var(--space-2) * -1) calc(var(--space-3) * -1);
+  content: '';
+}
+
+.scroller_dragging .scroller__thumb {
+  --thumb-w: 9px;
+  background: var(--color-text-muted);
+  cursor: grabbing;
+}
+
+/* Подпись «где мы» — слева от ручки, на её высоте. */
+.scroller__label {
+  position: absolute;
+  top: 0;
+  right: var(--space-6);
+  padding: var(--space-1) var(--space-3);
+  border-radius: var(--radius-full);
+  background: var(--color-bg-elevated);
+  color: var(--color-text);
+  box-shadow: var(--shadow-m);
+  font-size: var(--text-small);
+  font-weight: var(--weight-semibold);
+  white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
+  translate: 0 calc(var(--thumb-top) + var(--thumb-size) / 2 - 50%);
+  transition: opacity var(--duration-fast) ease;
+}
+
+.scroller__label:empty {
+  display: none;
+}
+
+.scroller_telling .scroller__label {
+  opacity: 1;
+}
+
+/* Полоса всей страницы: узкая колонка у правого края окна, поверх всего. */
+.scroller_page {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  z-index: var(--z-panel);
+  width: 16px;
+  height: auto;
+  pointer-events: none;
+}
+
+/* У края окна полосу видно и без прокрутки — стоит навести курсор. На пальце
+   невидимая полоса касаний не ловит: иначе тап у правого края листал бы страницу. */
+@media (hover: hover) {
+  .scroller_page .scroller__bar {
+    pointer-events: auto;
+  }
+}

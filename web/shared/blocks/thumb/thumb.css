@@ -1,0 +1,44 @@
+/*
+ * Блок thumb: превью файла или картинки в строке.
+ *
+ *   <button class="thumb thumb_interactive" type="button"><img class="thumb__image" src="…" alt="…"></button>
+ *
+ *   thumb_size_{s|l}   40 · 88 (по умолчанию 56) · thumb_broken (картинка не пришла)
+ *   thumb_interactive — открывается по нажатию
+ */
+.thumb {
+  --thumb-size: 56px;
+
+  position: relative;
+  display: grid;
+  flex: 0 0 auto;
+  place-items: center;
+  width: var(--thumb-size);
+  height: var(--thumb-size);
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-s);
+  background: var(--color-fill-2);
+  color: var(--color-text-faint);
+  overflow: hidden;
+  --icon-size: calc(var(--thumb-size) * .42);
+}
+
+.thumb_size_s { --thumb-size: 40px; }
+.thumb_size_l { --thumb-size: 88px; }
+
+.thumb_interactive {
+  cursor: zoom-in;
+}
+
+.thumb__image {
+  grid-area: 1 / 1;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.thumb_broken .thumb__image {
+  display: none;
+}

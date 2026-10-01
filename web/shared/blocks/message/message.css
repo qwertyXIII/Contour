@@ -1,0 +1,121 @@
+/*
+ * Блок message: одна реплика. Без пузырей — крупный жирный текст, интонацию
+ * держат вес и межстрочный. Свои реплики — справа и тише.
+ *
+ *   message_from_me · message_kind_system · message_kind_quiet · message_pending
+ *   message_kind_voice — голосовое (ADR-0072 Alter'а): <div>, внутри блок
+ *   voice-note (__note) и текст (__text) — у своего это расшифровка, тише и мельче,
+ *   у Alter'а — сказанное, обычной репликой
+ *   message_attached — с вложениями (что Alter показал, что прислали): <div>,
+ *   сверху блоки media миксом __media — фото и видео мозаикой (media_view_mosaic:
+ *   одно — в своей пропорции, несколько — полным прямоугольником, крупная первая
+ *   со стороны говорящего), файлы и ссылки плашками (media_view_rows), — под ними
+ *   текст (__text). Бывает и с голосовым: тогда вложения над волной. Ширину
+ *   вложений держит --message-media-w, высоту одного — --message-media-h: одно
+ *   фото встаёт в коробку ширина × высота (по умолчанию 340 × 340)
+ *
+ * Цвета задаёт то, на чём лента лежит, переменными (так делает открытая
+ * панель чата: Alter — акцентом, свои — белым, остальное — серым):
+ *   --message-fg (Alter) · --message-me-fg · --message-muted-fg (служебная)
+ *   --message-faint-fg («промолчал») · --message-pending-fg + --message-pending-opacity
+ * Без них — оттенки текущего цвета, как на акценте закрытой панели.
+ *
+ * Переносы строк ответа сохраняются (pre-wrap), поэтому текст в разметке —
+ * одной строкой, без отступов вокруг: иначе отступы тоже станут текстом.
+ */
+.message {
+  margin: 0;
+  color: var(--message-fg, currentColor);
+  font-size: var(--text-message);
+  font-weight: var(--weight-semibold);
+  line-height: var(--leading-snug);
+  letter-spacing: var(--tracking-snug);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  user-select: text;
+  -webkit-user-select: text;
+}
+
+/* Своя — справа: и крупная плитка вложений у правого края (media_view_mosaic). */
+.message_from_me {
+  --media-lead-end: 1;
+
+  color: var(--message-me-fg, color-mix(in srgb, currentColor 72%, transparent));
+  text-align: end;
+}
+
+/* Служебная строка: «нет связи», «переподключаюсь». */
+.message_kind_system {
+  color: var(--message-muted-fg, color-mix(in srgb, currentColor 64%, transparent));
+  font-size: var(--text-body);
+  font-weight: var(--weight-medium);
+  letter-spacing: 0;
+}
+
+/* Alter решил не отвечать: тихая пометка на месте ответа. */
+.message_kind_quiet {
+  color: var(--message-faint-fg, color-mix(in srgb, currentColor 46%, transparent));
+  font-size: var(--text-small);
+  font-weight: var(--weight-medium);
+  letter-spacing: 0;
+}
+
+/* Отправлено посреди хода — модель этого ещё не видела. */
+.message_pending {
+  color: var(--message-pending-fg, color-mix(in srgb, currentColor 72%, transparent));
+  opacity: var(--message-pending-opacity, .45);
+}
+
+/* Голосовое: волна сверху, под ней — что сказано. */
+.message_kind_voice {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-2);
+  white-space: normal;
+}
+
+.message_kind_voice.message_from_me {
+  align-items: flex-end;
+}
+
+.message__text {
+  max-width: 100%;
+  margin: 0;
+  white-space: pre-wrap;
+}
+
+.message_kind_voice.message_from_me .message__text {
+  color: var(--message-muted-fg, color-mix(in srgb, currentColor 64%, transparent));
+  font-size: var(--text-body);
+  font-weight: var(--weight-medium);
+  letter-spacing: 0;
+}
+
+.message__text:empty {
+  display: none;
+}
+
+/*
+ * С вложениями: они сверху, текст под ними; своё — к правому краю. Плашки и
+ * сетка — одной ширины: колонка вложений ровная, как бы они ни шли.
+ */
+.message_attached {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-2);
+  white-space: normal;
+}
+
+.message_attached.message_from_me {
+  align-items: flex-end;
+}
+
+.message__media {
+  --media-radius: var(--radius-l);
+  --media-max-h: var(--message-media-h, 340px);
+
+  width: 100%;
+  max-width: var(--message-media-w, 340px);
+}

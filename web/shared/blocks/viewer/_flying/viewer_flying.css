@@ -1,0 +1,13 @@
+/*
+ * viewer_flying — фото летит из плитки во весь экран или обратно (компонент
+ * viewer, flight.js). Летит рамка со снимком (__flyer): лента и рамка просмотра
+ * на это время спрятаны, подложку ведёт полёт. Своего появления у просмотра,
+ * открытого полётом, нет вовсе — ни в полёте, ни после посадки: его включает
+ * только viewer_appearing (viewer.css).
+ */
+.viewer_flying .viewer__track,
+.viewer_flying .viewer__bar,
+.viewer_flying .viewer__foot,
+.viewer_flying .viewer__nav {
+  opacity: 0;
+}

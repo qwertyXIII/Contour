@@ -1,0 +1,48 @@
+/*
+ * Блок cluster: строка с переносом — кнопки, метки, чипы.
+ *
+ *   cluster_gap_{xs|s|m|l|xl}          4 · 8 (по умолчанию) · 12 · 16 · 24
+ *   cluster_justify_{between|end|center}
+ *   cluster_align_{start|baseline|stretch}
+ *   cluster_nowrap
+ *   cluster_scroll — одной строкой с прокруткой вбок: длинный ряд чипов на телефоне
+ */
+.cluster {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--cluster-gap, var(--space-2));
+  min-width: 0;
+}
+
+.cluster_gap_xs { --cluster-gap: var(--space-1); }
+.cluster_gap_s { --cluster-gap: var(--space-2); }
+.cluster_gap_m { --cluster-gap: var(--space-3); }
+.cluster_gap_l { --cluster-gap: var(--space-4); }
+.cluster_gap_xl { --cluster-gap: var(--space-6); }
+
+.cluster_justify_between { justify-content: space-between; }
+.cluster_justify_end { justify-content: flex-end; }
+.cluster_justify_center { justify-content: center; }
+
+.cluster_align_start { align-items: flex-start; }
+.cluster_align_baseline { align-items: baseline; }
+.cluster_align_stretch { align-items: stretch; }
+
+.cluster_nowrap { flex-wrap: nowrap; }
+
+/*
+ * Ряд листается вбок, а не переносится: девять чипов в три строки съели бы
+ * полэкрана над сеткой. Края ряда — до краёв колонки, полосы прокрутки нет.
+ */
+.cluster_scroll {
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+}
+
+.cluster_scroll::-webkit-scrollbar { display: none; }
+
+.cluster_scroll > * { flex: none; }

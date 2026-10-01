@@ -1,0 +1,142 @@
+/*
+ * Блок sheet: лист снизу. Один блок — панель разговора и вопросы и формы поверх
+ * экрана, как лист «Локатора» на iPhone: на малой высоте плавает с отступами и
+ * скруглением, на большой — во всю ширину (ADR-0065 Alter'а).
+ *
+ * Облик по умолчанию — панель разговора: закрытая — акцентная пилюля, из-под
+ * которой выглядывает хвост последней реплики; открытая — чёрная, реплики Alter'а
+ * акцентом, свои — белым, неотправленные, служебные и «думает» — серым. Цвет
+ * ведёт доля хода --sheet-p (0 — закрыта, 1 — открыта): фон, текст и реплики
+ * смешиваются по ней непрерывно, пока лист тянут, а не щёлкают в конце.
+ * Лист вопроса или формы — sheet_view_surface.
+ *
+ *   __handle (жест, ручка — ::after) · __head (шапка, микс с bar; тоже тянет)
+ *   __body · __foot
+ *   sheet_open — на верхнем упоре (у разметки без компонента — «открытая»)
+ *   sheet_live (геометрию ведёт компонент Sheet) · sheet_layered (панель приложения)
+ *   sheet_view_surface (вопрос, форма) · sheet_modal (<dialog> в верхнем слое)
+ *
+ * Приложение читает --sheet-closed и --sheet-radius с самого блока: из них
+ * считается геометрия хода, и число живёт в одном месте.
+ *
+ * ⚠️ Цена кадра. Доля хода меняется каждый кадр, а наследуемая переменная на
+ * корне — это пересчёт стилей всего, что внутри (сотня реплик). Поэтому:
+ *   - --sheet-p и всё, что из неё выведено для геометрии, — зарегистрированы
+ *     ненаследуемыми (@property): кадр пересчитывает корень, ручку и ленту —
+ *     они берут своё явно (inherit), — а реплики не трогает;
+ *   - цвет текста — от --sheet-tone: та же доля, округлённая до шага 0.05.
+ *     Фон корня идёт непрерывно, а реплики перекрашиваются двадцатью шагами за
+ *     весь ход — на глаз в движении плавно, а пересчёт — втрое реже кадров.
+ */
+@property --sheet-p { syntax: "<number>"; inherits: false; initial-value: 0; }
+@property --sheet-tone { syntax: "<number>"; inherits: true; initial-value: 0; }
+
+.sheet {
+  --sheet-closed: 128px;
+  --sheet-radius: var(--radius-2xl);
+  --sheet-p: 0;
+  --sheet-tone: round(var(--sheet-p), .05);
+  --sheet-from: var(--color-accent);
+  --sheet-to: var(--color-bg);
+  --sheet-mix: calc(var(--sheet-tone) * 100%);
+  --sheet-fg: color-mix(in oklab, var(--color-on-accent), var(--color-text) var(--sheet-mix));
+  --sheet-grip: color-mix(in oklab, var(--color-on-accent-line), var(--color-border-strong) var(--sheet-mix));
+  --sheet-grip-w: 68px;
+  --sheet-grip-top: 15px;
+
+  /*
+   * Реплики — переменными блоков message и typing: на акценте — оттенки белого
+   * (как у currentColor по умолчанию), в открытой — свои цвета тёмной схемы.
+   */
+  --message-fg: color-mix(in oklab, var(--color-on-accent), var(--color-accent-text) var(--sheet-mix));
+  --message-me-fg: color-mix(in oklab, color-mix(in srgb, var(--color-on-accent) 72%, transparent), var(--color-text) var(--sheet-mix));
+  --message-muted-fg: color-mix(in oklab, color-mix(in srgb, var(--color-on-accent) 64%, transparent), var(--color-text-muted) var(--sheet-mix));
+  --message-faint-fg: color-mix(in oklab, color-mix(in srgb, var(--color-on-accent) 46%, transparent), var(--color-text-faint) var(--sheet-mix));
+  --message-pending-fg: color-mix(in oklab, color-mix(in srgb, var(--color-on-accent) 72%, transparent), var(--color-text-faint) var(--sheet-mix));
+  --message-pending-opacity: calc(.45 + .55 * var(--sheet-tone));
+  --typing-fg: color-mix(in oklab, var(--color-on-accent), var(--color-text-muted) var(--sheet-mix));
+  --typing-what-fg: color-mix(in oklab, color-mix(in srgb, var(--color-on-accent) 62%, transparent), var(--color-text-muted) var(--sheet-mix));
+
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-height: var(--sheet-closed);
+  overflow: hidden;
+  border-radius: var(--sheet-radius);
+  /* Фон — прямо от доли хода, без переменной: наследуемая переменная тянула бы за собой всё внутри. */
+  background: color-mix(in oklab, var(--sheet-from), var(--sheet-to) calc(var(--sheet-p) * 100%));
+  color: var(--sheet-fg);
+  /* Открытая — всегда тёмная, в любой теме; у закрытой цвета от акцента, схема им безразлична. */
+  color-scheme: dark;
+  user-select: none;
+  -webkit-user-select: none;
+  transition: border-radius var(--duration-normal) var(--ease-out), background-color var(--duration-normal) var(--ease-out),
+    color var(--duration-normal) var(--ease-out);
+}
+
+/* Разметка без компонента (образцы): закрытая — ровно пилюля, высота не от длины реплики. */
+.sheet:not(.sheet_open):not(.sheet_live) {
+  height: var(--sheet-closed);
+}
+
+.sheet_open {
+  --sheet-p: 1;
+
+  border-radius: 0;
+}
+
+.sheet__handle {
+  position: relative;
+  flex: 0 0 auto;
+  height: var(--space-8);
+  cursor: ns-resize;
+  touch-action: none;
+}
+
+.sheet__handle::after {
+  content: "";
+  position: absolute;
+  top: var(--sheet-grip-top);
+  left: 50%;
+  width: var(--sheet-grip-w);
+  height: 5px;
+  border-radius: var(--radius-full);
+  background: var(--sheet-grip);
+  transform: translateX(-50%);
+}
+
+/* Шапка тянет лист, как ручка: вниз — свернуть или закрыть, вверх — раскрыть. */
+.sheet__head {
+  flex: 0 0 auto;
+  padding: 0 var(--space-5) var(--space-1);
+  touch-action: none;
+}
+
+.sheet__body {
+  flex: 1 1 auto;
+  min-height: 0;
+  padding: 0 var(--space-6) var(--space-5);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  touch-action: pan-y;
+}
+
+/* Закрытая без компонента: последняя строка целиком, предыдущие гаснут под маской. */
+.sheet:not(.sheet_open):not(.sheet_live) .sheet__body {
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  overflow: hidden;
+  -webkit-mask-image: linear-gradient(to bottom, transparent 0, var(--color-mask) 30px);
+  mask-image: linear-gradient(to bottom, transparent 0, var(--color-mask) 30px);
+}
+
+.sheet__foot {
+  flex: 0 0 auto;
+  padding: var(--space-2) var(--space-3) calc(var(--sheet-safe-bottom, 0px) + var(--space-4));
+}
+
+/* Строка ввода закрытой панели не видна. */
+.sheet:not(.sheet_open):not(.sheet_live) .sheet__foot {
+  display: none;
+}

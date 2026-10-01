@@ -1,0 +1,36 @@
+/*
+ * fader_fill: ползунок на всю клетку — виджет 1×2 в сетке виджетов. Подпись
+ * и значение сверху, таблетка занимает всю оставшуюся высоту. Подложка —
+ * как у плитки, чтобы в сетке он стоял вровень с соседями.
+ */
+.fader_fill {
+  --fader-w: 100%;
+  --fader-h: 100%;
+  --fader-radius: var(--radius-l);
+
+  display: grid;
+  grid-template-rows: auto auto minmax(0, 1fr);
+  align-items: start;
+  justify-items: start;
+  gap: var(--space-half);
+  width: 100%;
+  height: 100%;
+  padding: var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-xl);
+  background: var(--color-surface);
+}
+
+.fader_fill .fader__label {
+  grid-row: 1;
+  text-align: start;
+}
+
+.fader_fill .fader__value {
+  grid-row: 2;
+}
+
+.fader_fill .fader__track {
+  grid-row: 3;
+  margin-top: var(--space-1);
+}

@@ -1,0 +1,53 @@
+/*
+ * Блок text-motion: буквы текста в полёте (components/text-motion). Разметку
+ * ставит и убирает компонент: доиграв, буквы сливаются обратно в обычный текст.
+ * Облик у текста свой — блок только раскладывает буквы.
+ *
+ *   <h2 class="bar__title">
+ *     <span class="visually-hidden">Работа</span>                ← итог для скринридера
+ *     <span class="text-motion" aria-hidden="true">
+ *       <span class="text-motion__word"><span class="text-motion__letter">Р</span>…</span> …
+ *     </span>
+ *   </h2>
+ *
+ *   __word — слово: внутри не переносится (буквы — inline-block, а между ними
+ *            браузер вправе перенести строку где угодно)
+ *   __letter — буква в полёте: inline-block, иначе сдвиг (transform) не работает
+ *   __swap — место смены: новые буквы стоят в строке, ушедшие — поверх (__gone)
+ *   __gone — уходящие буквы поверх новых, с начала места смены; line-height: normal
+ *            кладёт их строку на ту же базовую линию, что и у букв в строке
+ *   text-motion_block — хозяин блочный (заголовок, абзац): буквы — блоком во всю его
+ *            ширину; __gone_block — сменилось всё с начала: ушедшие лежат поверх
+ *            всего блока и переносятся по его ширине, как стояли
+ */
+.text-motion__word {
+  white-space: nowrap;
+}
+
+.text-motion__letter {
+  display: inline-block;
+}
+
+.text-motion__swap {
+  position: relative;
+}
+
+.text-motion__gone {
+  position: absolute;
+  top: 0;
+  left: 0;
+  line-height: normal;
+  white-space: pre;
+  pointer-events: none;
+}
+
+.text-motion_block {
+  position: relative;
+  display: block;
+}
+
+.text-motion__gone_block {
+  right: 0;
+  line-height: inherit;
+  white-space: inherit;
+}

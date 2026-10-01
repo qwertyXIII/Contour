@@ -1,0 +1,68 @@
+/*
+ * slide-confirm_both: ручка посередине, вправо — «да», влево — «нет».
+ * Для вопроса Alter'а «отправить?», где отказ — тоже ответ, а не просто «ничего».
+ *
+ *   <span class="slide-confirm__fill slide-confirm__fill_side_decline"></span>
+ *   <span class="slide-confirm__fill"></span>                               ← сторона «да»
+ *   <span class="slide-confirm__text slide-confirm__text_side_decline">Нет</span>
+ *   <span class="slide-confirm__text">Да</span>
+ *
+ * Цвет «нет» — --slide-decline (по умолчанию опасный). --slide от −1 до 1.
+ */
+.slide-confirm_both {
+  --slide-travel: calc(50cqw - var(--slide-thumb) / 2 - var(--slide-pad));
+  --slide-decline: var(--color-danger);
+  --slide-decline-soft: var(--color-danger-soft);
+}
+
+.slide-confirm_both .slide-confirm__thumb {
+  left: calc(50% - var(--slide-thumb) / 2);
+  background: var(--color-contrast);
+  color: var(--color-on-contrast);
+}
+
+/*
+ * Заливка растёт от середины в сторону ручки. Множитель min(1, max(0, …×1000))
+ * — «есть ли сдвиг в эту сторону»: без него полукруг под ручкой торчал бы
+ * с другой стороны, пока тянут в эту.
+ */
+.slide-confirm_both .slide-confirm__fill {
+  --side: min(1, max(0, var(--slide) * 1000));
+
+  left: 50%;
+  width: calc((max(0, var(--slide)) * var(--slide-travel) + var(--slide-thumb) / 2) * var(--side));
+}
+
+.slide-confirm_both .slide-confirm__fill_side_decline {
+  --side: min(1, max(0, var(--slide) * -1000));
+
+  right: 50%;
+  left: auto;
+  width: calc((max(0, var(--slide) * -1) * var(--slide-travel) + var(--slide-thumb) / 2) * var(--side));
+  background: var(--slide-decline-soft);
+}
+
+.slide-confirm_both .slide-confirm__text {
+  justify-content: flex-end;
+  padding-inline: var(--space-5);
+}
+
+.slide-confirm_both .slide-confirm__text_side_decline {
+  justify-content: flex-start;
+  opacity: calc(1 - max(0, var(--slide) * -1) * 1.8);
+}
+
+.slide-confirm_side_decline {
+  --slide-color: var(--slide-decline);
+  --slide-on: var(--color-on-contrast);
+}
+
+.slide-confirm_both.slide-confirm_done .slide-confirm__thumb {
+  background: var(--slide-on);
+  color: var(--slide-color);
+}
+
+.slide-confirm_both.slide-confirm_done .slide-confirm__fill {
+  left: 0;
+  width: 100%;
+}

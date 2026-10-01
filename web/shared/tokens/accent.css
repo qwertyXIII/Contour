@@ -1,0 +1,68 @@
+/*
+ * Акцент — одна переменная --accent.
+ *
+ * Всё остальное выводится из неё, поэтому смена акцента — одна строка:
+ *   document.documentElement.style.setProperty('--accent', '#0a84ff')
+ *
+ * Производные объявлены и на :root, и на .theme. Причина: пользовательское
+ * свойство вычисляется там, где объявлено. Будь они только на :root, область
+ * со своим акцентом (плитка модуля в его цвете, <div class="theme"
+ * style="--accent: …">) получила бы производные корневого акцента.
+ */
+:root {
+  --accent: #fe6344;
+}
+
+:root,
+.theme {
+  --color-accent: var(--accent);
+  --color-accent-hover: light-dark(
+    color-mix(in oklch, var(--accent), #000 9%),
+    color-mix(in oklch, var(--accent), #fff 12%)
+  );
+  --color-accent-pressed: light-dark(
+    color-mix(in oklch, var(--accent), #000 18%),
+    color-mix(in oklch, var(--accent), #000 10%)
+  );
+  --color-accent-soft: color-mix(in srgb, var(--accent) 14%, transparent);
+  --color-accent-line: color-mix(in srgb, var(--accent) 32%, transparent);
+  /* Акцент как цвет текста на фоне: на светлом темнее, иначе не читается. */
+  --color-accent-text: light-dark(
+    color-mix(in oklch, var(--accent), #000 26%),
+    color-mix(in oklch, var(--accent), #fff 10%)
+  );
+  --color-focus: var(--accent);
+
+  /*
+   * Акцент как метка на графике. На светлом фоне коралл не дотягивает до 3:1
+   * (проверено валидатором dataviz), поэтому там метка на шаг темнее.
+   */
+  --color-chart-accent: light-dark(
+    color-mix(in oklch, var(--accent), #000 16%),
+    var(--accent)
+  );
+
+  /* Текст на акценте. Запасной вариант — белый: коралл по умолчанию тёмный. */
+  --color-on-accent: #ffffff;
+  --color-on-accent-muted: color-mix(in srgb, var(--color-on-accent) 72%, transparent);
+  --color-on-accent-line: color-mix(in srgb, var(--color-on-accent) 60%, transparent);
+
+  /* Белая таблетка поверх акцента: поле и кнопка в панели чата. */
+  --color-on-accent-field: rgba(255, 255, 255, .94);
+  --color-on-accent-field-hover: #ffffff;
+  --color-on-accent-field-text: #1a1a1a;
+  --color-on-accent-field-muted: rgba(0, 0, 0, .5);
+  --color-on-accent-field-faint: rgba(0, 0, 0, .36);
+}
+
+/*
+ * Белый или чёрный текст — по светлоте акцента в OKLCH: ниже 0.72 — белый,
+ * выше — чёрный. (0.72 − l) · 1000 уходит в плюс или в минус бесконечность,
+ * clamp обрезает до 1 или 0. Коралл (l ≈ 0.69) → белый, лимонный → чёрный.
+ */
+@supports (color: oklch(from red l c h)) {
+  :root,
+  .theme {
+    --color-on-accent: oklch(from var(--accent) clamp(0, (0.72 - l) * 1000, 1) 0 0);
+  }
+}

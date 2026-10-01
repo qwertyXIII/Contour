@@ -1,0 +1,39 @@
+/*
+ * Блок orb: кольцо Alter'а — капсулы, которые дышат по состоянию агента, и знак
+ * Alter в центре. SVG строит движок кольца (components/orb/), здесь —
+ * его облик. Классы пишет движок: orb · __capsules · __mark · orb--shape (его,
+ * с двойным тире; фигуры дизайн-система пока не включает).
+ *
+ * Свечение задаёт сам SVG-фильтр; цвета капсул движок берёт из переменных ниже.
+ */
+.orb {
+  --orb-mark-w: 15;
+
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+
+.orb__mark {
+  fill: none;
+  stroke: var(--color-text);
+  stroke-width: var(--orb-mark-w);
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  transition: opacity var(--shape-mark-duration, var(--duration-slow)) var(--ease-in-out);
+}
+
+/*
+ * Мост для движка кольца: он читает цвета с :root по старым именам приложения и
+ * только как #rrggbb. Уйдёт, когда движок перейдёт на имена дизайн-системы
+ * (перенос в Alter, design-system.md). Кольцо всегда на тёмном — значения тёмной
+ * темы Alter'а; коралловый — это акцент, он меняется вместе с темой.
+ */
+:root {
+  --ink: #ffffff;
+  --coral: var(--accent);
+  --ok: #6ee787;
+  --danger: #ff8b83;
+  --tool: #7cc8ff;
+}

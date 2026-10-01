@@ -1,0 +1,144 @@
+/*
+ * Блок columns: узлы рядом слева направо — «слева текст и значок, справа
+ * картинка», две карточки в ряд. На узком контейнере ряд сам встаёт столбиком:
+ * ширину экрана знать не нужно, решает место, куда ряд положили (разбор
+ * декларативного интерфейса, §10.1). Насколько узком — модификатор ряда,
+ * кто при этом уходит наверх — модификатор ребёнка.
+ *
+ *   <div class="columns">
+ *     <div class="columns__track">
+ *       <div class="stack columns__item">…</div>
+ *       <div class="media media_view_fill columns__item columns__item_width_third columns__item_fill columns__item_narrow_first">…</div>
+ *     </div>
+ *   </div>
+ *
+ *   columns_gap_{xs|s|m|l|xl}          4 · 8 · 12 · 16 (по умолчанию) · 24
+ *   columns_align_{start|center|end}   по высоте; без него колонки тянутся на высоту ряда
+ *   columns_collapse_{m|l}             столбиком уже 480 · 720px; без него — уже 200px
+ *                                      (клетка виджета, половина экрана)
+ *   __track   сам ряд
+ *   __item    микс на корне ребёнка — его место в ряду, облик остаётся его.
+ *             Без ширины делит свободное место поровну с такими же.
+ *   __item_width_{auto|half|third|two-thirds|quarter}   по содержимому или доля ряда
+ *   __item_narrow_{first|last}   встал столбиком — этот в начало или в конец;
+ *                                в ряду порядок декларации
+ *   __item_fill   ребёнок во всю высоту ряда, сам её не задаёт (media_view_fill);
+ *                 в столбике — его пропорция по умолчанию
+ *
+ * Корень — контейнер запроса, а ряд — его элемент: запрос смотрит на предка,
+ * поэтому столбиком встаёт __track, а не сам .columns. Своей ширины по
+ * содержимому у контейнера нет — его растягивает родитель.
+ *
+ * «Столбиком» — это несколько переменных, которые запрос ставит на __track, а
+ * дети читают: так у каждого порога один короткий набор правил. Корень их
+ * сбрасывает — вложенный ряд не наследует столбик внешнего.
+ */
+.columns {
+  --columns-gap: var(--space-4);
+  --columns-align: stretch;
+  --columns-flow: row;
+  --columns-wrap: wrap;
+  --columns-stacked: initial;
+  --columns-first: 0;
+  --columns-last: 0;
+  --columns-fill-height: 100%;
+  --columns-fill-ratio: auto;
+
+  min-width: 0;
+  container-type: inline-size;
+}
+
+.columns_gap_xs { --columns-gap: var(--space-1); }
+.columns_gap_s { --columns-gap: var(--space-2); }
+.columns_gap_m { --columns-gap: var(--space-3); }
+.columns_gap_l { --columns-gap: var(--space-4); }
+.columns_gap_xl { --columns-gap: var(--space-6); }
+
+.columns_align_start { --columns-align: flex-start; }
+.columns_align_center { --columns-align: center; }
+.columns_align_end { --columns-align: flex-end; }
+
+/* Доли больше ряда переходят строкой ниже: повтор карточек по 1/2 — сетка в две колонки. */
+.columns__track {
+  display: flex;
+  flex-direction: var(--columns-flow);
+  flex-wrap: var(--columns-wrap);
+  align-items: var(--columns-align);
+  gap: var(--columns-gap);
+  min-width: 0;
+}
+
+/* Колонка не распирает ряд: длинное слово переносится, а не уводит экран вбок. */
+.columns__item {
+  --columns-flex: 1 1 0;
+
+  flex: var(--columns-stacked, var(--columns-flex));
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+/*
+ * Доля — от ширины ряда за вычетом своей части промежутков: f·100% − gap·(1 − f).
+ * Тогда 1/3 + 2/3, 1/2 + 1/2 и четыре по 1/4 сходятся ровно в ширину ряда.
+ */
+.columns__item_width_auto { --columns-flex: 0 1 auto; }
+.columns__item_width_half { --columns-flex: 0 0 calc(50% - var(--columns-gap) / 2); }
+.columns__item_width_third { --columns-flex: 0 0 calc(100% / 3 - var(--columns-gap) * 2 / 3); }
+.columns__item_width_two-thirds { --columns-flex: 0 0 calc(200% / 3 - var(--columns-gap) / 3); }
+.columns__item_width_quarter { --columns-flex: 0 0 calc(25% - var(--columns-gap) * 3 / 4); }
+
+.columns__item_narrow_first { order: var(--columns-first); }
+.columns__item_narrow_last { order: var(--columns-last); }
+
+/* Картинке на высоту ряда своя пропорция не нужна — высоту дают соседи. */
+.columns__item_fill {
+  --media-fill-height: var(--columns-fill-height);
+  --media-fill-ratio: var(--columns-fill-ratio);
+}
+
+/*
+ * Столбиком: во всю ширину, доли не действуют, `narrow` — в начало или конец,
+ * картинке на высоту ряда возвращается её пропорция (высоты соседа больше нет).
+ * Без переноса: в многострочном столбике ребёнок меряется своей шириной, а у
+ * контейнера запроса (media) она ноль — фото ложилось на соседа.
+ * Порог по умолчанию ниже карточки во всю ширину даже на телефоне шириной 320
+ * (~240px внутри) и выше половины экрана телефона и клетки виджета 2×1 (~140px).
+ */
+@container (max-width: 200px) {
+  .columns__track {
+    --columns-flow: column;
+    --columns-wrap: nowrap;
+    --columns-align: stretch;
+    --columns-stacked: 0 0 auto;
+    --columns-first: -1;
+    --columns-last: 1;
+    --columns-fill-height: initial;
+    --columns-fill-ratio: initial;
+  }
+}
+
+@container (max-width: 480px) {
+  .columns_collapse_m > .columns__track {
+    --columns-flow: column;
+    --columns-wrap: nowrap;
+    --columns-align: stretch;
+    --columns-stacked: 0 0 auto;
+    --columns-first: -1;
+    --columns-last: 1;
+    --columns-fill-height: initial;
+    --columns-fill-ratio: initial;
+  }
+}
+
+@container (max-width: 720px) {
+  .columns_collapse_l > .columns__track {
+    --columns-flow: column;
+    --columns-wrap: nowrap;
+    --columns-align: stretch;
+    --columns-stacked: 0 0 auto;
+    --columns-first: -1;
+    --columns-last: 1;
+    --columns-fill-height: initial;
+    --columns-fill-ratio: initial;
+  }
+}

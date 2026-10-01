@@ -1,0 +1,120 @@
+/*
+ * Блок input: однострочное поле. Рамку рисует обёртка, нативный <input> внутри
+ * прозрачный — так значки и кнопки ложатся в поле, а не рядом с ним.
+ *
+ *   <div class="input">
+ *     <svg class="icon input__icon">…</svg>                   ← необязательно
+ *     <input class="input__control" type="text">
+ *     <span class="input__suffix">мс</span>                   ← необязательно
+ *     <span class="input__actions"><button class="input__action input__action_kind_clear">…</button></span>
+ *   </div>
+ *
+ *   input_size_{s|l} · input_shape_pill · input_view_{on-accent|code}
+ *   input_invalid (или :user-invalid у __control) · input_filled (ставит компонент Input)
+ *   __action_kind_{clear|reveal} — поведение даёт компонент Input
+ */
+.input {
+  --input-h: var(--control-h-m);
+  --input-pad: var(--space-3);
+  --input-radius: var(--radius-m);
+  --input-bg: var(--color-well);
+  --input-fg: var(--color-text);
+  --input-border: var(--color-border);
+  --input-font: var(--text-field);
+  --input-placeholder: var(--color-text-faint);
+  --input-action-fg: var(--color-text-muted);
+
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  width: 100%;
+  min-width: 0;
+  height: var(--input-h);
+  padding: 0 var(--input-pad);
+  border: 1px solid var(--input-border);
+  border-radius: var(--input-radius);
+  background: var(--input-bg);
+  color: var(--input-fg);
+  cursor: text;
+  --icon-size: var(--icon-s);
+  transition: border-color var(--duration-fast) ease, box-shadow var(--duration-fast) ease;
+}
+
+.input:focus-within {
+  border-color: var(--color-focus);
+  box-shadow: 0 0 0 3px var(--color-accent-soft);
+}
+
+.input__control {
+  flex: 1 1 auto;
+  width: 100%;
+  min-width: 0;
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-size: var(--input-font);
+  line-height: normal;
+}
+
+.input__control:focus-visible {
+  outline: none;
+}
+
+.input__control::placeholder {
+  color: var(--input-placeholder);
+  opacity: 1;
+}
+
+/* Автозаполнение браузера не красит поле жёлтым. */
+.input__control:-webkit-autofill {
+  -webkit-text-fill-color: var(--input-fg);
+  transition: background-color 600000s 0s;
+}
+
+.input__icon {
+  color: var(--color-text-faint);
+}
+
+.input__suffix {
+  flex: 0 0 auto;
+  color: var(--color-text-muted);
+  font-size: var(--text-small);
+}
+
+/* Состояния */
+.input_invalid,
+.input:has(.input__control:user-invalid) {
+  --input-border: var(--color-danger);
+}
+
+.input_invalid:focus-within,
+.input:has(.input__control:user-invalid):focus-within {
+  border-color: var(--color-danger);
+  box-shadow: 0 0 0 3px var(--color-danger-soft);
+}
+
+.input:has(.input__control:disabled) {
+  opacity: .5;
+  cursor: not-allowed;
+}
+
+/* Размеры и формы */
+.input_size_s {
+  --input-h: var(--control-h-s);
+  --input-font: var(--text-body);
+  --input-radius: var(--radius-s);
+}
+
+.input_size_l {
+  --input-h: var(--control-h-l);
+}
+
+.input_shape_pill {
+  --input-radius: var(--radius-full);
+  --input-pad: var(--space-4);
+}

@@ -1,0 +1,74 @@
+/*
+ * Модификатор button_view: роль кнопки. Задаёт только переменные блока —
+ * наведение и нажатие написаны в button.css один раз для всех видов.
+ *
+ *   primary (акцент) · contrast (белая на тёмном, чёрная на светлом) · ghost (тихая)
+ *   danger (опасное действие) · on-accent (белая таблетка поверх акцента)
+ *   media (тёмное стекло поверх фото и видео — одинаковое в обеих темах)
+ *   glass (стекло цвета темы с размытием: кнопки шапки над постером — там кнопка то
+ *   над фото, то, когда постер сжался, над фоном, и тёмный media на светлом фоне
+ *   смотрелся бы дырой)
+ */
+.button_view_primary {
+  --button-bg: var(--color-accent);
+  --button-bg-hover: var(--color-accent-hover);
+  --button-bg-active: var(--color-accent-pressed);
+  --button-fg: var(--color-on-accent);
+  --button-border: transparent;
+}
+
+.button_view_contrast {
+  --button-bg: var(--color-contrast);
+  --button-bg-hover: var(--color-contrast-hover);
+  --button-bg-active: var(--color-contrast-hover);
+  --button-fg: var(--color-on-contrast);
+  --button-border: transparent;
+}
+
+.button_view_ghost {
+  --button-bg: transparent;
+  --button-bg-hover: var(--color-fill-1);
+  --button-bg-active: var(--color-fill-2);
+  --button-border: transparent;
+}
+
+.button_view_danger {
+  --button-fg: var(--color-danger);
+  --button-border: var(--color-danger-line);
+  --button-bg-hover: var(--color-danger-soft);
+  --button-bg-active: var(--color-danger-soft);
+}
+
+/* Белая таблетка поверх акцента — «отправить» в панели чата. */
+.button_view_on-accent {
+  --button-bg: var(--color-on-accent-field);
+  --button-bg-hover: var(--color-on-accent-field-hover);
+  --button-bg-active: var(--color-on-accent-field);
+  --button-fg: var(--color-on-accent-field-text);
+  --button-border: transparent;
+}
+
+/* Поверх фото и видео: картинка под кнопкой любая, поэтому подложка тёмная в обеих темах. */
+.button_view_media {
+  --button-bg: var(--color-media-shade);
+  --button-bg-hover: var(--color-media-shade-strong);
+  --button-bg-active: var(--color-media-shade-strong);
+  --button-fg: var(--color-on-media);
+  --button-border: transparent;
+}
+
+/*
+ * Стекло: кнопка поверх фото (шапка над постером карточки) — фон темы насквозь и
+ * размытое под ним; над обычным фоном — тихий круг. Последним видом в файле: навигатор
+ * мешает его с ghost у «Ещё», и стекло берёт верх.
+ */
+.button_view_glass {
+  --button-bg: var(--color-glass);
+  --button-bg-hover: var(--color-glass-strong);
+  --button-bg-active: var(--color-glass-strong);
+  --button-fg: var(--color-text);
+  --button-border: transparent;
+
+  -webkit-backdrop-filter: blur(var(--blur-glass));
+  backdrop-filter: blur(var(--blur-glass));
+}

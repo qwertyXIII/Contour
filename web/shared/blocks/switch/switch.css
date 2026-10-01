@@ -1,0 +1,68 @@
+/*
+ * Блок switch: включить или выключить — применяется сразу, без «Сохранить».
+ * Нативный checkbox с role="switch", ручка — ::after дорожки.
+ *
+ *   <label class="switch">
+ *     <input class="switch__input visually-hidden" type="checkbox" role="switch">
+ *     <span class="switch__track" aria-hidden="true"></span>
+ *     <span class="switch__label">Подпись</span>   ← необязательно: в field подпись у поля
+ *   </label>
+ */
+.switch {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-3);
+  cursor: pointer;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.switch__track {
+  position: relative;
+  flex: 0 0 auto;
+  width: var(--switch-w);
+  height: var(--switch-h);
+  border-radius: var(--radius-full);
+  background: var(--color-fill-3);
+  transition: background-color var(--duration-fast) ease;
+}
+
+.switch__track::after {
+  content: "";
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: calc(var(--switch-h) - 6px);
+  height: calc(var(--switch-h) - 6px);
+  border-radius: 50%;
+  background: var(--color-knob);
+  box-shadow: var(--shadow-knob);
+  transition: transform var(--duration-normal) var(--ease-out);
+}
+
+.switch__input:checked + .switch__track {
+  background: var(--color-accent);
+}
+
+.switch__input:checked + .switch__track::after {
+  transform: translateX(calc(var(--switch-w) - var(--switch-h)));
+}
+
+.switch__input:focus-visible + .switch__track {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 2px;
+}
+
+.switch__input:disabled + .switch__track {
+  opacity: .45;
+}
+
+.switch:has(.switch__input:disabled) {
+  cursor: default;
+}
+
+.switch__label {
+  font-size: var(--text-lead);
+  font-weight: var(--weight-medium);
+  line-height: 1.3;
+}

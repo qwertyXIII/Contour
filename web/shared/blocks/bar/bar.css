@@ -1,0 +1,90 @@
+/*
+ * Блок bar: шапка экрана, диалога или карточки — назад, заголовок, действия.
+ *
+ *   <header class="bar">
+ *     <div class="bar__start"><button class="button button_shape_round …">←</button></div>
+ *     <div class="bar__text"><h2 class="bar__title">Память</h2><p class="bar__subtitle">…</p></div>
+ *     <div class="bar__end">…</div>
+ *   </header>
+ *
+ *   bar_size_s (заголовок диалога) · bar_size_l (заголовок главного экрана)
+ *   bar_align_center (заголовок по центру) · bar_align_start (всё по верху)
+ *   __eyebrow — строка над заголовком: дата, раздел
+ */
+.bar {
+  --bar-title: var(--text-title);
+
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-width: 0;
+  min-height: var(--hit-min);
+}
+
+.bar_size_s {
+  --bar-title: var(--text-heading);
+}
+
+.bar_size_l {
+  --bar-title: var(--text-display);
+  --bar-tracking: var(--tracking-display);
+}
+
+.bar_align_start {
+  align-items: flex-start;
+}
+
+.bar__start,
+.bar__end {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.bar__text {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: var(--space-half);
+  min-width: 0;
+}
+
+.bar__title {
+  /* Режется только вбок (многоточие); вверх и вниз — нет: буквы заголовка, который
+     сменяется (components/text-motion), улетают вверх и поднимаются снизу в размытии,
+     и край строки обрезал бы их ровной полосой. Без поддержки clip — как было.
+     Поле по бокам — туда же: размытая первая буква у левого края не обрезается
+     (overflow-clip-margin у среза по одной оси браузеры не соблюдают); текст стоит,
+     где стоял, — поле внутри, отступ наружу его гасит. */
+  margin: 0 calc(-1 * var(--space-3));
+  padding: 0 var(--space-3);
+  overflow: hidden;
+  overflow: clip visible;
+  font-size: var(--bar-title);
+  font-weight: var(--weight-bold);
+  line-height: var(--leading-title);
+  letter-spacing: var(--bar-tracking, var(--tracking-title));
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.bar__eyebrow {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: var(--text-body);
+  font-weight: var(--weight-medium);
+}
+
+.bar__subtitle {
+  margin: 0;
+  overflow: hidden;
+  color: var(--color-text-muted);
+  font-size: var(--text-small);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.bar_align_center .bar__text {
+  text-align: center;
+}

@@ -1,0 +1,28 @@
+/* Горизонтальная таблетка: та же механика, заливка слева направо. */
+.fader_horizontal {
+  --fader-w: 100%;
+  --fader-h: 56px;
+  --fader-radius: var(--radius-l);
+
+  display: flex;
+  align-items: stretch;
+  width: 100%;
+}
+
+.fader_horizontal .fader__track {
+  cursor: ew-resize;
+}
+
+.fader_horizontal .fader__fill {
+  top: 0;
+  right: auto;
+  width: calc(var(--fader-value) * 100%);
+  height: auto;
+}
+
+.fader_horizontal .fader__icon {
+  bottom: 50%;
+  left: var(--space-4);
+  transform: translateY(50%);
+  --icon-size: var(--icon-m);
+}

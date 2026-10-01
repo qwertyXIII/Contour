@@ -1,0 +1,23 @@
+/*
+ * Блок tiles: сетка плиток. Число колонок не задано — оно выходит из ширины:
+ * на телефоне две, на десктопе сколько поместится. Медиазапросы не нужны,
+ * и сетка в узкой колонке десктопа сама станет «телефонной». auto-fit, а не
+ * auto-fill: когда плиток мало, они растягиваются, а не оставляют пустые колонки.
+ *
+ *   __item_wide (две колонки) · __item_tall (две строки)
+ */
+.tiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(var(--tiles-min, 150px), 1fr));
+  grid-auto-flow: dense;
+  gap: var(--tiles-gap, var(--space-3));
+  min-width: 0;
+}
+
+.tiles__item_wide {
+  grid-column: span 2;
+}
+
+.tiles__item_tall {
+  grid-row: span 2;
+}

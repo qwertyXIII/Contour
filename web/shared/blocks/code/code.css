@@ -1,0 +1,76 @@
+/*
+ * Блок code: машинный текст. Строчный — команда в подсказке, блочный —
+ * аргументы и результат шага трассировки.
+ *
+ *   code_block · code_tone_danger · code_folded · code_lit
+ *
+ * code_lit — подсвечен (components/code/highlight.js): внутри — span'ы hljs-*,
+ * цвета — токены блока ниже, светлые и тёмные. Своих стилей библиотеки нет.
+ *
+ * code_folded — длинный блок свёрнут: видно `--code-fold-lines` строк (8), низ
+ * тает маской. Раскрывает тот, кто рисует блок, — снимает модификатор кнопкой
+ * рядом («Показать целиком»); своего поведения у блока нет.
+ */
+.code {
+  padding: .12em .4em;
+  border-radius: var(--radius-xs);
+  background: var(--color-fill-1);
+  font-family: var(--font-mono);
+  font-size: .88em;
+  /* Строчный код не рвётся на дефисе: «--swatch-color» остаётся одним словом. */
+  white-space: nowrap;
+}
+
+/* Длинный JSON переносится, а не уезжает вбок: экран телефона узкий. */
+.code_block {
+  display: block;
+  margin: 0;
+  padding: var(--space-3);
+  border-radius: var(--radius-s);
+  background: var(--color-well);
+  color: var(--color-text-muted);
+  font-size: var(--text-caption);
+  line-height: 1.5;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.code_tone_danger {
+  color: var(--color-danger);
+}
+
+/* Высота — строками блока: line-height у code_block 1.5, отступы — сверху и снизу. */
+.code_folded {
+  max-height: calc(var(--code-fold-lines, 8) * 1.5em + 2 * var(--space-3));
+  overflow: hidden;
+  -webkit-mask-image: linear-gradient(to bottom, var(--color-mask) 60%, transparent);
+  mask-image: linear-gradient(to bottom, var(--color-mask) 60%, transparent);
+}
+
+/*
+ * Подсветка кода: семь ролей, а не палитра библиотеки — цвета берутся из
+ * тонов темы, и код в просмотре на тёмной подложке читается так же, как на
+ * светлом экране.
+ */
+.code_lit {
+  --code-keyword: light-dark(#a626a4, #d7a6ff);
+  --code-string: light-dark(#1f7a3f, #9fe0a8);
+  --code-number: light-dark(#b35d00, #ffc07a);
+  --code-comment: var(--color-text-faint);
+  --code-title: light-dark(#1d5fb8, #8cc4ff);
+  --code-type: light-dark(#a15f00, #ffd589);
+  --code-attr: light-dark(#8a4b00, #f2b984);
+
+  color: var(--color-text);
+}
+
+.code_lit :is(.hljs-keyword, .hljs-built_in, .hljs-selector-tag, .hljs-doctag, .hljs-meta .hljs-keyword) { color: var(--code-keyword); }
+.code_lit :is(.hljs-string, .hljs-regexp, .hljs-template-tag, .hljs-template-variable, .hljs-addition) { color: var(--code-string); }
+.code_lit :is(.hljs-number, .hljs-literal, .hljs-symbol, .hljs-bullet) { color: var(--code-number); }
+.code_lit :is(.hljs-comment, .hljs-quote, .hljs-meta) { color: var(--code-comment); font-style: italic; }
+.code_lit :is(.hljs-title, .hljs-section, .hljs-name, .hljs-selector-id, .hljs-selector-class) { color: var(--code-title); }
+.code_lit :is(.hljs-type, .hljs-class, .hljs-variable.language_, .hljs-params) { color: var(--code-type); }
+.code_lit :is(.hljs-attr, .hljs-attribute, .hljs-property, .hljs-tag) { color: var(--code-attr); }
+.code_lit .hljs-deletion { color: var(--color-danger); }
+.code_lit .hljs-emphasis { font-style: italic; }
+.code_lit .hljs-strong { font-weight: var(--weight-semibold); }

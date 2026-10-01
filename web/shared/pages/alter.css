@@ -1,0 +1,176 @@
+/*
+ * Дизайн-система Alter целиком: токены и все блоки. Это то, что подключает
+ * приложение. Только импорты — собственных правил здесь нет.
+ *
+ * Порядок важен в одном месте: токены раньше блоков, а внутри блоков —
+ * простые раньше составных. Составной блок (checkbox, composer) иногда
+ * смешивается с простым (icon, input) на одном элементе, и при равной
+ * специфичности побеждает тот, кто импортирован позже.
+ */
+
+/* Токены */
+@import url('../tokens/colors.css');
+@import url('../tokens/accent.css');
+@import url('../tokens/series.css');
+@import url('../tokens/scale.css');
+@import url('../tokens/sizes.css');
+@import url('../tokens/motion.css');
+
+/* База */
+@import url('../blocks/theme/theme.css');
+@import url('../blocks/page/page.css');
+@import url('../blocks/visually-hidden/visually-hidden.css');
+@import url('../blocks/text/text.css');
+@import url('../blocks/text-motion/text-motion.css');
+@import url('../blocks/link/link.css');
+@import url('../blocks/icon/icon.css');
+@import url('../blocks/icon/__part/icon__part.css');
+@import url('../blocks/icon/__part/_motion/icon__part_motion_turn.css');
+@import url('../blocks/icon/__part/_motion/icon__part_motion_move.css');
+@import url('../blocks/icon/__part/_motion/icon__part_motion_scale.css');
+@import url('../blocks/icon/__part/_motion/icon__part_motion_stroke.css');
+@import url('../blocks/icon/__part/_only/icon__part_only.css');
+@import url('../blocks/stack/stack.css');
+@import url('../blocks/cluster/cluster.css');
+@import url('../blocks/divider/divider.css');
+
+/* Простые */
+@import url('../blocks/button/button.css');
+@import url('../blocks/button/_view/button_view.css');
+@import url('../blocks/button/__circle/button__circle.css');
+@import url('../blocks/button/__count/button__count.css');
+@import url('../blocks/spinner/spinner.css');
+@import url('../blocks/dots/dots.css');
+@import url('../blocks/badge/badge.css');
+@import url('../blocks/channel-mark/channel-mark.css');
+@import url('../blocks/avatar/avatar.css');
+@import url('../blocks/avatar-stack/avatar-stack.css');
+@import url('../blocks/waveform/waveform.css');
+@import url('../blocks/glyph/glyph.css');
+@import url('../blocks/code/code.css');
+@import url('../blocks/prose/prose.css');
+@import url('../blocks/sticky/sticky.css');
+@import url('../blocks/thumb/thumb.css');
+@import url('../blocks/progress/progress.css');
+@import url('../blocks/metric/metric.css');
+@import url('../blocks/gauge/gauge.css');
+@import url('../blocks/bars/bars.css');
+@import url('../blocks/chart/chart.css');
+@import url('../blocks/chart/__plot/chart__plot.css');
+@import url('../blocks/chart/__tip/chart__tip.css');
+@import url('../blocks/heatmap/heatmap.css');
+
+/* Ввод и выбор */
+@import url('../blocks/input/input.css');
+@import url('../blocks/input/__action/input__action.css');
+@import url('../blocks/input/_view/input_view.css');
+@import url('../blocks/textarea/textarea.css');
+@import url('../blocks/popup/popup.css');
+@import url('../blocks/select/select.css');
+@import url('../blocks/select/__popup/select__popup.css');
+@import url('../blocks/chip/chip.css');
+@import url('../blocks/segmented/segmented.css');
+@import url('../blocks/segmented/_scroll/segmented_scroll.css');
+@import url('../blocks/datestrip/datestrip.css');
+@import url('../blocks/datestrip/_view/datestrip_view_text.css');
+@import url('../blocks/switch/switch.css');
+@import url('../blocks/checkbox/checkbox.css');
+@import url('../blocks/radio/radio.css');
+@import url('../blocks/checkbox-group/checkbox-group.css');
+@import url('../blocks/choice/choice.css');
+@import url('../blocks/range/range.css');
+@import url('../blocks/fader/fader.css');
+@import url('../blocks/fader/_view/fader_view_track.css');
+@import url('../blocks/fader/_bipolar/fader_bipolar.css');
+@import url('../blocks/fader/_horizontal/fader_horizontal.css');
+@import url('../blocks/fader/_fill/fader_fill.css');
+@import url('../blocks/slide-confirm/slide-confirm.css');
+@import url('../blocks/slide-confirm/_both/slide-confirm_both.css');
+@import url('../blocks/dial/dial.css');
+@import url('../blocks/stepper/stepper.css');
+@import url('../blocks/swatch/swatch.css');
+@import url('../blocks/icon-choice/icon-choice.css');
+@import url('../blocks/color-picker/color-picker.css');
+@import url('../blocks/field/field.css');
+
+/* Поверхности */
+@import url('../blocks/scroller/scroller.css');
+@import url('../blocks/card/card.css');
+@import url('../blocks/tile/tile.css');
+@import url('../blocks/tile/_size/tile_size_s.css');
+@import url('../blocks/tiles/tiles.css');
+@import url('../blocks/widgets/widgets.css');
+@import url('../blocks/widgets/__item/widgets__item.css');
+@import url('../blocks/widgets/_editing/widgets_editing.css');
+@import url('../blocks/row/row.css');
+@import url('../blocks/masthead/masthead.css');
+@import url('../blocks/list/list.css');
+@import url('../blocks/kv/kv.css');
+@import url('../blocks/group/group.css');
+/* Колонки — после простых и поверхностей: микс columns__item задаёт flex корню ребёнка и должен их перекрыть. */
+@import url('../blocks/columns/columns.css');
+
+/* Медиа */
+@import url('../blocks/media/media.css');
+@import url('../blocks/media/_view/media_view_carousel.css');
+@import url('../blocks/media/_view/media_view_album.css');
+@import url('../blocks/media/_view/media_view_fill.css');
+@import url('../blocks/media/_view/media_view_rows.css');
+@import url('../blocks/media/_view/media_view_mosaic.css');
+@import url('../blocks/media/_fit/media_fit_contain.css');
+@import url('../blocks/media/_pick/media_pick.css');
+@import url('../blocks/video/video.css');
+@import url('../blocks/viewer/viewer.css');
+@import url('../blocks/viewer/__flyer/viewer__flyer.css');
+@import url('../blocks/viewer/_flying/viewer_flying.css');
+@import url('../blocks/player/player.css');
+@import url('../blocks/player/__queue/player__queue.css');
+@import url('../blocks/player/_view/player_view_strip.css');
+@import url('../blocks/player/_view/player_view_square.css');
+@import url('../blocks/player/_view/player_view_wide.css');
+@import url('../blocks/player/_view/player_view_full.css');
+@import url('../blocks/player/_view/player_view_tv.css');
+@import url('../blocks/player/_view/player_view_voice.css');
+@import url('../blocks/map-pin/map-pin.css');
+@import url('../blocks/map/map.css');
+@import url('../blocks/route/route.css');
+
+/* Навигация и отклик */
+@import url('../blocks/bar/bar.css');
+@import url('../blocks/tabs/tabs.css');
+@import url('../blocks/menu/menu.css');
+@import url('../blocks/callout/callout.css');
+@import url('../blocks/empty/empty.css');
+@import url('../blocks/toast/toast.css');
+@import url('../blocks/toaster/toaster.css');
+@import url('../blocks/dialog/dialog.css');
+@import url('../blocks/panel/panel.css');
+
+/* Экраны */
+@import url('../blocks/screens/screens.css');
+@import url('../blocks/screen-tabs/screen-tabs.css');
+@import url('../blocks/screens-frame/screens-frame.css');
+
+/* Голосовой режим: кольцо, его сцена, экран */
+@import url('../blocks/orb/orb.css');
+@import url('../blocks/orb-stage/orb-stage.css');
+@import url('../blocks/voice/voice.css');
+
+/* Разговор */
+@import url('../blocks/sheet/sheet.css');
+@import url('../blocks/sheet/_live/sheet_live.css');
+@import url('../blocks/sheet/_layered/sheet_layered.css');
+@import url('../blocks/sheet/_view/sheet_view.css');
+@import url('../blocks/sheet/_modal/sheet_modal.css');
+@import url('../blocks/sheet/_voice/sheet_voice.css');
+@import url('../blocks/messages/messages.css');
+@import url('../blocks/message/message.css');
+@import url('../blocks/voice-note/voice-note.css');
+@import url('../blocks/typing/typing.css');
+@import url('../blocks/composer/composer.css');
+@import url('../blocks/composer/__attachments/composer__attachments.css');
+@import url('../blocks/transcript/transcript.css');
+@import url('../blocks/bubble/bubble.css');
+
+/* Заготовки загрузки — последними: при равной специфичности перекрывают цвета блоков. */
+@import url('../blocks/skeleton/skeleton.css');

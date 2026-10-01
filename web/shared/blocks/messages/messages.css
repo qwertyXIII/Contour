@@ -1,0 +1,19 @@
+/*
+ * Блок messages: лента реплик разговора. Цвет не задаёт — берёт у того, на
+ * чём лежит: на акценте панели чата и на обычном фоне десктопа одна разметка.
+ *
+ *   messages_faded — края ленты гаснут (прокрутка уходит под маску)
+ */
+.messages {
+  display: flex;
+  flex-direction: column;
+  gap: calc(22px - 4px * var(--density));
+  min-width: 0;
+}
+
+.messages_faded {
+  -webkit-mask-image: linear-gradient(to bottom, transparent 0, var(--color-mask) 40px,
+    var(--color-mask) calc(100% - 40px), transparent 100%);
+  mask-image: linear-gradient(to bottom, transparent 0, var(--color-mask) 40px,
+    var(--color-mask) calc(100% - 40px), transparent 100%);
+}

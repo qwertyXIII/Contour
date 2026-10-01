@@ -1,0 +1,129 @@
+/*
+ * Список select: пункты, группы, поиск, «ничего не нашлось». Панель — блок
+ * popup (микс select__popup), здесь только то, что внутри неё.
+ *
+ *   __search (микс с input) · __list (role=listbox) · __group
+ *   __option (role=option) → __option-icon · __option-text → __option-label · __option-hint ; __check
+ *   __option_active — подсвечен клавиатурой или курсором · aria-selected — выбран
+ *   __empty
+ */
+/*
+ * Прокручивается только список: поиск стоит сверху, даже когда список
+ * отмотан к выбранному пункту. display — только у открытой панели: закрытый
+ * popover прячет стиль браузера, и «display: flex» без :popover-open его бы перебил.
+ */
+.select__popup:popover-open {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.select__search {
+  flex: 0 0 auto;
+  margin-bottom: var(--space-1);
+}
+
+.select__list {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: var(--space-half);
+  min-height: 0;
+  margin: 0;
+  padding: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  list-style: none;
+  outline: none;
+}
+
+.select__group {
+  flex: 0 0 auto;
+  padding: var(--space-3) var(--space-3) var(--space-1);
+  color: var(--color-text-faint);
+  font-size: var(--text-caption);
+  font-weight: var(--weight-semibold);
+  letter-spacing: var(--tracking-caps);
+  text-transform: uppercase;
+  user-select: none;
+}
+
+.select__group:first-child {
+  padding-top: var(--space-2);
+}
+
+/* Пункты не сжимаются: прокручивается список, а не они. */
+.select__option {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: var(--hit-min);
+  padding: var(--space-2) var(--space-3);
+  border-radius: calc(var(--radius-l) - var(--space-1));
+  color: var(--color-text);
+  cursor: pointer;
+  user-select: none;
+  -webkit-user-select: none;
+  --icon-size: var(--icon-s);
+  transition: background-color var(--duration-press) ease;
+}
+
+.select__option_active {
+  background: var(--color-fill-1);
+}
+
+.select__option:active {
+  background: var(--color-fill-2);
+}
+
+.select__option[aria-disabled="true"] {
+  opacity: .42;
+  cursor: default;
+}
+
+.select__option-icon {
+  color: var(--color-text-muted);
+}
+
+.select__option-text {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: var(--space-half);
+  min-width: 0;
+}
+
+.select__option-label {
+  font-size: var(--text-body);
+  line-height: 1.3;
+  overflow-wrap: anywhere;
+}
+
+.select__option-hint {
+  color: var(--color-text-muted);
+  font-size: var(--text-small);
+  line-height: 1.3;
+}
+
+.select__option[aria-selected="true"] .select__option-label {
+  font-weight: var(--weight-semibold);
+}
+
+.select__check {
+  color: var(--color-accent-text);
+  opacity: 0;
+  stroke-width: 2.4;
+}
+
+.select__option[aria-selected="true"] .select__check {
+  opacity: 1;
+}
+
+.select__empty {
+  margin: 0;
+  padding: var(--space-4) var(--space-3);
+  color: var(--color-text-muted);
+  font-size: var(--text-small);
+  text-align: center;
+}

@@ -1,0 +1,40 @@
+/*
+ * Модификатор input_view: поле в особом окружении.
+ *   on-accent — белое поле поверх акцента (закрытая панель чата, акцентные экраны)
+ *   fill      — поле заливкой без рамки (строка ввода открытой панели чата)
+ *   code      — код привязки: крупно, моноширинно, по центру
+ */
+/* Белое поле поверх акцента: панель чата. Кольца фокуса нет — его некуда класть. */
+.input_view_on-accent {
+  --input-bg: var(--color-on-accent-field);
+  --input-fg: var(--color-on-accent-field-text);
+  --input-border: transparent;
+  --input-placeholder: var(--color-on-accent-field-faint);
+  --input-action-fg: var(--color-on-accent-field-muted);
+}
+
+.input_view_on-accent:focus-within {
+  border-color: transparent;
+  box-shadow: none;
+}
+
+/* Заливкой без рамки: на чёрном фоне открытой панели чата рамка шумит. */
+.input_view_fill {
+  --input-bg: var(--color-fill-1);
+  --input-border: transparent;
+}
+
+/* Код привязки: крупно, моноширинно, по центру. */
+.input_view_code {
+  --input-h: calc(var(--control-h-l) + 6px);
+  --input-font: 24px;
+  --input-radius: var(--radius-l);
+}
+
+.input_view_code .input__control {
+  font-family: var(--font-mono);
+  font-weight: var(--weight-semibold);
+  letter-spacing: .18em;
+  text-align: center;
+  text-transform: uppercase;
+}

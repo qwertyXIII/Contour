@@ -1,0 +1,30 @@
+/*
+ * Блок channel-mark: значок канала — «TG», «WA».
+ *
+ * Буквы и цвет приходят с сервера из объявления пакета (--mark-color), поэтому
+ * в стилях нет ни одного имени канала. Канал без цвета — нейтральная плашка:
+ * это запасной вариант, а не ошибка.
+ */
+.channel-mark {
+  display: inline-grid;
+  flex: 0 0 auto;
+  place-items: center;
+  min-width: 26px;
+  height: 20px;
+  padding: 0 var(--space-1);
+  border-radius: var(--radius-xs);
+  background: var(--mark-color, var(--color-fill-3));
+  color: var(--color-on-brand);
+  font-size: calc(var(--text-caption) - 1px);
+  font-weight: var(--weight-bold);
+  letter-spacing: .02em;
+  line-height: 1;
+  /* Светлые фирменные цвета съедают белый текст — поэтому тень, а не тон. */
+  text-shadow: var(--shadow-text);
+}
+
+.channel-mark_size_l {
+  min-width: 34px;
+  height: 26px;
+  font-size: var(--text-caption);
+}

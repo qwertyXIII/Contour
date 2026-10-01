@@ -1,0 +1,125 @@
+/*
+ * Блок skeleton: заготовка, пока данные не пришли. Два способа, один облик:
+ *
+ * 1. Из настоящей разметки. Любой блок или экран с aria-busy="true" через
+ *    ~300 мс становится своей заготовкой: компонент Skeletons помечает
+ *    текст (skeleton_text — полосы по строкам), картинки и значки
+ *    (skeleton_media) и готовые формы — аватар, превью, знак (skeleton_shape).
+ *    Текст в заготовке может быть любым нужной длины: его не видно.
+ * 2. Своими формами, когда блока ещё нет:
+ *      <span class="skeleton skeleton_shape_line" style="--skeleton-w: 60%"></span>
+ *      skeleton_shape_{line|text|circle|rect} · --skeleton-w · --skeleton-h · --lines
+ *
+ * По всем заготовкам экрана идёт один общий блик слева направо (фон
+ * привязан к окну); «меньше движения» — без блика. Импортируется последним:
+ * при равной специфичности заготовка перекрывает цвета блоков.
+ */
+.skeleton {
+  --skeleton-base: var(--color-fill-2);
+  --skeleton-shine: var(--color-fill-3);
+  /* Полосы строк с круглыми концами: середина полосы + два полукруга по краям,
+     на каждую строку (1lh). Высота полосы — 60% строки, радиус конца — половина. */
+  --skeleton-cap: .3lh;
+  --skeleton-lines:
+    linear-gradient(to bottom, transparent .2lh, var(--color-mask) .2lh .8lh, transparent .8lh),
+    radial-gradient(circle var(--skeleton-cap) at var(--skeleton-cap) 50%, var(--color-mask) 97%, transparent),
+    radial-gradient(circle var(--skeleton-cap) at calc(100% - var(--skeleton-cap)) 50%, var(--color-mask) 97%, transparent);
+  --skeleton-lines-size: calc(100% - var(--skeleton-cap) * 2) 1lh, 100% 1lh, 100% 1lh;
+  --skeleton-lines-position: var(--skeleton-cap) 0, 0 0, 0 0;
+
+  background-color: var(--skeleton-base);
+  background-image: linear-gradient(100deg, transparent 20%, var(--skeleton-shine) 50%, transparent 80%);
+  background-repeat: no-repeat;
+  background-attachment: fixed;
+  background-size: 50vw 100%;
+  color: transparent;
+  animation: skeleton-shine calc(var(--duration-loop) * 1.4) linear infinite;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+/* Текст — полосы по строкам: маска режет блок на строки высотой в 1lh. */
+.skeleton.skeleton_text {
+  /* Полоса — длиной с сам текст, а не во всю строку: заготовка похожа на то, что придёт. */
+  width: fit-content;
+  max-width: 100%;
+  -webkit-mask: var(--skeleton-lines);
+  -webkit-mask-size: var(--skeleton-lines-size);
+  -webkit-mask-position: var(--skeleton-lines-position);
+  -webkit-mask-repeat: repeat-y;
+  mask: var(--skeleton-lines);
+  mask-size: var(--skeleton-lines-size);
+  mask-position: var(--skeleton-lines-position);
+  mask-repeat: repeat-y;
+  text-decoration-color: transparent;
+}
+
+/* Картинка, видео, значок, график: остаётся их коробка, содержимое прячется. */
+.skeleton.skeleton_media {
+  border-radius: var(--radius-xs);
+  object-position: 0 -200vh;
+}
+
+.skeleton_media *,
+.skeleton_shape * {
+  visibility: hidden;
+}
+
+/* Готовая форма (аватар, превью, знак): свой размер и скругление, фон — серый. */
+.skeleton.skeleton_shape {
+  border-color: transparent;
+  box-shadow: none;
+}
+
+/* Свои формы. */
+.skeleton_shape_line,
+.skeleton_shape_text,
+.skeleton_shape_circle,
+.skeleton_shape_rect {
+  display: block;
+  width: var(--skeleton-w, 100%);
+  border-radius: var(--radius-xs);
+}
+
+.skeleton_shape_line,
+.skeleton_shape_text {
+  -webkit-mask: var(--skeleton-lines);
+  -webkit-mask-size: var(--skeleton-lines-size);
+  -webkit-mask-position: var(--skeleton-lines-position);
+  -webkit-mask-repeat: repeat-y;
+  mask: var(--skeleton-lines);
+  mask-size: var(--skeleton-lines-size);
+  mask-position: var(--skeleton-lines-position);
+  mask-repeat: repeat-y;
+}
+
+.skeleton_shape_line {
+  height: 1lh;
+}
+
+.skeleton_shape_text {
+  height: calc(var(--lines, 3) * 1lh);
+}
+
+.skeleton_shape_circle {
+  width: var(--skeleton-w, 40px);
+  aspect-ratio: 1;
+  border-radius: 50%;
+}
+
+.skeleton_shape_rect {
+  height: var(--skeleton-h, 120px);
+  border-radius: var(--radius-m);
+}
+
+@keyframes skeleton-shine {
+  from { background-position: -50vw 0; }
+  to { background-position: 150vw 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .skeleton {
+    animation: none;
+    background-image: none;
+  }
+}

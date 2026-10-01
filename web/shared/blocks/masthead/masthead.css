@@ -1,0 +1,263 @@
+/*
+ * Блок masthead: шапка экрана о ком-то одном — как карточка контакта на iPhone.
+ * Сверху крупно и по центру: фото (или значок вещи), имя, пояснение, метки. При
+ * прокрутке фото и текст уменьшаются и плавно переезжают в строку «фото слева,
+ * имя справа», а шапка остаётся наверху полосой; метки уходят.
+ *
+ *   <header class="masthead">
+ *     <span class="masthead__lead"><span class="avatar avatar_size_2xl avatar_hued">М</span></span>
+ *     <h2 class="masthead__title">Мамочка</h2>
+ *     <p class="masthead__note">мама · писала вчера</p>
+ *     <div class="cluster cluster_gap_xs masthead__tags">…значки каналов, метки…</div>
+ *   </header>
+ *
+ * Без JS — просто крупная шапка по центру, уезжает вместе с экраном. Сжатие
+ * ведёт компонент Masthead: ставит masthead_live (шапка липнет), один раз
+ * меряет, куда каждой части ехать (--masthead-dx / -dy / -s у части,
+ * --masthead-top у блока), а при прокрутке пишет только долю --masthead-p
+ * (0 — крупно, 1 — полоса). Движение — transform: раскладка не пересчитывается.
+ * С «меньше движения» компонент не оживает — шапка не сжимается.
+ *
+ * Снаружи: --masthead-strip — высота полосы, --masthead-photo-compact — фото в
+ * ней, --masthead-title-s — имя в полосе долей крупного.
+ *
+ * masthead_view_poster — постер, как карточка контакта в iPhone с постером:
+ *
+ *   <header class="masthead masthead_view_poster">
+ *     <span class="masthead__lead"><span class="avatar avatar_view_poster avatar_hued">М<img class="avatar__image"></span></span>
+ *     …имя, пояснение, метки — как выше…
+ *   </header>
+ *
+ * Фото (или заливка оттенком с крупными буквами) — во всю ширину места и на
+ * --masthead-poster-h (две трети экрана); низ постера тает маской в то, что под
+ * ним, — в фон приложения, поэтому переход верен в обеих темах. Имя, пояснение и
+ * метки — поверх низа. Во всю ширину — через поля места: --bleed-x и --bleed-top
+ * отдаёт родитель (тело панели — свои отступы), без них постер стоит в поле.
+ * Ожив, постер сжимается в две фазы одной доли (колено --masthead-knee): сначала по
+ * центру в крупный круг (--masthead-photo-poster), имя и строка — под ним; потом круг
+ * едет в полосу — слева, сразу за «назад» (--masthead-start), — и мельчает, имя и
+ * строка — справа от него. Полоса — сама шапка навигатора поверх содержимого
+ * (--overlay-top — её высота, ставит навигатор). Компонент меряет квадрат постера
+ * (--masthead-cx — сколько срезать с боков, -ct / -cb — сверху и снизу,
+ * --masthead-r — радиус), и к
+ * доле --masthead-p квадрат вырезается кругом (clip-path) и уменьшается
+ * (transform) — раскладка не трогается. «Меньше движения» — постер не сжимается.
+ */
+/*
+ * Высота полосы — длина, а не текст: у постера она считается от высоты шапки навигатора
+ * (calc), а компонент читает её числом из вычисленного стиля.
+ */
+@property --masthead-strip {
+  syntax: '<length>';
+  inherits: false;
+  initial-value: 64px;
+}
+
+/* Отступ полосы постера слева (под «назад» шапки) и снизу — тоже длины, числом для компонента. */
+@property --masthead-start {
+  syntax: '<length>';
+  inherits: false;
+  initial-value: 0px;
+}
+
+@property --masthead-row-pad {
+  syntax: '<length>';
+  inherits: false;
+  initial-value: 0px;
+}
+
+.masthead {
+  --masthead-strip: var(--space-16);
+  --masthead-photo-compact: 44px;
+  --masthead-title-s: .7;
+  --masthead-p: 0;
+
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-2);
+  padding-block: var(--space-2) var(--space-3);
+  text-align: center;
+}
+
+.masthead__lead {
+  display: flex;
+  margin-bottom: var(--space-1);
+}
+
+/* Части — по содержимому: их ширина и есть то, что сжимается и едет. */
+.masthead__title,
+.masthead__note {
+  max-width: 100%;
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.masthead__title {
+  font-size: var(--text-title);
+  font-weight: var(--weight-semibold);
+  line-height: var(--leading-title);
+  letter-spacing: -.01em;
+}
+
+.masthead__note {
+  color: var(--color-text-muted);
+  font-size: var(--text-small);
+  line-height: 1.38;
+}
+
+.masthead__tags {
+  justify-content: center;
+}
+
+/*
+ * Ожил: шапка липнет так, что наверху остаётся только нижняя полоса высотой
+ * --masthead-strip; фон — чтобы экран уезжал под неё, а не сквозь.
+ */
+.masthead_live {
+  position: sticky;
+  top: var(--masthead-top, 0px);
+  z-index: 1;
+  background: var(--color-bg);
+}
+
+/*
+ * Путь части — доля --masthead-p; по горизонтали и в размере часть может идти
+ * быстрее (--masthead-kx, --masthead-ks): фото успевает уменьшиться и уйти влево
+ * раньше, чем имя поднимется к нему, — иначе имя проехало бы по фото.
+ */
+.masthead_live .masthead__lead,
+.masthead_live .masthead__title,
+.masthead_live .masthead__note {
+  --masthead-px: min(1, var(--masthead-p) * var(--masthead-kx, 1));
+  --masthead-ps: min(1, var(--masthead-p) * var(--masthead-ks, 1));
+
+  transform-origin: 0 0;
+  transform:
+    translate(calc(var(--masthead-dx, 0px) * var(--masthead-px)), calc(var(--masthead-dy, 0px) * var(--masthead-p)))
+    scale(calc(1 + (var(--masthead-s, 1) - 1) * var(--masthead-ps)));
+}
+
+.masthead_live .masthead__lead {
+  --masthead-kx: 1.5;
+  --masthead-ks: 2;
+}
+
+/* Метки не помещаются в полосу — уходят в первой трети пути. */
+.masthead_live .masthead__tags {
+  opacity: calc(1 - var(--masthead-p) * 3);
+  transform: translateY(calc(var(--masthead-p) * var(--space-4) * -1));
+}
+
+/* Черта под полосой — когда шапка уже полоса: пока крупная, черта лишняя. */
+.masthead_live::after {
+  position: absolute;
+  inset: auto 0 0;
+  height: 1px;
+  background: var(--color-border);
+  opacity: calc((var(--masthead-p) - .85) * 7);
+  content: '';
+  pointer-events: none;
+}
+
+/*
+ * Постер. Сетка из одной колонки: постер лежит на всех строках, текст — в нижних,
+ * поверх него (колонка у текста названа явно: иначе сетка обошла бы занятую
+ * постером клетку новой колонкой); верхняя строка забирает остаток высоты. Текст не шире места за
+ * вычетом полей — постер выходит на поля, а имя к краю экрана не липнет.
+ */
+.masthead_view_poster {
+  --masthead-poster-h: calc(100svh * 2 / 3);
+  /* Полоса — сама шапка навигатора поверх содержимого (--overlay-top): круг встаёт
+     слева сразу за «назад», имя и строка связи — справа от него, по ряду кнопок. */
+  --masthead-strip: var(--overlay-top, var(--space-16));
+  --masthead-start: calc(var(--control-h-m) + var(--space-3));
+  --masthead-row-pad: var(--space-3);
+  --masthead-title-s: .42;
+  --masthead-note-s: .86;
+  /* Две фазы одной доли: до колена постер сжимается в крупный круг по центру, после —
+     круг едет в шапку. u и w — доли фаз, 0…1; на колене обе на стыке, без рывка. */
+  --masthead-knee: .55;
+  --masthead-photo-poster: 120px;
+  --masthead-title-m: .6;
+  --masthead-u: clamp(0, var(--masthead-p) / var(--masthead-knee), 1);
+  --masthead-w: clamp(0, (var(--masthead-p) - var(--masthead-knee)) / (1 - var(--masthead-knee)), 1);
+
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: 1fr auto auto auto var(--space-4);
+  justify-items: center;
+  row-gap: var(--space-2);
+  min-height: var(--masthead-poster-h);
+  margin: calc(var(--bleed-top, 0px) * -1) calc(var(--bleed-x, 0px) * -1) 0;
+  padding: 0;
+}
+
+.masthead_view_poster .masthead__lead {
+  /* Низ тает: середина (там буквы и круг сжатого) — целиком, у имени — почти фон; сжимаясь, постер твердеет в круг. */
+  --masthead-poster-mask: linear-gradient(to bottom,
+    var(--color-mask) calc(48% + var(--masthead-u, 0) * 60%),
+    color-mix(in srgb, var(--color-mask) 55%, transparent) calc(66% + var(--masthead-u, 0) * 60%),
+    color-mix(in srgb, var(--color-mask) 18%, transparent) calc(80% + var(--masthead-u, 0) * 60%),
+    transparent calc(92% + var(--masthead-u, 0) * 60%));
+  /* Буквы постера без фото — на середину места над именем (меряет компонент) и не выше трети
+     постера: на низком постере крупные буквы легли бы на имя. */
+  --avatar-poster-shift: var(--masthead-focus, 0px);
+  --avatar-poster-letters: min(40cqi, calc(var(--masthead-poster-h) * .32));
+
+  grid-area: 1 / 1 / -1 / -1;
+  place-self: stretch;
+  margin: 0;
+  -webkit-mask-image: var(--masthead-poster-mask);
+  mask-image: var(--masthead-poster-mask);
+}
+
+.masthead_view_poster .masthead__title {
+  grid-area: 2 / 1;
+  max-width: calc(100% - var(--bleed-x, 0px) * 2);
+  font-size: var(--text-display);
+  font-weight: var(--weight-bold);
+  line-height: var(--leading-tight);
+  letter-spacing: -.02em;
+}
+
+.masthead_view_poster .masthead__note {
+  grid-area: 3 / 1;
+  max-width: calc(100% - var(--bleed-x, 0px) * 2);
+  font-size: var(--text-body);
+}
+
+.masthead_view_poster .masthead__tags {
+  grid-area: 4 / 1;
+  max-width: calc(100% - var(--bleed-x, 0px) * 2);
+}
+
+/*
+ * Путь частей постера — в две фазы: к колену (--masthead-dx / -dy / -s долей u) и от
+ * него к концу (приращения --masthead-dx2 / -dy2, масштаб --masthead-s2 долей w).
+ * Внутри первой фазы вбок и в размер — одной долей: круг всю дорогу по центру. Во
+ * второй круг уходит влево и мельчает быстрее (--masthead-kw), а вверх — вместе с
+ * именем: имя поднимается в строку, когда круг уже слева, и по нему не проезжает.
+ */
+.masthead_view_poster.masthead_live .masthead__lead,
+.masthead_view_poster.masthead_live .masthead__title,
+.masthead_view_poster.masthead_live .masthead__note {
+  --masthead-wk: min(1, var(--masthead-w) * var(--masthead-kw, 1));
+
+  transform:
+    translate(
+      calc(var(--masthead-dx, 0px) * var(--masthead-u) + var(--masthead-dx2, 0px) * var(--masthead-wk)),
+      calc(var(--masthead-dy, 0px) * var(--masthead-u) + var(--masthead-dy2, 0px) * var(--masthead-w)))
+    scale(calc(1 + (var(--masthead-s, 1) - 1) * var(--masthead-u) + (var(--masthead-s2, 1) - var(--masthead-s, 1)) * var(--masthead-wk)));
+}
+
+/* Квадрат постера — кругом к колену: срез и радиус растут вместе с уменьшением первой фазы. */
+.masthead_view_poster.masthead_live .masthead__lead {
+  --masthead-kw: 1.8;
+
+  clip-path: inset(
+    calc(var(--masthead-ct, 0px) * var(--masthead-u)) calc(var(--masthead-cx, 0px) * var(--masthead-u))
+    calc(var(--masthead-cb, 0px) * var(--masthead-u)) calc(var(--masthead-cx, 0px) * var(--masthead-u))
+    round calc(var(--masthead-r, 0px) * var(--masthead-u)));
+  will-change: transform;
+}

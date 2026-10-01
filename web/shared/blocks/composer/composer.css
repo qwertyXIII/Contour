@@ -1,0 +1,147 @@
+/*
+ * Блок composer: строка ввода разговора. Сам почти ничего не рисует — он
+ * складывает input и button, а их вид выбирает тот, кто его ставит:
+ *
+ *   в открытой панели чата — input_view_fill + button_view_primary,
+ *   на акценте             — input_view_on-accent + button_view_on-accent,
+ *   на обычном фоне        — input + button_view_primary.
+ *
+ * Микрофон живёт ВНУТРИ поля (input__action), а не кнопкой рядом: две
+ * одинаковые таблетки по краям строки читаются как два «отправить».
+ *
+ *   __field (микс с input) · __send (микс с button)
+ *
+ * Файлы: скрепка — тоже внутри поля, у левого края (__attach, микс с input__action;
+ * микрофон остаётся справа). Выбранное — полосой превью над строкой (__attachments,
+ * отдельный файл __attachments/); строка тогда переносится: полоса — первой строкой,
+ * поле и «Отправить» — второй, ширина та же. composer_waiting — «Отправить» нажали,
+ * пока идёт закачка: кнопка со спиннером (button_loading) отправит сама.
+ *
+ *   <form class="composer">
+ *     <ul class="composer__attachments">…</ul>                ← ставит компонент
+ *     <div class="input … composer__field">
+ *       <button class="input__action composer__attach" type="button">скрепка</button>
+ *       <input class="input__control">…
+ *     </div>
+ *     <button class="… composer__send">…</button>
+ *     <input class="visually-hidden composer__picker" type="file" multiple>  ← ставит компонент
+ *   </form>
+ *
+ * Голосовое (ADR-0072 Alter'а): нажали микрофон — поле становится полосой записи
+ * (composer_recording, ставит компонент по composer:record): ✕, красная точка,
+ * время и живая волна; «Отправить» шлёт звук, ✕ или смахнуть влево — бросить.
+ * Полоса лежит ВНУТРИ поля, поверх него: форма и высота строки не меняются.
+ *
+ *   <div class="input … composer__field">…
+ *     <div class="composer__record">
+ *       <button class="composer__cancel" type="button">✕</button>
+ *       <span class="composer__dot"></span><span class="composer__time">0:07</span>
+ *       <span class="waveform composer__wave">…</span>
+ *     </div>
+ *   </div>
+ */
+.composer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  width: 100%;
+  min-width: 0;
+  margin: 0;
+}
+
+/* Основа ширины — ноль, не 100% поля: иначе при переносе «Отправить» ушла бы на свою строку. */
+.composer__field {
+  flex: 1 1 0;
+}
+
+/* Скрепка — у левого края пилюли, как микрофон у правого. */
+.composer__attach {
+  flex: 0 0 auto;
+  margin-inline-start: calc(4px - var(--input-pad, var(--space-3)));
+}
+
+.composer__send {
+  flex: 0 0 auto;
+}
+
+/* ── Запись голосового ─────────────────────────────────────────────── */
+
+.composer__record {
+  position: absolute;
+  inset: 0;
+  display: none;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 0 var(--space-4) 0 var(--space-1);
+  border-radius: inherit;
+  background: var(--input-bg);
+  touch-action: pan-y;
+}
+
+.composer_recording .composer__record {
+  display: flex;
+}
+
+/* Поле под полосой — невидимо и без фокуса: запись и набор — не одновременно. */
+.composer_recording .composer__field .input__control,
+.composer_recording .composer__field .input__actions,
+.composer_recording .composer__attach {
+  visibility: hidden;
+}
+
+.composer__cancel {
+  display: grid;
+  flex: 0 0 auto;
+  place-items: center;
+  width: calc(var(--input-h, var(--control-h-l)) - 2 * var(--space-1));
+  aspect-ratio: 1;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-full);
+  background: transparent;
+  color: var(--input-action-fg, currentColor);
+  cursor: pointer;
+}
+
+.composer__dot {
+  flex: 0 0 auto;
+  width: 10px;
+  height: 10px;
+  border-radius: var(--radius-full);
+  background: var(--color-danger);
+  animation: composer-dot 1.2s var(--ease-in-out) infinite alternate;
+}
+
+@keyframes composer-dot {
+  to { opacity: .35; }
+}
+
+.composer__time {
+  flex: 0 0 auto;
+  min-width: 4ch;
+  font-variant-numeric: tabular-nums;
+  font-weight: var(--weight-semibold);
+}
+
+/* Волна — свежие полоски справа, старые уходят влево за край. */
+.composer__wave {
+  --wave-h: 24px;
+
+  flex: 1 1 auto;
+  justify-content: flex-end;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--input-fg, currentColor);
+  -webkit-mask-image: linear-gradient(to right, transparent, var(--color-mask) 24px);
+  mask-image: linear-gradient(to right, transparent, var(--color-mask) 24px);
+}
+
+.composer__wave .waveform__bar {
+  flex: 0 0 auto;
+  background: currentColor;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .composer__dot { animation: none; }
+}

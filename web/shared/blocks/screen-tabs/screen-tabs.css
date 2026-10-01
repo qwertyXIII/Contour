@@ -1,0 +1,172 @@
+/*
+ * Блок screen-tabs: пилюли над свёрнутым чатом — какой экран показан. На
+ * пилюле короткое имя, значок перед ним — если есть; у «Предложений» только
+ * значок. Подложки нет (владелец, 2026-09-30): невыбранная пилюля — просто
+ * надпись, выбранную отмечает белый бегунок, который едет следом за
+ * пальцем, пока листают экраны. Экранов больше, чем влезает, — пилюли
+ * прокручиваются вбок.
+ *
+ *   <div class="screen-tabs" role="radiogroup" aria-label="Экраны" aria-controls="home-screens">
+ *     <label class="screen-tabs__tab screen-tabs__tab_icon">
+ *       <input class="screen-tabs__input visually-hidden" type="radio" name="scr" value="0" aria-label="Предложения">
+ *       <span class="screen-tabs__label"><svg class="icon">…#sparkles</svg></span>
+ *     </label> …
+ *     <button class="screen-tabs__add" type="button" aria-label="Новый экран">…#plus</button>
+ *   </div>
+ *
+ *   __tab (_icon — без текста) · __input · __label · __text (надпись — её меняет
+ *   components/text-motion) · __add · от JS: __thumb
+ *   screen-tabs_away — спрятаны (открыта панель чата; ставит оболочка)
+ *   от JS: screen-tabs_fade_{start|end} — за краем есть ещё пилюли, край затухает;
+ *   __tab_held — долгое нажатие засчитано, палец ещё держат (screen-tabs_held — держат
+ *   выбранную: бегунок приподнимается вместе с ней); __tab_leaving — экран
+ *   удалён, буквы улетают; --tab-cover у __label — доля 0…1, на которую её накрыл
+ *   бегунок: по ней надпись темнеет (screen-tabs_enhanced)
+ */
+.screen-tabs {
+  --tabs-h: var(--control-h-s);
+  --tabs-held-scale: 1.06;
+
+  position: relative;
+  display: flex;
+  gap: var(--space-1);
+  width: fit-content;
+  max-width: 100%;
+  padding: var(--space-half);
+  overflow-x: auto;
+  scrollbar-width: none;
+  isolation: isolate;
+  transition: opacity var(--duration-normal) ease, translate var(--duration-normal) var(--ease-out);
+}
+
+.screen-tabs::-webkit-scrollbar {
+  display: none;
+}
+
+/* Затухание краёв — маской: подложки нет, фон под пилюлями любой. */
+.screen-tabs_fade_start {
+  --fade-start: var(--space-8);
+}
+
+.screen-tabs_fade_end {
+  --fade-end: var(--space-8);
+}
+
+.screen-tabs_fade_start,
+.screen-tabs_fade_end {
+  -webkit-mask-image: linear-gradient(to right, transparent, var(--color-mask) var(--fade-start, 0px), var(--color-mask) calc(100% - var(--fade-end, 0px)), transparent);
+  mask-image: linear-gradient(to right, transparent, var(--color-mask) var(--fade-start, 0px), var(--color-mask) calc(100% - var(--fade-end, 0px)), transparent);
+}
+
+.screen-tabs_away {
+  opacity: 0;
+  pointer-events: none;
+  translate: 0 var(--space-3);
+}
+
+.screen-tabs__tab {
+  position: relative;
+  display: flex;
+  flex: 0 0 auto;
+  -webkit-tap-highlight-color: transparent;
+  -webkit-touch-callout: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.screen-tabs__label,
+.screen-tabs__add {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-1);
+  height: var(--tabs-h);
+  padding: 0 var(--space-3);
+  border: 0;
+  border-radius: var(--radius-full);
+  background: transparent;
+  color: var(--color-text);
+  /* Подложки нет, а под пилюлями едет экран: ореол цвета фона держит надпись читаемой. */
+  text-shadow: 0 0 var(--space-2) var(--color-bg), 0 0 var(--space-1) var(--color-bg);
+  font: inherit;
+  font-size: var(--text-small);
+  font-weight: var(--weight-semibold);
+  white-space: nowrap;
+  cursor: pointer;
+  transition: color var(--duration-fast) ease, transform var(--duration-press) var(--ease-out);
+  --icon-size: var(--icon-s);
+}
+
+.screen-tabs__label .icon,
+.screen-tabs__add .icon {
+  filter: var(--tab-halo, drop-shadow(0 0 var(--space-1) var(--color-bg)));
+}
+
+.screen-tabs__tab_icon .screen-tabs__label,
+.screen-tabs__add {
+  width: var(--tabs-h);
+  padding: 0;
+}
+
+.screen-tabs__label:active,
+.screen-tabs__add:active {
+  transform: scale(var(--press-scale-strong));
+}
+
+.screen-tabs__input:checked + .screen-tabs__label {
+  --tab-halo: none;
+
+  background: var(--color-contrast);
+  color: var(--color-on-contrast);
+  text-shadow: none;
+}
+
+.screen-tabs__input:focus-visible + .screen-tabs__label {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 2px;
+}
+
+/* Бегунок — белая таблетка под выбранной; выбранная пилюля прозрачна, цвет даёт он. */
+.screen-tabs__thumb {
+  position: absolute;
+  top: var(--space-half);
+  left: 0;
+  z-index: -1;
+  width: var(--thumb-w, 0);
+  height: var(--tabs-h);
+  border-radius: var(--radius-full);
+  background: var(--color-contrast);
+  box-shadow: var(--shadow-s);
+  transform: translateX(var(--thumb-x, 0));
+  pointer-events: none;
+  transition: scale var(--duration-press) var(--ease-out);
+}
+
+/*
+ * С JS выбранную красит не :checked, а бегунок: надпись темнеет на ту долю, на
+ * которую он её накрыл, ореол гаснет так же. Пока экран ведут пальцем, цвет идёт
+ * за ним — а не прыгает с пилюли на пилюлю на середине жеста.
+ */
+.screen-tabs_enhanced .screen-tabs__label,
+.screen-tabs_enhanced .screen-tabs__input:checked + .screen-tabs__label {
+  --tab-glow: color-mix(in srgb, var(--color-bg) calc((1 - var(--tab-cover, 0)) * 100%), transparent);
+  --tab-halo: drop-shadow(0 0 var(--space-1) var(--tab-glow));
+
+  background: transparent;
+  color: color-mix(in srgb, var(--color-on-contrast) calc(var(--tab-cover, 0) * 100%), var(--color-text));
+  text-shadow: 0 0 var(--space-2) var(--tab-glow), 0 0 var(--space-1) var(--tab-glow);
+  transition: transform var(--duration-press) var(--ease-out);
+}
+
+/* Нажатие засчитано — пилюля чуть поднимается: отпусти, откроется правка. */
+.screen-tabs__tab_held .screen-tabs__label {
+  transform: scale(var(--tabs-held-scale));
+}
+
+.screen-tabs_held .screen-tabs__thumb {
+  scale: var(--tabs-held-scale);
+}
+
+.screen-tabs__tab_leaving {
+  pointer-events: none;
+}

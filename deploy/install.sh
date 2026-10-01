@@ -232,7 +232,7 @@ ensure_sudoers() {
   # Владелец перезапускает сервис после синка без пароля — только эти команды.
   local file=/etc/sudoers.d/contour
   cat > "$file.tmp" <<EOF
-$OWNER ALL=(root) NOPASSWD: /usr/bin/systemctl start contour.service, /usr/bin/systemctl stop contour.service, /usr/bin/systemctl restart contour.service, /usr/bin/systemctl status contour.service, /usr/bin/systemctl restart contour-dns.service, /usr/bin/systemctl status contour-dns.service
+$OWNER ALL=(root) NOPASSWD: /usr/bin/systemctl start contour.service, /usr/bin/systemctl stop contour.service, /usr/bin/systemctl restart contour.service, /usr/bin/systemctl status contour.service, /usr/bin/systemctl restart contour-dns.service, /usr/bin/systemctl status contour-dns.service, /usr/bin/systemctl restart contour-root.service
 EOF
   chmod 440 "$file.tmp"
   if visudo -cf "$file.tmp" >/dev/null; then
@@ -352,9 +352,54 @@ EOF
   note "домашняя сеть: $PREFIX/sbin/contour-addr, unit'ы contour-addr и contour-dns (включает enable-lan.sh)"
 }
 
+# Помощник от root для панели: код — КОПИЯ от root в /opt/contour/root-app,
+# а не папка владельца (правка там не должна становиться командой от root).
+# Обновляется только этим скриптом.
+ensure_root_helper() {
+  local app="$PREFIX/root-app"
+  rm -rf "$app.new"
+  install -d -m 755 "$app.new"
+  cp -a "$SRC/src" "$SRC/node_modules" "$SRC/package.json" "$app.new/"
+  chown -R root:root "$app.new"
+  chmod -R go-w "$app.new"
+  rm -rf "$app"
+  mv "$app.new" "$app"
+  install -m 755 -o root -g root "$SRC/deploy/contour-ovpn-up.sh" "$PREFIX/sbin/contour-ovpn-up"
+  cat > /etc/systemd/system/contour-root.service <<EOF
+[Unit]
+Description=Contour — помощник от root для панели (выходы, ключи)
+After=network-online.target
+
+[Service]
+Type=simple
+ExecStart=$PREFIX/node/bin/node $app/src/root/main.ts
+Restart=always
+RestartSec=3s
+StandardOutput=append:$LOG/root.log
+StandardError=inherit
+ProtectHome=read-only
+PrivateTmp=yes
+
+[Install]
+WantedBy=multi-user.target
+EOF
+  systemctl daemon-reload
+  systemctl enable contour-root.service >/dev/null 2>&1
+  systemctl restart contour-root.service
+  note "помощник от root: $app (копия), unit contour-root — запущен"
+}
+
+ensure_panel_password() {
+  if [ -f "$ETC/panel.json" ]; then
+    note "пароль панели уже задан (сменить: sudo bash $SRC/deploy/panel-password.sh)"
+    return
+  fi
+  bash "$SRC/deploy/panel-password.sh" --generate
+}
+
 ensure_logrotate() {
   cat > /etc/logrotate.d/contour <<EOF
-$LOG/log.log $LOG/socks.log $LOG/dns.log $LOG/addr.log {
+$LOG/log.log $LOG/socks.log $LOG/dns.log $LOG/addr.log $LOG/root.log $LOG/ovpn-*.log {
   weekly
   rotate 8
   missingok
@@ -390,6 +435,8 @@ ensure_deps
 ensure_unit
 ensure_netns_units
 ensure_lan_units
+ensure_root_helper
+ensure_panel_password
 ensure_sudoers
 ensure_logrotate
 verify

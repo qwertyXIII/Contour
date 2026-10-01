@@ -1,0 +1,154 @@
+/*
+ * Блок tile: плитка быстрого действия или виджета на главном экране.
+ * Плитки приносят модули — блок не знает, что в нём: календарь, дом, задачи.
+ *
+ *   __head · __label · __icon (микс с icon) · __value · __note · __foot · __figure
+ *   tile_tone_accent · tile_interactive (для a/button) · tile_editing · tile_placeholder · tile_size_s (клетка 1×1, 2×1)
+ *   tile_align_top — значение сразу под подписью, низ (__foot) — к низу плитки: в сетке
+ *   плиток ряд одной высоты, и числа у всех на одной строке, стопки лиц — по нижнему краю
+ *
+ * Размер в сетке (две колонки, две строки) — дело сетки: tiles__item_wide / _tall.
+ */
+.tile {
+  --tile-bg: var(--color-surface);
+  --tile-bg-hover: var(--color-surface-hover);
+  --tile-fg: inherit;
+  --tile-muted: var(--color-text-muted);
+  --tile-border: var(--color-border);
+
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-width: 0;
+  min-height: var(--tile-h);
+  margin: 0;
+  padding: var(--card-pad);
+  border: 1px solid var(--tile-border);
+  border-radius: var(--radius-xl);
+  background: var(--tile-bg);
+  color: var(--tile-fg);
+  font: inherit;
+  text-align: start;
+  text-decoration: none;
+  overflow: hidden;
+  -webkit-backdrop-filter: blur(var(--blur-glass));
+  backdrop-filter: blur(var(--blur-glass));
+}
+
+.tile__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.tile__label {
+  min-width: 0;
+  color: var(--tile-muted);
+  font-size: var(--text-small);
+  font-weight: var(--weight-medium);
+  line-height: 1.3;
+}
+
+.tile__icon {
+  color: var(--tile-muted);
+}
+
+/* Значение плитки — крупно и тонко; цифры пропорциональные, не моноширинные. */
+.tile__value {
+  margin-top: auto;
+  font-size: var(--text-value);
+  font-weight: var(--weight-light);
+  line-height: var(--leading-tight);
+  letter-spacing: var(--tracking-hero);
+  overflow-wrap: anywhere;
+}
+
+.tile__note {
+  color: var(--tile-muted);
+  font-size: var(--text-caption);
+  font-weight: var(--weight-medium);
+  line-height: 1.35;
+}
+
+.tile__foot {
+  margin-top: var(--space-2);
+}
+
+/* Картинка плитки — кольцо, регулятор, крупный знак: по центру оставшегося
+   места и размером с него (клетка 2×2 на телефоне и на широком — разная). */
+.tile__figure {
+  display: grid;
+  flex: 1 1 auto;
+  place-items: center;
+  min-height: 0;
+  container-type: size;
+  --gauge-size: min(100cqw, 100cqh);
+}
+
+.tile_tone_accent {
+  --tile-bg: var(--color-accent);
+  --tile-bg-hover: var(--color-accent-hover);
+  --tile-fg: var(--color-on-accent);
+  --tile-muted: var(--color-on-accent-muted);
+  --tile-border: transparent;
+}
+
+.tile_interactive {
+  cursor: pointer;
+  transition: transform var(--duration-fast) var(--ease-out), background-color var(--duration-fast) ease;
+}
+
+@media (hover: hover) {
+  .tile_interactive:hover {
+    background-color: var(--tile-bg-hover);
+  }
+}
+
+.tile_interactive:active {
+  transform: scale(var(--press-scale));
+}
+
+/* Режим правки сетки: плитки покачиваются, рамка пунктиром. */
+.tile_editing {
+  --tile-border: var(--color-border-strong);
+  border-style: dashed;
+  animation: tile-nudge 1.6s ease-in-out infinite;
+}
+
+.tile_placeholder {
+  --tile-bg: transparent;
+  --tile-border: var(--color-border-strong);
+  align-items: center;
+  justify-content: center;
+  border-style: dashed;
+  color: var(--color-text-muted);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+
+@keyframes tile-nudge {
+  0%, 100% { transform: rotate(-.5deg); }
+  50% { transform: rotate(.5deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tile_editing {
+    animation: none;
+  }
+}
+
+/*
+ * Сверху вниз (сетка плиток экрана, «Группы»): число — под подписью, а не у низа, и в
+ * ряду, где у соседки есть метка и она выше, числа всё равно на одной строке.
+ */
+.tile_align_top .tile__value {
+  margin-top: 0;
+}
+
+.tile_align_top .tile__foot {
+  margin-top: auto;
+  padding-top: var(--space-2);
+}

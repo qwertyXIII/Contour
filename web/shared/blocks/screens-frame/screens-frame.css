@@ -1,0 +1,53 @@
+/*
+ * Блок screens-frame: пейджер экранов (screens) и шапка над ним, которая стоит на
+ * месте, пока экраны листают (владелец, 2026-09-30): заголовок текущего экрана не
+ * уезжает вместе с экраном, а сменяется буквами (components/text-motion). Экран под
+ * шапкой — тело своей панели: прокручивается под её нижним краем.
+ *
+ *   <div class="screens-frame">
+ *     <header class="bar bar_size_l bar_align_start screens-frame__head">
+ *       <div class="bar__text"><p class="bar__eyebrow screens-frame__eyebrow">…</p><h2 class="bar__title screens-frame__title">…</h2></div>
+ *       <div class="bar__end">…</div>
+ *     </header>
+ *     <div class="screens screens-frame__pager" id="…">…</div>
+ *   </div>
+ *
+ *   __head — шапка: отступы по бокам — как у тела панели, заголовок стоит над текстом экрана
+ *   __eyebrow — строка над заголовком: одной строкой, лишнее — многоточием; шапка не
+ *            меняет высоту, пока экраны листают (иначе под пальцем дёрнулся бы пейджер)
+ *   __title — заголовок, который держат пальцем (правка экрана): не выделяется, выноски нет
+ *   __pager — пейджер: вся высота под шапкой
+ */
+.screens-frame {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+}
+
+.screens-frame__head {
+  flex: 0 0 auto;
+  padding: var(--space-4) var(--space-5) 0;
+}
+
+/* Поле по бокам с отступом наружу — как у заголовка bar: размытая буква у края не обрезается. */
+.screens-frame__eyebrow {
+  margin-inline: calc(-1 * var(--space-3));
+  padding-inline: var(--space-3);
+  overflow: hidden;
+  overflow: clip visible;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.screens-frame__title {
+  -webkit-touch-callout: none;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.screens-frame__pager {
+  flex: 1 1 0;
+  min-height: 0;
+}

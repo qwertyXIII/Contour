@@ -27,7 +27,7 @@ const PUBLIC_DNS = ['1.1.1.1', '8.8.8.8'];
 
 function dnsFor(o: MihomoOutlet): string[] {
   if (o.config.dns.length > 0) return o.config.dns;
-  return [...new Set([...o.profile.dns, ...PUBLIC_DNS])];
+  return [...new Set([...(o.profile?.dns ?? []), ...PUBLIC_DNS])];
 }
 
 /**
@@ -48,7 +48,7 @@ const DEFAULT_MTU = 1280;
 const IP_STACK = 'mips';
 
 function mtuFor(o: MihomoOutlet): number {
-  return o.config.mtu ?? o.profile.mtu ?? DEFAULT_MTU;
+  return o.config.mtu ?? o.profile?.mtu ?? DEFAULT_MTU;
 }
 
 /** Числа — числами, остальное (`i1` с байтовыми шаблонами) — строкой. */
@@ -60,8 +60,13 @@ function amneziaOption(raw: Record<string, string>): Record<string, number | str
   return out;
 }
 
-function proxyOf(o: MihomoOutlet): Record<string, unknown> {
-  const p = o.profile;
+/** Выход из ссылки: протокол как в ссылке, имя — имя выхода. */
+function linkProxyOf(o: MihomoOutlet): Record<string, unknown> {
+  return { ...(o.link as Record<string, unknown>), name: o.outlet.name };
+}
+
+function wgProxyOf(o: MihomoOutlet): Record<string, unknown> {
+  const p = o.profile as NonNullable<MihomoOutlet['profile']>;
   const bare = p.addresses.map((a) => a.split('/')[0] as string);
   const proxy: Record<string, unknown> = {
     name: o.outlet.name,
@@ -88,6 +93,31 @@ function proxyOf(o: MihomoOutlet): Record<string, unknown> {
   return proxy;
 }
 
+const PROBE_URL = 'https://www.gstatic.com/generate_204';
+
+/**
+ * Подписка — провайдер mihomo и группа `url-test` над ним с именем выхода:
+ * какой сервер подписки сейчас быстрее, решает mihomo, а для Contour это один
+ * выход. Подписку mihomo скачивает сам, раз в сутки; если есть ядерный выход —
+ * через него (`contour-fetch`): сайт подписки отсюда может быть закрыт.
+ */
+function providerOf(o: MihomoOutlet, viaFetch: boolean): [string, Record<string, unknown>] {
+  return [`sub-${o.outlet.name}`, {
+    type: 'http',
+    url: o.subscription,
+    interval: 86_400,
+    path: `./providers/${o.outlet.name}.yaml`,
+    ...(viaFetch ? { proxy: FETCH_PROXY } : {}),
+    'health-check': { enable: true, url: PROBE_URL, interval: 300 },
+  }];
+}
+
+function groupOf(o: MihomoOutlet): Record<string, unknown> {
+  return { name: o.outlet.name, type: 'url-test', use: [`sub-${o.outlet.name}`], url: PROBE_URL, interval: 300, tolerance: 50 };
+}
+
+export const FETCH_PROXY = 'contour-fetch';
+
 function listenerOf(o: MihomoOutlet): Record<string, unknown> {
   return {
     name: `in-${o.outlet.name}`,
@@ -100,8 +130,18 @@ function listenerOf(o: MihomoOutlet): Record<string, unknown> {
   };
 }
 
-export function buildMihomoConfig(input: { outlets: MihomoOutlet[]; controller: string; secret: string }): string {
-  const doc = {
+/** Ядерный выход как SOCKS для mihomo — только чтобы скачать подписку. */
+export type FetchVia = { host: string; port: number; user: string; pass: string };
+
+export function buildMihomoConfig(input: { outlets: MihomoOutlet[]; controller: string; secret: string; fetchVia?: FetchVia | null }): string {
+  const subs = input.outlets.filter((o) => o.subscription);
+  const direct = input.outlets.filter((o) => !o.subscription);
+  const via = input.fetchVia ?? null;
+  const proxies: Record<string, unknown>[] = direct.map((o) => (o.link ? linkProxyOf(o) : wgProxyOf(o)));
+  if (via && subs.length > 0) {
+    proxies.push({ name: FETCH_PROXY, type: 'socks5', server: via.host, port: via.port, username: via.user, password: via.pass, udp: false });
+  }
+  const doc: Record<string, unknown> = {
     mode: 'rule',
     'log-level': 'warning',
     ipv6: false,
@@ -110,8 +150,12 @@ export function buildMihomoConfig(input: { outlets: MihomoOutlet[]; controller: 
     'geo-auto-update': false,
     'unified-delay': true,
     listeners: input.outlets.map(listenerOf),
-    proxies: input.outlets.map(proxyOf),
+    proxies,
     rules: ['MATCH,REJECT'],
   };
+  if (subs.length > 0) {
+    doc['proxy-providers'] = Object.fromEntries(subs.map((o) => providerOf(o, via !== null)));
+    doc['proxy-groups'] = subs.map(groupOf);
+  }
   return stringify(doc, { lineWidth: 0 });
 }

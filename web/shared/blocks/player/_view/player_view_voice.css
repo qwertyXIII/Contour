@@ -1,0 +1,58 @@
+/*
+ * player_view_voice — музыка в голосовом режиме. Вид лежит на сцене кольца
+ * (orb-stage) поверх всего её поля: обложка — круг в центре кольца (где и какого
+ * размера — переменные сцены --orb-x, --orb-y, --orb-size, --orb-hole), название
+ * и исполнитель — под кольцом, ниже — что сказать. Кнопок нет: здесь говорят.
+ * Кольцо вокруг реагирует на трек и красится цветами обложки (компонент сцены).
+ */
+.player_view_voice {
+  --player-bg: transparent;
+  --player-border: transparent;
+  --player-pad: 0px;
+
+  position: absolute;
+  inset: 0;
+  display: block;
+  height: auto;
+  border-radius: 0;
+  overflow: visible;
+  pointer-events: none;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+
+.player_view_voice .player__art {
+  position: absolute;
+  top: var(--orb-y);
+  left: var(--orb-x);
+  width: calc(var(--orb-size) * var(--orb-hole));
+  border-radius: 50%;
+  translate: -50% -50%;
+  transition: top var(--orb-move), left var(--orb-move), width var(--orb-move);
+}
+
+.player_view_voice .player__meta {
+  position: absolute;
+  top: calc(var(--orb-y) + var(--orb-size) / 2 + var(--space-4));
+  right: var(--space-4);
+  left: var(--space-4);
+  justify-items: center;
+  text-align: center;
+  transition: top var(--orb-move);
+}
+
+.player_view_voice .player__title {
+  font-size: var(--text-title);
+  letter-spacing: var(--tracking-title);
+}
+
+.player_view_voice .player__hint {
+  position: absolute;
+  right: var(--space-4);
+  bottom: var(--space-2);
+  left: var(--space-4);
+  justify-content: center;
+  font-size: var(--text-small);
+  text-align: center;
+  --icon-size: var(--icon-s);
+}

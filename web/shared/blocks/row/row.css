@@ -1,0 +1,121 @@
+/*
+ * Блок row: строка «что-то · о чём · что с этим сделать». Из неё собраны
+ * пункт настроек, строка списка, человек в книге, файл, устройство.
+ *
+ *   __lead  (avatar, glyph, thumb, icon)
+ *   __body  → __title · __note · __meta
+ *   __trail (badge, switch, button, __chevron)
+ *
+ *   row_align_start · row_wrap (на узком __trail уходит под текст)
+ *   row_interactive (строка-кнопка внутри списка без карточки); отступ по бокам —
+ *   --row-inset (список-книга list_view_links ставит 0: буква раздела и аватар
+ *   стоят на одной линии, как в образце «Прокрутка»)
+ */
+.row {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: var(--space-3);
+  width: 100%;
+  min-width: 0;
+  min-height: var(--hit-min);
+  color: inherit;
+  text-align: start;
+  text-decoration: none;
+}
+
+.row_align_start {
+  align-items: flex-start;
+}
+
+.row__lead {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-text-muted);
+}
+
+.row__body {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+
+.row__title {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-1) var(--space-2);
+  min-width: 0;
+  font-size: var(--text-lead);
+  font-weight: var(--weight-semibold);
+  line-height: 1.3;
+  overflow-wrap: anywhere;
+}
+
+.row__note {
+  color: var(--color-text-muted);
+  font-size: var(--text-small);
+  line-height: 1.38;
+  overflow-wrap: anywhere;
+}
+
+.row__meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1) var(--space-3);
+  color: var(--color-text-muted);
+  font-size: var(--text-small);
+  font-variant-numeric: tabular-nums;
+}
+
+.row__trail {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--color-text-muted);
+}
+
+.row__chevron {
+  color: var(--color-text-faint);
+  --icon-size: var(--icon-s);
+}
+
+/* Строка-кнопка в списке-меню: своя подсветка, свои отступы. */
+.row_interactive {
+  margin: 0;
+  padding: var(--row-pad-y) var(--row-inset, var(--row-pad-x));
+  border: 0;
+  border-radius: var(--radius-m);
+  background: transparent;
+  font: inherit;
+  cursor: pointer;
+  transition: background-color var(--duration-fast) ease, transform var(--duration-press) var(--ease-out);
+}
+
+@media (hover: hover) {
+  .row_interactive:hover {
+    background: var(--color-fill-1);
+  }
+}
+
+.row_interactive:active {
+  background: var(--color-fill-2);
+  transform: scale(.99);
+}
+
+/* Узкий контейнер: кнопки строки уходят вниз, а не сжимают текст в столбик. */
+@container (max-width: 420px) {
+  .row_wrap {
+    flex-wrap: wrap;
+  }
+
+  .row_wrap .row__trail {
+    flex-basis: 100%;
+    justify-content: flex-start;
+  }
+}

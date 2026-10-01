@@ -1,0 +1,40 @@
+/*
+ * Блок kv: пары «что — сколько». Трассировка, карточка устройства, данные
+ * человека.
+ *
+ *   <dl class="kv"><dt class="kv__key">Модель</dt><dd class="kv__value">gpt-5</dd> …</dl>
+ *
+ *   kv_layout_stack — значение под ключом (длинные значения, узкая колонка)
+ */
+.kv {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: var(--space-3) var(--space-4);
+  margin: 0;
+  font-size: var(--text-body);
+  line-height: 1.4;
+}
+
+.kv__key {
+  min-width: 0;
+  color: var(--color-text-muted);
+}
+
+.kv__value {
+  min-width: 0;
+  margin: 0;
+  font-weight: var(--weight-medium);
+  font-variant-numeric: tabular-nums;
+  text-align: end;
+  overflow-wrap: anywhere;
+}
+
+.kv_layout_stack {
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-1);
+}
+
+.kv_layout_stack .kv__value {
+  margin-bottom: var(--space-2);
+  text-align: start;
+}

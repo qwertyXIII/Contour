@@ -10,7 +10,19 @@ import { parse } from 'yaml';
  * а не молчание: опечатка в имени иначе выглядит как «настройка не работает».
  */
 
-export type OutletProtocol = 'amneziawg' | 'wireguard';
+/**
+ * Чем поднимается выход:
+ * - `amneziawg`, `wireguard` — ядро (`kind: netns`) или mihomo;
+ * - `openvpn` — только ядро, в namespace;
+ * - `link` (`vless://`, `vmess://`, `trojan://`, `ss://`, `hysteria2://`) и
+ *   `subscription` (ссылка на подписку) — только mihomo.
+ */
+export type OutletProtocol = 'amneziawg' | 'wireguard' | 'openvpn' | 'link' | 'subscription';
+
+const PROTOCOLS_BY_KIND: Record<'netns' | 'mihomo', OutletProtocol[]> = {
+  netns: ['amneziawg', 'wireguard', 'openvpn'],
+  mihomo: ['amneziawg', 'wireguard', 'link', 'subscription'],
+};
 
 export type OutletConfig = {
   name: string;
@@ -46,6 +58,18 @@ export type Config = {
     ipIntervalSec: number;
   };
   sticky: { hours: number };
+  /** Веб-панель: дома по паролю — http://vpn.home и http://<lan.address>. */
+  panel: {
+    enabled: boolean;
+    /** Где панель слушает сама — для ssh-тоннеля и проверок; из сети её отдаёт вход lan по Host. */
+    listen: string;
+    port: number;
+    /** Имя панели в домашней сети — его отдаёт DNS Contour. */
+    name: string;
+    /** Хеш пароля (scrypt) — пишет install.sh / panel-password.sh. */
+    passwordFile: string;
+    dataDir: string;
+  };
   /** Вход для устройств домашней сети: «умный DNS» + SNI на своём адресе. */
   lan: {
     enabled: boolean;
@@ -108,6 +132,14 @@ export const DEFAULTS: Config = {
     ipIntervalSec: 300,
   },
   sticky: { hours: 24 },
+  panel: {
+    enabled: true,
+    listen: '127.0.0.1',
+    port: 18090,
+    name: 'vpn.home',
+    passwordFile: '/etc/contour/panel.json',
+    dataDir: '/var/lib/contour/panel',
+  },
   lan: {
     enabled: false,
     address: '192.168.0.50',
@@ -222,9 +254,10 @@ function outlet(raw: unknown, index: number): OutletConfig {
   if (kind !== 'mihomo' && kind !== 'netns') throw new ConfigError(`${where}.kind: «netns» или «mihomo»`);
   const bridge = kind === 'netns' ? num(raw, 'bridge', 0, where, 1, 250) : null;
   if (kind === 'netns' && raw.bridge === undefined) throw new ConfigError(`${where}.bridge: у выхода netns нужен номер моста от 1 до 250`);
-  const protocol = str(raw, 'protocol', '', where);
-  if (protocol !== 'amneziawg' && protocol !== 'wireguard') {
-    throw new ConfigError(`${where}.protocol: «amneziawg» или «wireguard»`);
+  const protocol = str(raw, 'protocol', '', where) as OutletProtocol;
+  const allowed = PROTOCOLS_BY_KIND[kind];
+  if (!allowed.includes(protocol)) {
+    throw new ConfigError(`${where}.protocol: для kind ${kind} — ${allowed.join(', ')}`);
   }
   return {
     name,
@@ -243,7 +276,7 @@ function outlet(raw: unknown, index: number): OutletConfig {
 export function parseConfig(text: string): Config {
   const raw: unknown = parse(text) ?? {};
   if (!isRecord(raw)) throw new ConfigError('в корне должен быть раздел, а не список или строка');
-  onlyKnown(raw, 'корень', ['http', 'tokens', 'outlets', 'mihomo', 'health', 'sticky', 'lan']);
+  onlyKnown(raw, 'корень', ['http', 'tokens', 'outlets', 'mihomo', 'health', 'sticky', 'lan', 'panel']);
 
   const http = section(raw, 'http');
   onlyKnown(http, 'http', ['listen', 'port']);
@@ -253,6 +286,8 @@ export function parseConfig(text: string): Config {
   onlyKnown(health, 'health', ['intervalSec', 'connectTimeoutSec', 'probeHost', 'probePath', 'ipHost', 'ipIntervalSec']);
   const sticky = section(raw, 'sticky');
   onlyKnown(sticky, 'sticky', ['hours']);
+  const panel = section(raw, 'panel');
+  onlyKnown(panel, 'panel', ['enabled', 'listen', 'port', 'name', 'passwordFile', 'dataDir']);
   const lan = section(raw, 'lan');
   onlyKnown(lan, 'lan', ['enabled', 'address', 'allow', 'upstream', 'domains', 'extraDomains', 'tlsPort', 'httpPort', 'lists', 'learn', 'probeBudgetMs', 'dataDir']);
 
@@ -293,6 +328,14 @@ export function parseConfig(text: string): Config {
       ipIntervalSec: num(health, 'ipIntervalSec', d.health.ipIntervalSec, 'health', 10, 86_400),
     },
     sticky: { hours: num(sticky, 'hours', d.sticky.hours, 'sticky', 0, 24 * 30) },
+    panel: {
+      enabled: bool(panel, 'enabled', d.panel.enabled, 'panel'),
+      listen: str(panel, 'listen', d.panel.listen, 'panel'),
+      port: num(panel, 'port', d.panel.port, 'panel', 1024, 65_535),
+      name: str(panel, 'name', d.panel.name, 'panel').toLowerCase(),
+      passwordFile: str(panel, 'passwordFile', d.panel.passwordFile, 'panel'),
+      dataDir: str(panel, 'dataDir', d.panel.dataDir, 'panel'),
+    },
     lan: {
       enabled: bool(lan, 'enabled', d.lan.enabled, 'lan'),
       address: ipv4(lan, 'address', d.lan.address),

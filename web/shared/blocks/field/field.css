@@ -1,0 +1,122 @@
+/*
+ * Блок field: подпись, пояснение, контрол и ошибка вместе. Контрол — любой
+ * блок: input, select, textarea, range, segmented, switch, stepper.
+ *
+ *   <div class="field">
+ *     <div class="field__text">
+ *       <div class="field__head">
+ *         <label class="field__label" for="x">Задержка</label>
+ *         <output class="field__value" for="x">45 с</output>   ← необязательно
+ *       </div>
+ *       <p class="field__hint">…</p>
+ *     </div>
+ *     <div class="input field__control">…</div>
+ *     <p class="field__error">…</p>
+ *   </div>
+ *
+ *   field_layout_inline   — подпись слева, контрол справа (тумблер, счётчик)
+ *   field_layout_adaptive — на узком столбиком, на широком подпись колонкой слева
+ *   field_invalid         — показать __error
+ *   __label_legend        — подпись <fieldset> (legend не участвует в gap)
+ *
+ * Адаптивная раскладка смотрит на ширину контейнера, а не экрана: одно и то же
+ * поле в узкой колонке десктопа ведёт себя как на телефоне.
+ */
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.field__text {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
+.field__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.field__label {
+  padding: 0;
+  font-size: var(--text-lead);
+  font-weight: var(--weight-semibold);
+  line-height: 1.3;
+}
+
+/* Подпись группы радио: <legend> не участвует в gap, отступ — свой. */
+.field__label_legend {
+  margin-bottom: var(--space-3);
+}
+
+.field__value {
+  flex: 0 0 auto;
+  color: var(--color-accent-text);
+  font-family: var(--font-mono);
+  font-size: var(--text-small);
+  font-variant-numeric: tabular-nums;
+}
+
+.field__hint {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: var(--text-small);
+  line-height: 1.4;
+}
+
+.field__error {
+  display: none;
+  margin: 0;
+  color: var(--color-danger);
+  font-size: var(--text-small);
+  line-height: 1.4;
+}
+
+.field_invalid .field__error {
+  display: block;
+}
+
+.field_disabled {
+  opacity: .5;
+}
+
+/* Подпись слева, контрол справа */
+.field_layout_inline {
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2) var(--space-4);
+}
+
+.field_layout_inline .field__text {
+  flex: 1 1 12rem;
+}
+
+.field_layout_inline .field__error {
+  flex-basis: 100%;
+}
+
+/* На широком контейнере — две колонки: что это и чем задаётся. */
+@container (min-width: 560px) {
+  .field_layout_adaptive {
+    display: grid;
+    grid-template-columns: minmax(11rem, 2fr) 3fr;
+    align-items: start;
+    gap: var(--space-2) var(--space-6);
+  }
+
+  .field_layout_adaptive .field__control,
+  .field_layout_adaptive .field__error {
+    grid-column: 2;
+  }
+}

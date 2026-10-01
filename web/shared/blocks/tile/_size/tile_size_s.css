@@ -1,0 +1,24 @@
+/*
+ * tile_size_s: плитка в маленькой клетке сетки виджетов — 1×1 и 2×1 (на
+ * телефоне клетка около 80px). Отступы меньше, значение — кеглем заголовка,
+ * пояснение прячется: ему там нет места.
+ */
+.tile_size_s {
+  --card-pad: var(--space-3);
+
+  gap: 0;
+}
+
+.tile_size_s .tile__value {
+  font-size: var(--text-heading);
+  font-weight: var(--weight-regular);
+  letter-spacing: var(--tracking-title);
+}
+
+.tile_size_s .tile__label {
+  font-size: var(--text-caption);
+}
+
+.tile_size_s .tile__note {
+  display: none;
+}

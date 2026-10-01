@@ -1,0 +1,12 @@
+/* Блок divider: тонкая линия между частями. Отступы вокруг — у родителя. */
+.divider {
+  width: 100%;
+  height: 0;
+  margin: 0;
+  border: 0;
+  border-top: 1px solid var(--color-border);
+}
+
+.divider_strong {
+  border-top-color: var(--color-border-strong);
+}

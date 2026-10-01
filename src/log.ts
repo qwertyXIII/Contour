@@ -60,11 +60,32 @@ function jsonWriter(_type: string, line: string, entry: LogEntry): void {
   process.stdout.write(`${stamp(entry.timeStamp)}: ${line}\n`);
 }
 
+/**
+ * Журнал для панели — последние записи info и выше, в памяти. Берётся
+ * из того же лога дополнительным приёмником логгера: всё, что Contour и так
+ * пишет (выход упал/поднялся, переключение, отказы), попадает сюда без
+ * отдельной проводки событий. Строки mihomo в журнал не идут — их много и
+ * они на его языке.
+ */
+export type JournalEntry = { t: number; level: string; text: string; src: string | null };
+const JOURNAL_MAX = 300;
+export const journal: JournalEntry[] = [];
+
+function toJournal(entry: LogEntry): void {
+  if (entry.type !== 'info' && entry.type !== 'warn' && entry.type !== 'error') return;
+  const src = typeof entry.src === 'string' ? entry.src : null;
+  if (src === 'mihomo') return;
+  const [first] = entry.content ?? [];
+  journal.push({ t: entry.timeStamp, level: entry.type, text: String(first ?? ''), src });
+  if (journal.length > JOURNAL_MAX) journal.splice(0, journal.length - JOURNAL_MAX);
+}
+
 export const log: Logger = createLogger({
   level,
   context: { app: 'contour' },
   trace: !pretty,
   writer: pretty ? prettyWriter : jsonWriter,
+  sink: toJournal,
 });
 
 export type { Logger };

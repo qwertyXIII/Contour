@@ -55,9 +55,12 @@ load_meta() {
   case "${PROTO:-}" in
     amneziawg) LINK_TYPE=amneziawg; TOOL=awg; MODULE=amneziawg ;;
     wireguard) LINK_TYPE=wireguard; TOOL=wg; MODULE=wireguard ;;
-    *) die "PROTO в $META — amneziawg или wireguard" ;;
+    openvpn) LINK_TYPE=''; TOOL=''; MODULE=tun ;;
+    *) die "PROTO в $META — amneziawg, wireguard или openvpn" ;;
   esac
   WG_IF="ctw$BRIDGE"
+  TUN_IF="ctt$BRIDGE"
+  OVPN_PID="/run/contour-ovpn-$NAME.pid"
   VETH_HOST="ctv$BRIDGE"
   VETH_NS="ctv${BRIDGE}n"
   HOST_IP="10.201.$BRIDGE.1"
@@ -70,6 +73,8 @@ conf_value() {
 }
 
 require_module() {
+  # tun у OpenVPN бывает встроен в ядро — тогда есть /dev/net/tun, а модуля в списке нет.
+  [ "$MODULE" = tun ] && [ -c /dev/net/tun ] && return
   grep -q "^$MODULE " /proc/modules && return
   modprobe "$MODULE" 2>/dev/null || true
   grep -q "^$MODULE " /proc/modules || die "модуль ядра $MODULE не загружен и не грузится"
@@ -113,11 +118,29 @@ EOF
   chown "$SERVICE_USER:$SERVICE_USER" "$dir/config.yaml"
 }
 
-cmd_up() {
-  load_meta
-  require_module
-  [ -f "$CONF" ] || die "нет $CONF"
+# OpenVPN: процесс живёт в корневом namespace (его сокет к серверу ходит обычной
+# сетью), туннель создаётся там же и переносится внутрь скриптом --up —
+# тот же приём, что у AWG. Маршруты и адреса OpenVPN не ставит сам
+# (--route-noexec, --ifconfig-noexec): всё ставит contour-ovpn-up внутри.
+# DCO выключен: устройство ovpn-dco не переносится между namespace.
+ovpn_tunnel() {
+  command -v openvpn >/dev/null || die "openvpn не установлен: apt install openvpn"
+  [ -f "$OVPN_PID" ] && kill "$(cat "$OVPN_PID")" 2>/dev/null || true
+  rm -f "$OVPN_PID"
+  openvpn --config "$CONF" --dev "$TUN_IF" --dev-type tun --disable-dco --persist-tun \
+    --route-noexec --ifconfig-noexec --script-security 2 \
+    --setenv CT_NS "$NS" --up /opt/contour/sbin/contour-ovpn-up \
+    --daemon "contour-ovpn-$NAME" --writepid "$OVPN_PID" --log-append "/var/log/contour/ovpn-$NAME.log"
+  local i
+  for i in $(seq 1 30); do
+    ip -n "$NS" link show "$TUN_IF" >/dev/null 2>&1 && { note "OpenVPN: туннель $TUN_IF в $NS"; return; }
+    sleep 1
+  done
+  tail -n 15 "/var/log/contour/ovpn-$NAME.log" >&2 || true
+  die "OpenVPN не поднял туннель за 30 с — лог выше"
+}
 
+wg_tunnel() {
   local address mtu tmp
   address=$(conf_value Address | cut -d, -f1 | tr -d ' ')
   if [ -z "$address" ] && [ -f "$ENVF" ]; then
@@ -127,18 +150,6 @@ cmd_up() {
   [[ "$address" == */* ]] || address="$address/32"
   mtu=$(conf_value MTU)
   mtu=${mtu:-$DEFAULT_MTU}
-
-  echo "Поднимаю выход $NAME ($PROTO, мост $HOST_IP ↔ $NS_IP):"
-
-  # Пересоздаём всегда: setconf на живом интерфейсе оставляет старых пиров.
-  ip netns del "$NS" 2>/dev/null || true
-  ip link del "$WG_IF" 2>/dev/null || true
-  ip link del "$VETH_HOST" 2>/dev/null || true
-
-  ip netns add "$NS"
-  ip -n "$NS" link set lo up
-  mkdir -p "/etc/netns/$NS"
-  printf 'nameserver 1.1.1.1\nnameserver 8.8.8.8\n' > "/etc/netns/$NS/resolv.conf"
 
   # setconf понимает только секции протокола: Address/DNS/MTU и прочее от wg-quick — убрать.
   tmp=$(mktemp)
@@ -151,6 +162,27 @@ cmd_up() {
   ip -n "$NS" link set "$WG_IF" mtu "$mtu" up
   ip -n "$NS" route add default dev "$WG_IF"
   note "туннель $WG_IF: адрес $address, MTU $mtu, весь трафик namespace через него"
+}
+
+cmd_up() {
+  load_meta
+  require_module
+  [ -f "$CONF" ] || die "нет $CONF"
+
+  echo "Поднимаю выход $NAME ($PROTO, мост $HOST_IP ↔ $NS_IP):"
+
+  # Пересоздаём всегда: setconf на живом интерфейсе оставляет старых пиров.
+  [ -f "$OVPN_PID" ] && kill "$(cat "$OVPN_PID")" 2>/dev/null || true
+  ip netns del "$NS" 2>/dev/null || true
+  ip link del "$WG_IF" 2>/dev/null || true
+  ip link del "$VETH_HOST" 2>/dev/null || true
+
+  ip netns add "$NS"
+  ip -n "$NS" link set lo up
+  mkdir -p "/etc/netns/$NS"
+  printf 'nameserver 1.1.1.1\nnameserver 8.8.8.8\n' > "/etc/netns/$NS/resolv.conf"
+
+  if [ "$PROTO" = openvpn ]; then ovpn_tunnel; else wg_tunnel; fi
 
   ip link add "$VETH_HOST" type veth peer name "$VETH_NS"
   ip link set "$VETH_NS" netns "$NS"
@@ -176,6 +208,7 @@ cmd_up() {
 
 cmd_down() {
   load_meta
+  if [ -f "$OVPN_PID" ]; then kill "$(cat "$OVPN_PID")" 2>/dev/null || true; rm -f "$OVPN_PID"; fi
   ip netns del "$NS" 2>/dev/null || true
   ip link del "$VETH_HOST" 2>/dev/null || true
   echo "Выход $NAME снят. Ключ и пароль оставлены."
@@ -185,6 +218,11 @@ cmd_status() {
   load_meta
   ip netns list | grep -qw "$NS" || die "namespace $NS не поднят"
   ip -n "$NS" -br addr
+  if [ "$PROTO" = openvpn ]; then
+    [ -f "$OVPN_PID" ] && kill -0 "$(cat "$OVPN_PID")" 2>/dev/null && echo "openvpn работает (pid $(cat "$OVPN_PID"))" || echo "openvpn не запущен"
+    ip -n "$NS" -s link show "$TUN_IF" 2>/dev/null | sed -n '4p;6p'
+    return
+  fi
   ip netns exec "$NS" "$TOOL" show "$WG_IF" latest-handshakes | awk '{ if ($2 > 0) print "рукопожатие", systime() - $2, "с назад"; else print "рукопожатия не было" }'
   ip netns exec "$NS" "$TOOL" show "$WG_IF" transfer | awk '{ printf "принято %.1f МБ, отправлено %.1f МБ\n", $2/1048576, $3/1048576 }'
 }

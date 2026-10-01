@@ -1,0 +1,183 @@
+/*
+ * Движения масштабом вокруг оси --o.
+ *   pop     — появиться с перелётом (плюс, солнце на картинке, точка)
+ *   pulse   — вдох до --s и обратно (кнопка, линза, динамик)
+ *   beat    — двойной удар (сердце)
+ *   blink   — моргнуть по вертикали (глаз, робот)
+ *   grow    — вырасти из --sx/--sy (фигуры; линии растят через draw)
+ *   fold    — сложиться до --sx/--sy, постоять, раскрыться (дверь, конверт, крышка ноутбука)
+ *   squeeze — сжиматься и раскрываться без остановки (глобус, монета)
+ *   twinkle — мерцание звезды: сжатие с поворотом
+ *   ripple  — круг разбегается и тает (волны, радар, касание)
+ *   flicker — пламя: неровно вытягивается и приседает
+ *   flutter — флаг: полотно колышется наклоном
+ */
+.icon__part_motion_pop {
+  --motion: icon-pop;
+  --motion-loop: icon-pop-loop;
+  --dur: 550ms;
+  --ease: ease-out;
+}
+
+.icon__part_motion_pulse {
+  --motion: icon-pulse;
+  --motion-loop: icon-pulse;
+  --dur: 600ms;
+  --ease: ease-in-out;
+  --dur-loop: 1.6s;
+}
+
+.icon__part_motion_beat {
+  --motion: icon-beat;
+  --motion-loop: icon-beat;
+  --dur: 1000ms;
+  --ease: ease-in-out;
+  --dur-loop: 1.3s;
+}
+
+.icon__part_motion_blink {
+  --motion: icon-blink;
+  --motion-loop: icon-blink-loop;
+  --dur: 700ms;
+  --ease: ease-in-out;
+  --dur-loop: 4s;
+}
+
+.icon__part_motion_grow {
+  --motion: icon-grow;
+  --motion-loop: icon-grow-loop;
+  --dur: 700ms;
+  --ease: ease-out;
+}
+
+.icon__part_motion_fold {
+  --motion: icon-fold;
+  --motion-loop: icon-fold;
+  --dur: 1100ms;
+  --ease: ease-in-out;
+  --dur-loop: 2.6s;
+}
+
+.icon__part_motion_squeeze {
+  --motion: icon-squeeze;
+  --motion-loop: icon-squeeze;
+  --dur: 1400ms;
+  --ease: ease-in-out;
+  --dur-loop: 2.8s;
+}
+
+.icon__part_motion_twinkle {
+  --motion: icon-twinkle;
+  --motion-loop: icon-twinkle;
+  --dur: 900ms;
+  --ease: ease-in-out;
+  --dur-loop: 2s;
+}
+
+.icon__part_motion_ripple {
+  --motion: icon-ripple;
+  --motion-loop: icon-ripple;
+  --dur: 900ms;
+  --ease: ease-out;
+  --dur-loop: 1.8s;
+}
+
+.icon__part_motion_flicker {
+  --motion: icon-flicker;
+  --motion-loop: icon-flicker;
+  --dur: 800ms;
+  --ease: ease-in-out;
+  --count: 2;
+  --dur-loop: 1s;
+}
+
+.icon__part_motion_flutter {
+  --motion: icon-flutter;
+  --motion-loop: icon-flutter;
+  --dur: 900ms;
+  --ease: ease-in-out;
+  --count: 2;
+  --dur-loop: 1.4s;
+}
+
+@keyframes icon-pop {
+  0% { scale: .2; opacity: 0; }
+  45% { scale: 1.18; opacity: 1; }
+  70% { scale: .94; }
+  100% { scale: 1; }
+}
+
+@keyframes icon-pop-loop {
+  0% { scale: .2; opacity: 0; }
+  16% { scale: 1.18; opacity: 1; }
+  25% { scale: .94; }
+  34%, 100% { scale: 1; }
+}
+
+@keyframes icon-pulse {
+  0%, 100% { scale: 1; }
+  45% { scale: var(--s, 1.15); }
+}
+
+@keyframes icon-beat {
+  0%, 56%, 100% { scale: 1; }
+  14% { scale: var(--s, 1.2); }
+  28% { scale: .97; }
+  42% { scale: calc(var(--s, 1.2) - .08); }
+}
+
+@keyframes icon-blink {
+  0%, 36%, 72%, 100% { scale: 1 1; }
+  18%, 54% { scale: 1 .08; }
+}
+
+@keyframes icon-blink-loop {
+  0%, 88%, 96%, 100% { scale: 1 1; }
+  92% { scale: 1 .08; }
+}
+
+@keyframes icon-grow {
+  0% { scale: var(--sx, 1) var(--sy, .1); }
+  65% { scale: calc(1 + (1 - var(--sx, 1)) * .06) calc(1 + (1 - var(--sy, .1)) * .06); }
+  100% { scale: 1 1; }
+}
+
+@keyframes icon-grow-loop {
+  0%, 100% { scale: var(--sx, 1) var(--sy, .1); }
+  25% { scale: calc(1 + (1 - var(--sx, 1)) * .06) calc(1 + (1 - var(--sy, .1)) * .06); }
+  35%, 80% { scale: 1 1; }
+}
+
+@keyframes icon-fold {
+  0%, 100% { scale: 1 1; }
+  35%, 65% { scale: var(--sx, 1) var(--sy, 1); }
+}
+
+@keyframes icon-squeeze {
+  0%, 100% { scale: 1 1; }
+  50% { scale: var(--sx, 1) var(--sy, 1); }
+}
+
+@keyframes icon-twinkle {
+  0%, 100% { scale: 1; rotate: 0deg; opacity: 1; }
+  50% { scale: var(--s, .55); rotate: var(--a, 45deg); opacity: .55; }
+}
+
+@keyframes icon-ripple {
+  0% { scale: var(--s0, .4); opacity: 0; }
+  25% { opacity: 1; }
+  100% { scale: var(--s, 1.35); opacity: 0; }
+}
+
+@keyframes icon-flicker {
+  0%, 100% { scale: 1 1; rotate: 0deg; }
+  25% { scale: .94 1.07; rotate: -2deg; }
+  50% { scale: 1.04 .95; rotate: 1.5deg; }
+  75% { scale: .97 1.04; rotate: -1deg; }
+}
+
+@keyframes icon-flutter {
+  0%, 100% { transform: skewY(0deg); scale: 1 1; }
+  25% { transform: skewY(var(--a, 5deg)); scale: .95 1; }
+  75% { transform: skewY(calc(var(--a, 5deg) * -1)); scale: .98 1; }
+}

@@ -1,0 +1,1158 @@
+<svg xmlns="http://www.w3.org/2000/svg">
+  <!--
+    Спрайт значков Alter. Сетка 24×24, линия 1.9 со скруглениями. В символах
+    только геометрия: цвет и толщину задаёт блок icon.
+
+    Значки подвижные. Часть, которая двигается, несёт класс icon__part и
+    движение (icon__part_motion_swing …), параметры — переменными в style.
+    Словарь движений — src/blocks/icon/__part/_motion/. Через <use> значок
+    стоит на месте; оживляет его компонент MotionIcon (components/icon/).
+
+    У символа: data-motion — как задуман (hover — один проход, hold — пока
+    держат, loop — всегда, once — при появлении), data-note — что движется.
+    Группы <g data-group> — разделы витрины. Новый значок — новый <symbol>,
+    витрина покажет его сама.
+
+    opacity="0" у части — «призрак»: виден только в движении (волны у
+    микрофона, лучи лампы). pathLength="1" — для движений draw/eq/dash.
+  -->
+
+  <g data-group="Alter и ИИ">
+    <symbol id="alter" viewBox="0 0 24 24" data-motion="hover" data-note="буква дорисовывается">
+      <path class="icon__part icon__part_motion_draw" d="M5 19.5 12 4.5l7 15" pathLength="1" style="--dur: 800ms"/>
+    </symbol>
+    <symbol id="sparkle" viewBox="0 0 24 24" data-motion="hold" data-note="звезда мерцает">
+      <path class="icon__part icon__part_motion_twinkle" d="M12 3.5 13.9 10l6.6 2-6.6 2L12 20.5 10.1 14l-6.6-2 6.6-2L12 3.5Z" style="--s: .6; --a: 90deg"/>
+    </symbol>
+    <symbol id="sparkles" viewBox="0 0 24 24" data-motion="loop" data-note="звёзды вспыхивают по очереди">
+      <path class="icon__part icon__part_motion_twinkle" d="M10 5.5 11.7 11.3 17.5 13 11.7 14.7 10 20.5 8.3 14.7 2.5 13 8.3 11.3Z" style="--o: 10px 13px; --s: .75; --a: 0deg"/>
+      <path class="icon__part icon__part_motion_twinkle" d="M18 2.7 18.8 4.7 20.8 5.5 18.8 6.3 18 8.3 17.2 6.3 15.2 5.5 17.2 4.7Z" style="--o: 18px 5.5px; --s: .4; --a: 90deg; --delay: 300ms"/>
+      <path class="icon__part icon__part_motion_twinkle" d="M19 15.8v4.4M16.8 18h4.4" style="--o: 19px 18px; --s: .3; --a: 90deg; --delay: 600ms"/>
+    </symbol>
+    <symbol id="wand" viewBox="0 0 24 24" data-motion="hover" data-note="палочка взмахивает, сыплются искры">
+      <g class="icon__part icon__part_motion_tilt" style="--o: 4px 20px; --a: -9deg">
+        <path d="M4 20 13.6 10.4"/>
+        <path class="icon__part icon__part_motion_twinkle" d="M16.5 4 17.4 6.6 20 7.5 17.4 8.4 16.5 11 15.6 8.4 13 7.5 15.6 6.6Z" style="--o: 16.5px 7.5px; --s: .6; --a: 90deg; --delay: 150ms"/>
+      </g>
+      <path class="icon__part icon__part_motion_pop" d="M20.8 3.5h.01" stroke-width="2.6" style="--o: 20.8px 3.5px; --delay: 250ms"/>
+      <path class="icon__part icon__part_motion_pop" d="M21 12h.01" stroke-width="2.6" style="--o: 21px 12px; --delay: 350ms"/>
+      <path class="icon__part icon__part_motion_pop" d="M11.8 3.2h.01" stroke-width="2.6" style="--o: 11.8px 3.2px; --delay: 450ms"/>
+    </symbol>
+    <symbol id="robot" viewBox="0 0 24 24" data-motion="hover" data-note="подпрыгивает, мигает антенной и глазами">
+      <g class="icon__part icon__part_motion_hop" style="--o: 12px 19px; --y: -2px">
+        <rect x="5" y="8" width="14" height="11" rx="3"/>
+        <path d="M12 8V5.4M3 12v3.5M21 12v3.5M10.5 16.3h3"/>
+        <circle class="icon__part icon__part_motion_pulse" cx="12" cy="4.2" r="1.2" style="--o: 12px 4.2px; --s: 1.5; --delay: 100ms"/>
+        <path class="icon__part icon__part_motion_blink" d="M9.5 12.3v2M14.5 12.3v2" style="--o: 12px 13.3px; --delay: 250ms"/>
+      </g>
+    </symbol>
+    <symbol id="orb" viewBox="0 0 24 24" data-motion="loop" data-note="кольцо Alter’а дышит волной">
+      <circle class="icon__part icon__part_motion_pulse" cx="12" cy="12" r="3.2" style="--s: 1.15"/>
+      <path class="icon__part icon__part_motion_pulse" d="M12 5.8V3" style="--o: 12px 5.8px; --s: .5; --delay: 0ms; --delay-loop: 0ms"/>
+      <path class="icon__part icon__part_motion_pulse" d="M16.4 7.6 18.4 5.6" style="--o: 16.4px 7.6px; --s: .5; --delay: 110ms; --delay-loop: 200ms"/>
+      <path class="icon__part icon__part_motion_pulse" d="M18.2 12H21" style="--o: 18.2px 12px; --s: .5; --delay: 220ms; --delay-loop: 400ms"/>
+      <path class="icon__part icon__part_motion_pulse" d="M16.4 16.4 18.4 18.4" style="--o: 16.4px 16.4px; --s: .5; --delay: 330ms; --delay-loop: 600ms"/>
+      <path class="icon__part icon__part_motion_pulse" d="M12 18.2V21" style="--o: 12px 18.2px; --s: .5; --delay: 440ms; --delay-loop: 800ms"/>
+      <path class="icon__part icon__part_motion_pulse" d="M7.6 16.4 5.6 18.4" style="--o: 7.6px 16.4px; --s: .5; --delay: 550ms; --delay-loop: 1000ms"/>
+      <path class="icon__part icon__part_motion_pulse" d="M5.8 12H3" style="--o: 5.8px 12px; --s: .5; --delay: 660ms; --delay-loop: 1200ms"/>
+      <path class="icon__part icon__part_motion_pulse" d="M7.6 7.6 5.6 5.6" style="--o: 7.6px 7.6px; --s: .5; --delay: 770ms; --delay-loop: 1400ms"/>
+    </symbol>
+    <symbol id="waveform" viewBox="0 0 24 24" data-motion="loop" data-note="столбики голоса ходят">
+      <path class="icon__part icon__part_motion_eq" d="M4 10v4" pathLength="1" style="--s: .4; --dur: 800ms; --delay: 0ms"/>
+      <path class="icon__part icon__part_motion_eq" d="M8 7v10" pathLength="1" style="--s: .3; --dur: 1000ms; --delay: -300ms"/>
+      <path class="icon__part icon__part_motion_eq" d="M12 4v16" pathLength="1" style="--s: .35; --dur: 700ms; --delay: -150ms"/>
+      <path class="icon__part icon__part_motion_eq" d="M16 7v10" pathLength="1" style="--s: .3; --dur: 950ms; --delay: -450ms"/>
+      <path class="icon__part icon__part_motion_eq" d="M20 10v4" pathLength="1" style="--s: .45; --dur: 850ms; --delay: -200ms"/>
+    </symbol>
+    <symbol id="atom" viewBox="0 0 24 24" data-motion="hold" data-note="орбиты вращаются">
+      <circle cx="12" cy="12" r="1.4" fill="currentColor"/>
+      <g class="icon__part icon__part_motion_spin" style="--a: 120deg; --dur: 1400ms">
+        <ellipse cx="12" cy="12" rx="9.5" ry="3.6"/>
+        <ellipse cx="12" cy="12" rx="9.5" ry="3.6" transform="rotate(60 12 12)"/>
+        <ellipse cx="12" cy="12" rx="9.5" ry="3.6" transform="rotate(120 12 12)"/>
+      </g>
+    </symbol>
+  </g>
+
+  <g data-group="Действия">
+    <symbol id="settings" viewBox="0 0 24 24" data-motion="hold" data-note="шестерня крутится">
+      <g class="icon__part icon__part_motion_spin" style="--a: 45deg; --dur: 700ms; --dur-loop: 3s">
+        <circle cx="12" cy="12" r="5.8"/>
+        <path d="M12 6.2V3.9M12 17.8v2.3M17.8 12h2.3M6.2 12H3.9M16.1 7.9l1.6-1.6M7.9 16.1l-1.6 1.6M16.1 16.1l1.6 1.6M7.9 7.9 6.3 6.3" stroke-width="2.6"/>
+        <circle cx="12" cy="12" r="2.3"/>
+      </g>
+    </symbol>
+    <symbol id="sliders" viewBox="0 0 24 24" data-motion="hover" data-note="ползунки разъезжаются">
+      <path d="M4 7h16M4 12h16M4 17h16"/>
+      <circle class="icon__part icon__part_motion_slide" cx="15" cy="7" r="1.6" fill="currentColor" style="--x: -6px"/>
+      <circle class="icon__part icon__part_motion_slide" cx="8" cy="12" r="1.6" fill="currentColor" style="--x: 7px; --delay: 100ms"/>
+      <circle class="icon__part icon__part_motion_slide" cx="13" cy="17" r="1.6" fill="currentColor" style="--x: -4px; --delay: 200ms"/>
+    </symbol>
+    <symbol id="edit" viewBox="0 0 24 24" data-motion="hover" data-note="карандаш пишет, черта дорисовывается">
+      <path class="icon__part icon__part_motion_wiggle" d="M4 20h4l10-10a2.5 2.5 0 0 0-3.5-3.5L4.5 16.5 4 20Z" style="--o: 4.5px 19.5px; --a: 5deg; --dur: 600ms"/>
+      <path class="icon__part icon__part_motion_draw" d="M13 20h7" pathLength="1" style="--delay: 120ms; --dur: 500ms"/>
+    </symbol>
+    <symbol id="mic" viewBox="0 0 24 24" data-motion="hold" data-note="от микрофона расходятся волны">
+      <rect x="9" y="3" width="6" height="11" rx="3"/>
+      <path d="M5.5 11.5a6.5 6.5 0 0 0 13 0M12 18v3"/>
+      <path class="icon__part icon__part_motion_ripple" d="M6.2 6a4 4 0 0 0 0 5M17.8 6a4 4 0 0 1 0 5" opacity="0" style="--o: 12px 8.5px; --s0: .8; --s: 1.25"/>
+      <path class="icon__part icon__part_motion_ripple" d="M3.6 4.6a6.5 6.5 0 0 0 0 7.8M20.4 4.6a6.5 6.5 0 0 1 0 7.8" opacity="0" style="--o: 12px 8.5px; --s0: .8; --s: 1.2; --delay: 220ms"/>
+    </symbol>
+    <symbol id="send" viewBox="0 0 24 24" data-motion="hover" data-note="стрелка улетает и возвращается">
+      <path class="icon__part icon__part_motion_fly" d="M5 12h13M12 5.5 18.5 12 12 18.5" style="--x: 8px"/>
+    </symbol>
+    <symbol id="arrow-up" viewBox="0 0 24 24" data-motion="hover" data-note="толчок вверх">
+      <path class="icon__part icon__part_motion_nudge" d="M12 19V5.5M5.5 11.5 12 5l6.5 6.5" style="--y: -3px"/>
+    </symbol>
+    <symbol id="arrow-down" viewBox="0 0 24 24" data-motion="hover" data-note="толчок вниз">
+      <path class="icon__part icon__part_motion_nudge" d="M12 5v13.5M5.5 12.5 12 19l6.5-6.5" style="--y: 3px"/>
+    </symbol>
+    <symbol id="arrow-left" viewBox="0 0 24 24" data-motion="hover" data-note="толчок влево">
+      <path class="icon__part icon__part_motion_nudge" d="M19 12H5.5M11.5 5.5 5 12l6.5 6.5" style="--x: -3px"/>
+    </symbol>
+    <symbol id="arrow-right" viewBox="0 0 24 24" data-motion="hover" data-note="толчок вправо">
+      <path class="icon__part icon__part_motion_nudge" d="M5 12h13.5M12.5 5.5 19 12l-6.5 6.5" style="--x: 3px"/>
+    </symbol>
+    <symbol id="chevron-left" viewBox="0 0 24 24" data-motion="hover" data-note="толчок влево">
+      <path class="icon__part icon__part_motion_nudge" d="M14.5 6 9 12l5.5 6" style="--x: -2px"/>
+    </symbol>
+    <symbol id="chevron-right" viewBox="0 0 24 24" data-motion="hover" data-note="толчок вправо">
+      <path class="icon__part icon__part_motion_nudge" d="M9.5 6 15 12l-5.5 6" style="--x: 2px"/>
+    </symbol>
+    <symbol id="chevron-down" viewBox="0 0 24 24" data-motion="hover" data-note="толчок вниз">
+      <path class="icon__part icon__part_motion_nudge" d="M6 9.5 12 15l6-5.5" style="--y: 2px"/>
+    </symbol>
+    <symbol id="chevron-up" viewBox="0 0 24 24" data-motion="hover" data-note="толчок вверх">
+      <path class="icon__part icon__part_motion_nudge" d="M6 14.5 12 9l6 5.5" style="--y: -2px"/>
+    </symbol>
+    <symbol id="chevrons-right" viewBox="0 0 24 24" data-motion="loop" data-note="бегущие огни: «веди вправо»">
+      <path class="icon__part icon__part_motion_appear" d="M6 6.5 11.5 12 6 17.5"/>
+      <path class="icon__part icon__part_motion_appear" d="M12.5 6.5 18 12l-5.5 5.5" style="--delay: 150ms; --delay-loop: 300ms"/>
+    </symbol>
+    <symbol id="plus" viewBox="0 0 24 24" data-motion="hover" data-note="поворот на четверть">
+      <path class="icon__part icon__part_motion_spin" d="M12 5v14M5 12h14" style="--a: 90deg; --dur: 500ms"/>
+    </symbol>
+    <symbol id="minus" viewBox="0 0 24 24" data-motion="hover" data-note="сжимается">
+      <path class="icon__part icon__part_motion_fold" d="M5 12h14" style="--sx: .55; --dur: 700ms"/>
+    </symbol>
+    <symbol id="check" viewBox="0 0 24 24" data-motion="hover" data-note="галочка дорисовывается">
+      <path class="icon__part icon__part_motion_draw" d="m5 12.5 4.8 4.8L19 7.5" pathLength="1"/>
+    </symbol>
+    <symbol id="close" viewBox="0 0 24 24" data-motion="hover" data-note="поворот на четверть">
+      <path class="icon__part icon__part_motion_spin" d="M7 7l10 10M17 7 7 17" style="--a: 90deg; --dur: 500ms"/>
+    </symbol>
+    <symbol id="search" viewBox="0 0 24 24" data-motion="hold" data-note="лупа осматривается">
+      <g class="icon__part icon__part_motion_scan" style="--x: 2px; --y: 0px; --dur: 1200ms">
+        <circle cx="11" cy="11" r="6.5"/>
+        <path d="m16 16 4 4"/>
+      </g>
+    </symbol>
+    <symbol id="zoom-in" viewBox="0 0 24 24" data-motion="hover" data-note="линза приближает, плюс поворачивается">
+      <g class="icon__part icon__part_motion_pulse" style="--o: 11px 11px; --s: 1.08">
+        <circle cx="11" cy="11" r="6.5"/>
+        <path d="m16 16 4 4"/>
+      </g>
+      <path class="icon__part icon__part_motion_spin" d="M11 8.5v5M8.5 11h5" style="--o: 11px 11px; --a: 90deg; --dur: 500ms"/>
+    </symbol>
+    <symbol id="zoom-out" viewBox="0 0 24 24" data-motion="hover" data-note="линза отдаляет">
+      <g class="icon__part icon__part_motion_pulse" style="--o: 11px 11px; --s: .94">
+        <circle cx="11" cy="11" r="6.5"/>
+        <path d="m16 16 4 4"/>
+      </g>
+      <path class="icon__part icon__part_motion_fold" d="M8.5 11h5" style="--o: 11px 11px; --sx: .5; --dur: 700ms"/>
+    </symbol>
+    <symbol id="trash" viewBox="0 0 24 24" data-motion="hover" data-note="крышка приподнимается">
+      <path class="icon__part icon__part_motion_tilt" d="M4.5 7h15M9.5 7V4.8h5V7" style="--o: 4.5px 7px; --a: -20deg"/>
+      <path d="M6.5 7l.8 12.2h9.4L17.5 7M10 11v5M14 11v5"/>
+    </symbol>
+    <symbol id="copy" viewBox="0 0 24 24" data-motion="hover" data-note="листы расходятся">
+      <rect class="icon__part icon__part_motion_nudge" x="8.5" y="8.5" width="11.5" height="11.5" rx="2.5" style="--x: 1.3px; --y: 1.3px"/>
+      <path class="icon__part icon__part_motion_nudge" d="M15.5 8.5V6A2 2 0 0 0 13.5 4H6A2 2 0 0 0 4 6v7.5a2 2 0 0 0 2 2h2.5" style="--x: -1px; --y: -1px"/>
+    </symbol>
+    <symbol id="refresh" viewBox="0 0 24 24" data-motion="hover" data-note="оборот">
+      <path class="icon__part icon__part_motion_spin" d="M19.5 12a7.5 7.5 0 1 1-2.2-5.3M19.5 4.5v4h-4" style="--dur: 800ms"/>
+    </symbol>
+    <symbol id="sync" viewBox="0 0 24 24" data-motion="hold" data-note="стрелки идут по кругу">
+      <g class="icon__part icon__part_motion_spin" style="--a: 180deg; --dur: 900ms">
+        <path d="M4.8 10.1A7.5 7.5 0 0 1 19.2 10.1M19.2 6.3v3.8h-3.8"/>
+        <path d="M19.2 13.9A7.5 7.5 0 0 1 4.8 13.9M4.8 17.7v-3.8h3.8"/>
+      </g>
+    </symbol>
+    <symbol id="link" viewBox="0 0 24 24" data-motion="hover" data-note="звенья расходятся и сцепляются">
+      <path class="icon__part icon__part_motion_nudge" d="M10 14a4 4 0 0 0 5.7 0l3-3A4 4 0 0 0 13 5.3l-1 1" style="--x: 1.2px; --y: -1.2px"/>
+      <path class="icon__part icon__part_motion_nudge" d="M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1" style="--x: -1.2px; --y: 1.2px"/>
+    </symbol>
+    <symbol id="external" viewBox="0 0 24 24" data-motion="hover" data-note="стрелка выскакивает наружу">
+      <path class="icon__part icon__part_motion_nudge" d="M8 16 16.5 7.5M9.5 7.5h7v7" style="--x: 2px; --y: -2px"/>
+    </symbol>
+    <symbol id="more" viewBox="0 0 24 24" data-motion="hover" data-note="точки подпрыгивают волной">
+      <path class="icon__part icon__part_motion_hop" d="M6 12h.01" stroke-width="3.2" style="--y: -3px"/>
+      <path class="icon__part icon__part_motion_hop" d="M12 12h.01" stroke-width="3.2" style="--y: -3px; --delay: 90ms"/>
+      <path class="icon__part icon__part_motion_hop" d="M18 12h.01" stroke-width="3.2" style="--y: -3px; --delay: 180ms"/>
+    </symbol>
+    <symbol id="menu" viewBox="0 0 24 24" data-motion="hover" data-note="полоски сжимаются по очереди">
+      <path class="icon__part icon__part_motion_fold" d="M4.5 7h15" style="--o: 4.5px 7px; --sx: .6; --dur: 800ms"/>
+      <path class="icon__part icon__part_motion_fold" d="M4.5 12h15" style="--o: 4.5px 12px; --sx: .6; --dur: 800ms; --delay: 70ms"/>
+      <path class="icon__part icon__part_motion_fold" d="M4.5 17h15" style="--o: 4.5px 17px; --sx: .6; --dur: 800ms; --delay: 140ms"/>
+    </symbol>
+    <symbol id="grid" viewBox="0 0 24 24" data-motion="hover" data-note="клетки вдыхают по диагонали">
+      <rect class="icon__part icon__part_motion_pulse" x="4" y="4" width="6.5" height="6.5" rx="2" style="--o: 7.25px 7.25px; --s: .8"/>
+      <rect class="icon__part icon__part_motion_pulse" x="13.5" y="4" width="6.5" height="6.5" rx="2" style="--o: 16.75px 7.25px; --s: .8; --delay: 90ms"/>
+      <rect class="icon__part icon__part_motion_pulse" x="4" y="13.5" width="6.5" height="6.5" rx="2" style="--o: 7.25px 16.75px; --s: .8; --delay: 90ms"/>
+      <rect class="icon__part icon__part_motion_pulse" x="13.5" y="13.5" width="6.5" height="6.5" rx="2" style="--o: 16.75px 16.75px; --s: .8; --delay: 180ms"/>
+    </symbol>
+    <symbol id="list" viewBox="0 0 24 24" data-motion="hover" data-note="строки дописываются">
+      <path d="M4.5 7h.01" stroke-width="2.6"/>
+      <path d="M4.5 12h.01" stroke-width="2.6"/>
+      <path d="M4.5 17h.01" stroke-width="2.6"/>
+      <path class="icon__part icon__part_motion_draw" d="M9 7h11" pathLength="1" style="--dur: 450ms"/>
+      <path class="icon__part icon__part_motion_draw" d="M9 12h11" pathLength="1" style="--dur: 450ms; --delay: 90ms"/>
+      <path class="icon__part icon__part_motion_draw" d="M9 17h11" pathLength="1" style="--dur: 450ms; --delay: 180ms"/>
+    </symbol>
+    <symbol id="download" viewBox="0 0 24 24" data-motion="hover" data-note="стрелка опускается в лоток">
+      <path class="icon__part icon__part_motion_nudge" d="M12 4v11M7.5 10.5 12 15l4.5-4.5" style="--y: 3px"/>
+      <path d="M4.5 15.5V18A1.5 1.5 0 0 0 6 19.5h12a1.5 1.5 0 0 0 1.5-1.5v-2.5"/>
+    </symbol>
+    <symbol id="upload" viewBox="0 0 24 24" data-motion="hover" data-note="стрелка поднимается из лотка">
+      <path class="icon__part icon__part_motion_nudge" d="M12 15V4M7.5 8.5 12 4l4.5 4.5" style="--y: -2px"/>
+      <path d="M4.5 15.5V18A1.5 1.5 0 0 0 6 19.5h12a1.5 1.5 0 0 0 1.5-1.5v-2.5"/>
+    </symbol>
+    <symbol id="share" viewBox="0 0 24 24" data-motion="hover" data-note="стрелка выходит из коробки">
+      <path d="M8.5 9.5H7A1.5 1.5 0 0 0 5.5 11v7.5A1.5 1.5 0 0 0 7 20h10a1.5 1.5 0 0 0 1.5-1.5V11A1.5 1.5 0 0 0 17 9.5h-1.5"/>
+      <path class="icon__part icon__part_motion_nudge" d="M12 14V3.5M8.5 7 12 3.5 15.5 7" style="--y: -2px"/>
+    </symbol>
+    <symbol id="share-nodes" viewBox="0 0 24 24" data-motion="hover" data-note="связь бежит от узла к узлам">
+      <circle class="icon__part icon__part_motion_pulse" cx="6" cy="12" r="2.5" style="--o: 6px 12px; --s: 1.25"/>
+      <path class="icon__part icon__part_motion_draw" d="M8.2 10.8 15.8 6.7" pathLength="1" style="--dur: 400ms; --delay: 120ms"/>
+      <path class="icon__part icon__part_motion_draw" d="M8.2 13.2l7.6 4.1" pathLength="1" style="--dur: 400ms; --delay: 120ms"/>
+      <circle class="icon__part icon__part_motion_pulse" cx="18" cy="5.5" r="2.5" style="--o: 18px 5.5px; --s: 1.25; --delay: 380ms"/>
+      <circle class="icon__part icon__part_motion_pulse" cx="18" cy="18.5" r="2.5" style="--o: 18px 18.5px; --s: 1.25; --delay: 380ms"/>
+    </symbol>
+    <symbol id="filter" viewBox="0 0 24 24" data-motion="hover" data-note="из воронки капает">
+      <path class="icon__part icon__part_motion_fold" d="M4 5h16l-6 7.5V18l-4 2v-7.5L4 5Z" style="--o: 12px 5px; --sx: .9; --dur: 700ms"/>
+      <path class="icon__part icon__part_motion_fall" d="M12 21.6h.01" stroke-width="2.4" opacity="0" style="--o: 12px 21.6px; --y: 1.4px; --delay: 150ms"/>
+    </symbol>
+    <symbol id="sort" viewBox="0 0 24 24" data-motion="hover" data-note="стрелки расходятся">
+      <path class="icon__part icon__part_motion_nudge" d="M8 5v14M4.5 8.5 8 5l3.5 3.5" style="--y: -2.5px"/>
+      <path class="icon__part icon__part_motion_nudge" d="M16 19V5M12.5 15.5 16 19l3.5-3.5" style="--y: 2.5px; --delay: 80ms"/>
+    </symbol>
+    <symbol id="undo" viewBox="0 0 24 24" data-motion="hover" data-note="откат назад">
+      <path class="icon__part icon__part_motion_tilt" d="M9 14 4 9l5-5M4 9h10.5a5.5 5.5 0 0 1 0 11H11" style="--a: -16deg"/>
+    </symbol>
+    <symbol id="redo" viewBox="0 0 24 24" data-motion="hover" data-note="вперёд">
+      <path class="icon__part icon__part_motion_tilt" d="M15 14l5-5-5-5M20 9H9.5a5.5 5.5 0 0 0 0 11H13" style="--a: 16deg"/>
+    </symbol>
+    <symbol id="logout" viewBox="0 0 24 24" data-motion="hover" data-note="стрелка выходит за дверь">
+      <path d="M14 4H6.5A1.5 1.5 0 0 0 5 5.5v13A1.5 1.5 0 0 0 6.5 20H14"/>
+      <path class="icon__part icon__part_motion_nudge" d="M10 12h10M16.5 8.5 20 12l-3.5 3.5" style="--x: 2.5px"/>
+    </symbol>
+    <symbol id="login" viewBox="0 0 24 24" data-motion="hover" data-note="стрелка входит в дверь">
+      <path d="M10 4h7.5A1.5 1.5 0 0 1 19 5.5v13a1.5 1.5 0 0 1-1.5 1.5H10"/>
+      <path class="icon__part icon__part_motion_nudge" d="M4 12h10M10.5 8.5 14 12l-3.5 3.5" style="--x: 2.5px"/>
+    </symbol>
+    <symbol id="expand" viewBox="0 0 24 24" data-motion="hover" data-note="углы расходятся">
+      <path class="icon__part icon__part_motion_nudge" d="M14 4h6v6M20 4l-6.5 6.5" style="--x: 1.5px; --y: -1.5px"/>
+      <path class="icon__part icon__part_motion_nudge" d="M10 20H4v-6M4 20l6.5-6.5" style="--x: -1.5px; --y: 1.5px"/>
+    </symbol>
+    <symbol id="collapse" viewBox="0 0 24 24" data-motion="hover" data-note="углы сходятся">
+      <path class="icon__part icon__part_motion_nudge" d="M19.5 10H14V4.5M14 10l6-6" style="--x: -1.2px; --y: 1.2px"/>
+      <path class="icon__part icon__part_motion_nudge" d="M4.5 14H10v5.5M10 14l-6 6" style="--x: 1.2px; --y: -1.2px"/>
+    </symbol>
+    <symbol id="move" viewBox="0 0 24 24" data-motion="hover" data-note="стрелки расходятся на четыре стороны">
+      <path d="M12 4v16M4 12h16"/>
+      <path class="icon__part icon__part_motion_nudge" d="M9.5 6.5 12 4l2.5 2.5" style="--y: -1.5px"/>
+      <path class="icon__part icon__part_motion_nudge" d="M9.5 17.5 12 20l2.5-2.5" style="--y: 1.5px"/>
+      <path class="icon__part icon__part_motion_nudge" d="M6.5 9.5 4 12l2.5 2.5" style="--x: -1.5px"/>
+      <path class="icon__part icon__part_motion_nudge" d="M17.5 9.5 20 12l-2.5 2.5" style="--x: 1.5px"/>
+    </symbol>
+    <symbol id="bookmark" viewBox="0 0 24 24" data-motion="hover" data-note="закладка падает на место">
+      <path class="icon__part icon__part_motion_drop" d="M7 4.5h10a1 1 0 0 1 1 1v15l-6-4-6 4v-15a1 1 0 0 1 1-1Z" style="--y: -5px"/>
+    </symbol>
+    <symbol id="star" viewBox="0 0 24 24" data-motion="hover" data-note="звезда крутнётся на луч и вдохнёт">
+      <g class="icon__part icon__part_motion_spin" style="--o: 12px 12.5px; --a: 72deg; --dur: 700ms; --ease: cubic-bezier(.34, 1.56, .64, 1)">
+        <path class="icon__part icon__part_motion_pulse" d="M12 3.5 14.5 9.1 20.6 9.7 16 13.8 17.3 19.8 12 16.7 6.7 19.8 8 13.8 3.4 9.7 9.5 9.1Z" style="--o: 12px 12.5px; --s: 1.15"/>
+      </g>
+    </symbol>
+    <symbol id="heart" viewBox="0 0 24 24" data-motion="hover" data-note="сердце бьётся дважды">
+      <path class="icon__part icon__part_motion_beat" d="M12 7.7A4.2 4.2 0 0 1 20.2 9C20.2 13.4 15.2 17 12 19.8 8.8 17 3.8 13.4 3.8 9A4.2 4.2 0 0 1 12 7.7Z" style="--o: 12px 13px"/>
+    </symbol>
+    <symbol id="thumbs-up" viewBox="0 0 24 24" data-motion="hover" data-note="палец поднимается">
+      <g class="icon__part icon__part_motion_tilt" style="--o: 5px 20px; --a: -12deg">
+        <path d="M7 10v10H4.5a1 1 0 0 1-1-1v-8a1 1 0 0 1 1-1H7Z"/>
+        <path d="M7 10l3.3-5.9a1.8 1.8 0 0 1 3.3 1.2L13 9.5h5.3a2 2 0 0 1 2 2.3l-1.2 6.5a2 2 0 0 1-2 1.7H7"/>
+      </g>
+    </symbol>
+    <symbol id="flag" viewBox="0 0 24 24" data-motion="hold" data-note="полотно колышется">
+      <path d="M5 21V3.5"/>
+      <path class="icon__part icon__part_motion_flutter" d="M5 4.5c2.3-1.3 4.5-1.3 7 0s4.7 1.3 7 0v8.5c-2.3 1.3-4.5 1.3-7 0s-4.7-1.3-7 0" style="--o: 5px 8.5px"/>
+    </symbol>
+    <symbol id="tag" viewBox="0 0 24 24" data-motion="hover" data-note="бирка качается на дырочке">
+      <g class="icon__part icon__part_motion_swing" style="--o: 8px 8px; --a: 10deg">
+        <path d="M3.5 12V5A1.5 1.5 0 0 1 5 3.5h7l8.8 8.8a1.5 1.5 0 0 1 0 2.1l-6.4 6.4a1.5 1.5 0 0 1-2.1 0L3.5 12Z"/>
+        <circle cx="8" cy="8" r="1.5"/>
+      </g>
+    </symbol>
+    <symbol id="paperclip" viewBox="0 0 24 24" data-motion="hover" data-note="скрепка покачивается">
+      <path class="icon__part icon__part_motion_wiggle" d="M19.5 11.5 12 19a4.9 4.9 0 0 1-7-7l8-8a3.3 3.3 0 0 1 4.6 4.6l-7.8 7.8a1.6 1.6 0 0 1-2.3-2.3l7.1-7.1" style="--a: 8deg"/>
+    </symbol>
+    <symbol id="scissors" viewBox="0 0 24 24" data-motion="hover" data-note="ножницы чикают дважды">
+      <g class="icon__part icon__part_motion_tilt" style="--o: 11px 12px; --a: -18deg; --dur: 420ms; --count: 2">
+        <circle cx="6" cy="6.5" r="2.5"/>
+        <path d="M7.7 8.35 11 12 20 15.6"/>
+      </g>
+      <g class="icon__part icon__part_motion_tilt" style="--o: 11px 12px; --a: 18deg; --dur: 420ms; --count: 2">
+        <circle cx="6" cy="17.5" r="2.5"/>
+        <path d="M7.7 15.65 11 12 20 8.4"/>
+      </g>
+    </symbol>
+    <symbol id="print" viewBox="0 0 24 24" data-motion="hover" data-note="из принтера выходит лист">
+      <path d="M6.5 16.5H5A1.5 1.5 0 0 1 3.5 15v-5A1.5 1.5 0 0 1 5 8.5h14A1.5 1.5 0 0 1 20.5 10v5a1.5 1.5 0 0 1-1.5 1.5h-1.5M7 8.5V4h10v4.5"/>
+      <path class="icon__part icon__part_motion_grow" d="M7 13.5h10V20H7Z" style="--o: 12px 13.5px; --sy: .1; --dur: 900ms"/>
+    </symbol>
+    <symbol id="layers" viewBox="0 0 24 24" data-motion="hover" data-note="слои расходятся">
+      <path class="icon__part icon__part_motion_nudge" d="M12 4 20 8.5 12 13 4 8.5Z" style="--y: -1.8px"/>
+      <path d="M4 12.5l8 4.5 8-4.5"/>
+      <path class="icon__part icon__part_motion_nudge" d="M4 16.5l8 4.5 8-4.5" style="--y: 1.5px"/>
+    </symbol>
+    <symbol id="click" viewBox="0 0 24 24" data-motion="hover" data-note="курсор нажимает, расходится круг">
+      <path class="icon__part icon__part_motion_nudge" d="M8 7 19.5 12.5l-5.3 1.6-2.4 5.3L8 7Z" style="--x: -.8px; --y: -.8px; --dur: 450ms"/>
+      <circle class="icon__part icon__part_motion_ripple" cx="8" cy="7" r="3.5" opacity="0" style="--o: 8px 7px; --s0: .3; --s: 1.2; --delay: 150ms"/>
+    </symbol>
+    <symbol id="scan" viewBox="0 0 24 24" data-motion="loop" data-note="луч ходит по рамке">
+      <path d="M4 8.5V6a2 2 0 0 1 2-2h2.5M15.5 4H18a2 2 0 0 1 2 2v2.5M20 15.5V18a2 2 0 0 1-2 2h-2.5M8.5 20H6a2 2 0 0 1-2-2v-2.5"/>
+      <path class="icon__part icon__part_motion_scan" d="M6.5 12h11" style="--x: 0px; --y: 5px"/>
+    </symbol>
+    <symbol id="toggle" viewBox="0 0 24 24" data-motion="hover" data-note="рычажок переключается">
+      <rect x="2.5" y="6.5" width="19" height="11" rx="5.5"/>
+      <circle class="icon__part icon__part_motion_slide" cx="8" cy="12" r="3" style="--x: 8px"/>
+    </symbol>
+    <symbol id="check-square" viewBox="0 0 24 24" data-motion="hover" data-note="галочка дорисовывается">
+      <rect x="4" y="4" width="16" height="16" rx="3.5"/>
+      <path class="icon__part icon__part_motion_draw" d="M8.5 12.2l2.5 2.5 4.8-5.2" pathLength="1"/>
+    </symbol>
+    <symbol id="archive" viewBox="0 0 24 24" data-motion="hover" data-note="крышка ящика приподнимается">
+      <rect class="icon__part icon__part_motion_tilt" x="3.5" y="4" width="17" height="4.5" rx="1.2" style="--o: 3.5px 8.5px; --a: -14deg"/>
+      <path d="M5 8.5v10A1.5 1.5 0 0 0 6.5 20h11a1.5 1.5 0 0 0 1.5-1.5v-10M10 12.5h4"/>
+    </symbol>
+    <symbol id="box" viewBox="0 0 24 24" data-motion="hover" data-note="коробка подпрыгивает">
+      <g class="icon__part icon__part_motion_hop" style="--o: 12px 21px; --y: -2.5px">
+        <path d="M12 3 20 7.5v9L12 21l-8-4.5v-9L12 3Z"/>
+        <path d="M4 7.5l8 4.5 8-4.5M12 12v9"/>
+      </g>
+    </symbol>
+    <symbol id="inbox" viewBox="0 0 24 24" data-motion="hover" data-note="стрелка опускается в лоток">
+      <path d="M4 13.5 6.5 5.5h11l2.5 8V19a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1v-5.5ZM4 13.5h4.5l1.5 2.5h4l1.5-2.5H20"/>
+      <path class="icon__part icon__part_motion_nudge" d="M12 6.8v4.7M9.8 9.3 12 11.5l2.2-2.2" style="--y: 1.6px"/>
+    </symbol>
+    <symbol id="play" viewBox="0 0 24 24" data-motion="hover" data-note="кнопка вдыхает">
+      <path class="icon__part icon__part_motion_pulse" d="M8 5.8v12.4a.8.8 0 0 0 1.2.7l9.6-6.2a.8.8 0 0 0 0-1.4L9.2 5.1a.8.8 0 0 0-1.2.7Z" style="--o: 13px 12px; --s: 1.12"/>
+    </symbol>
+    <symbol id="stop" viewBox="0 0 24 24" data-motion="hover" data-note="кнопка сжимается">
+      <rect class="icon__part icon__part_motion_pulse" x="7" y="7" width="10" height="10" rx="2.2" style="--s: .85"/>
+    </symbol>
+  </g>
+
+  <g data-group="Состояния и защита">
+    <symbol id="info" viewBox="0 0 24 24" data-motion="hover" data-note="«i» подпрыгивает">
+      <circle cx="12" cy="12" r="9"/>
+      <path class="icon__part icon__part_motion_hop" d="M12 11v5.5M12 7.6v.1" style="--o: 12px 16.5px; --y: -2px"/>
+    </symbol>
+    <symbol id="ok" viewBox="0 0 24 24" data-motion="once" data-note="круг и галочка дорисовываются">
+      <path class="icon__part icon__part_motion_draw" d="M12 3a9 9 0 1 1 0 18 9 9 0 1 1 0-18" pathLength="1" style="--dur: 550ms"/>
+      <path class="icon__part icon__part_motion_draw" d="m8.2 12.3 2.6 2.6 5-5.4" pathLength="1" style="--dur: 400ms; --delay: 380ms"/>
+    </symbol>
+    <symbol id="warning" viewBox="0 0 24 24" data-motion="hover" data-note="знак дребезжит">
+      <g class="icon__part icon__part_motion_wiggle" style="--o: 12px 20px; --a: 7deg">
+        <path d="M10.3 4.9 3 17.6a2 2 0 0 0 1.7 3h14.6a2 2 0 0 0 1.7-3L13.7 4.9a2 2 0 0 0-3.4 0Z"/>
+        <path d="M12 10v4.3M12 17.3v.1"/>
+      </g>
+    </symbol>
+    <symbol id="error" viewBox="0 0 24 24" data-motion="hover" data-note="мотает головой: «нет»">
+      <g class="icon__part icon__part_motion_shake" style="--x: 1.8px">
+        <circle cx="12" cy="12" r="9"/>
+        <path d="M12 7.5V13M12 16.3v.1"/>
+      </g>
+    </symbol>
+    <symbol id="question" viewBox="0 0 24 24" data-motion="hover" data-note="вопрос склоняет голову">
+      <circle cx="12" cy="12" r="9"/>
+      <path class="icon__part icon__part_motion_swing" d="M9.4 9.4a2.7 2.7 0 1 1 3.9 2.4c-.8.4-1.3 1.2-1.3 2v.4M12 17.2v.1" style="--o: 12px 12px; --a: 14deg"/>
+    </symbol>
+    <symbol id="bell" viewBox="0 0 24 24" data-motion="hold" data-note="колокол качается, язычок бьёт">
+      <g class="icon__part icon__part_motion_swing" style="--o: 12px 3px; --a: 14deg">
+        <path d="M12 3v2M6 16.5V11a6 6 0 0 1 12 0v5.5l1.5 2h-15l1.5-2Z"/>
+        <path class="icon__part icon__part_motion_swing" d="M10 20.5a2 2 0 0 0 4 0" style="--o: 12px 18.5px; --a: 26deg; --delay: 70ms"/>
+      </g>
+    </symbol>
+    <symbol id="bell-off" viewBox="0 0 24 24" data-motion="hover" data-note="колокол зачёркивается">
+      <path d="M8.5 5.8A6 6 0 0 1 18 11v4M6 11v5.5l-1.5 2H18M10 20.5a2 2 0 0 0 4 0"/>
+      <path class="icon__part icon__part_motion_draw" d="M4 4l16 16" pathLength="1"/>
+    </symbol>
+    <symbol id="shield-check" viewBox="0 0 24 24" data-motion="hover" data-note="на щите появляется галочка">
+      <path class="icon__part icon__part_motion_pulse" d="M12 3.5 19 6.3v5.2c0 4.4-2.9 7.6-7 9-4.1-1.4-7-4.6-7-9V6.3L12 3.5Z" style="--o: 12px 12px; --s: 1.05"/>
+      <path class="icon__part icon__part_motion_draw" d="M9 12.2l2.2 2.2 4-4.3" pathLength="1" style="--delay: 120ms"/>
+    </symbol>
+    <symbol id="lock" viewBox="0 0 24 24" data-motion="hover" data-note="дужка приподнимается и защёлкивается">
+      <rect x="5" y="10.5" width="14" height="10" rx="2.5"/>
+      <path d="M12 14.5v2"/>
+      <path class="icon__part icon__part_motion_nudge" d="M8 10.5V8a4 4 0 0 1 8 0v2.5" style="--y: -2px"/>
+    </symbol>
+    <symbol id="unlock" viewBox="0 0 24 24" data-motion="hover" data-note="дужка откидывается">
+      <rect x="5" y="10.5" width="14" height="10" rx="2.5"/>
+      <path d="M12 14.5v2"/>
+      <path class="icon__part icon__part_motion_tilt" d="M8 10.5V7.5a4 4 0 0 1 7.9-.9" style="--o: 8px 10.5px; --a: -18deg"/>
+    </symbol>
+    <symbol id="key" viewBox="0 0 24 24" data-motion="hover" data-note="ключ поворачивается в замке">
+      <circle cx="7" cy="12" r="4"/>
+      <circle cx="7" cy="12" r="1.2"/>
+      <path class="icon__part icon__part_motion_fold" d="M11 12h10M17.5 12v3M20.5 12v2.5" style="--o: 12px 12px; --sy: -1; --dur: 900ms"/>
+    </symbol>
+    <symbol id="eye" viewBox="0 0 24 24" data-motion="hover" data-note="моргает и смотрит по сторонам">
+      <g class="icon__part icon__part_motion_blink" style="--o: 12px 12px">
+        <path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12Z"/>
+        <circle class="icon__part icon__part_motion_scan" cx="12" cy="12" r="3" style="--x: 1.6px; --y: 0px; --delay: 250ms"/>
+      </g>
+    </symbol>
+    <symbol id="eye-off" viewBox="0 0 24 24" data-motion="hover" data-note="глаз зачёркивается">
+      <path d="M9.9 5.8A9.6 9.6 0 0 1 12 5.5c6 0 9.5 6.5 9.5 6.5a17 17 0 0 1-2.6 3.4M6.6 7.3A16.4 16.4 0 0 0 2.5 12S6 18.5 12 18.5a9 9 0 0 0 4.5-1.2M9.9 9.9a3 3 0 0 0 4.2 4.2"/>
+      <path class="icon__part icon__part_motion_draw" d="M4 4l16 16" pathLength="1"/>
+    </symbol>
+    <symbol id="loader" viewBox="0 0 24 24" data-motion="loop" data-note="крутится">
+      <path class="icon__part icon__part_motion_spin" d="M12 3a9 9 0 1 1-9 9" style="--dur: 900ms; --dur-loop: 900ms"/>
+    </symbol>
+    <symbol id="loader-dots" viewBox="0 0 24 24" data-motion="loop" data-note="точки загораются по кругу">
+      <path class="icon__part icon__part_motion_appear" d="M12 4.5h.01" stroke-width="2.6" style="--o: 12px 4.5px; --delay: 0ms; --delay-loop: 0ms"/>
+      <path class="icon__part icon__part_motion_appear" d="M17.3 6.7h.01" stroke-width="2.6" style="--o: 17.3px 6.7px; --delay: 120ms; --delay-loop: 225ms"/>
+      <path class="icon__part icon__part_motion_appear" d="M19.5 12h.01" stroke-width="2.6" style="--o: 19.5px 12px; --delay: 240ms; --delay-loop: 450ms"/>
+      <path class="icon__part icon__part_motion_appear" d="M17.3 17.3h.01" stroke-width="2.6" style="--o: 17.3px 17.3px; --delay: 360ms; --delay-loop: 675ms"/>
+      <path class="icon__part icon__part_motion_appear" d="M12 19.5h.01" stroke-width="2.6" style="--o: 12px 19.5px; --delay: 480ms; --delay-loop: 900ms"/>
+      <path class="icon__part icon__part_motion_appear" d="M6.7 17.3h.01" stroke-width="2.6" style="--o: 6.7px 17.3px; --delay: 600ms; --delay-loop: 1125ms"/>
+      <path class="icon__part icon__part_motion_appear" d="M4.5 12h.01" stroke-width="2.6" style="--o: 4.5px 12px; --delay: 720ms; --delay-loop: 1350ms"/>
+      <path class="icon__part icon__part_motion_appear" d="M6.7 6.7h.01" stroke-width="2.6" style="--o: 6.7px 6.7px; --delay: 840ms; --delay-loop: 1575ms"/>
+    </symbol>
+    <symbol id="hourglass" viewBox="0 0 24 24" data-motion="hover" data-note="часы переворачиваются">
+      <g class="icon__part icon__part_motion_flip">
+        <path d="M6.5 3.5h11M6.5 20.5h11M7.5 3.5c0 4.5 4.5 5 4.5 8.5s-4.5 4-4.5 8.5M16.5 3.5c0 4.5-4.5 5-4.5 8.5s4.5 4 4.5 8.5"/>
+        <path d="M10.2 7.8h3.6"/>
+        <path d="M9.4 19.2c.8-1.3 1.6-1.9 2.6-1.9s1.8.6 2.6 1.9"/>
+      </g>
+    </symbol>
+  </g>
+
+  <g data-group="Связь и люди">
+    <symbol id="message" viewBox="0 0 24 24" data-motion="hover" data-note="пузырь подпрыгивает">
+      <path class="icon__part icon__part_motion_hop" d="M5 5h14a1.5 1.5 0 0 1 1.5 1.5v9A1.5 1.5 0 0 1 19 17h-8.5L6 20.5V17H5a1.5 1.5 0 0 1-1.5-1.5v-9A1.5 1.5 0 0 1 5 5Z" style="--o: 6px 20.5px; --y: -2px"/>
+    </symbol>
+    <symbol id="message-typing" viewBox="0 0 24 24" data-motion="loop" data-note="собеседник печатает">
+      <path d="M5 5h14a1.5 1.5 0 0 1 1.5 1.5v9A1.5 1.5 0 0 1 19 17h-8.5L6 20.5V17H5a1.5 1.5 0 0 1-1.5-1.5v-9A1.5 1.5 0 0 1 5 5Z"/>
+      <path class="icon__part icon__part_motion_hop" d="M8.5 11h.01" stroke-width="2.6" style="--y: -1.5px"/>
+      <path class="icon__part icon__part_motion_hop" d="M12 11h.01" stroke-width="2.6" style="--y: -1.5px; --delay: 150ms"/>
+      <path class="icon__part icon__part_motion_hop" d="M15.5 11h.01" stroke-width="2.6" style="--y: -1.5px; --delay: 300ms"/>
+    </symbol>
+    <symbol id="messages" viewBox="0 0 24 24" data-motion="hover" data-note="пузыри отвечают друг другу">
+      <path class="icon__part icon__part_motion_hop" d="M15.5 8.5V5.5A1.5 1.5 0 0 0 14 4H4.5A1.5 1.5 0 0 0 3 5.5v6.5A1.5 1.5 0 0 0 4.5 13.5H5v2.8l3-2.8h1" style="--o: 5px 16px; --y: -1.5px"/>
+      <path class="icon__part icon__part_motion_hop" d="M10.5 8.5h9A1.5 1.5 0 0 1 21 10v6a1.5 1.5 0 0 1-1.5 1.5H19v2.5l-3-2.5h-5.5A1.5 1.5 0 0 1 9 16v-6a1.5 1.5 0 0 1 1.5-1.5Z" style="--o: 19px 20px; --y: -1.5px; --delay: 140ms"/>
+    </symbol>
+    <symbol id="mail" viewBox="0 0 24 24" data-motion="hover" data-note="клапан конверта открывается">
+      <rect x="3.5" y="5.5" width="17" height="13" rx="2"/>
+      <path class="icon__part icon__part_motion_fold" d="M4 7l8 6 8-6" style="--o: 12px 6px; --sy: -.5"/>
+    </symbol>
+    <symbol id="paper-plane" viewBox="0 0 24 24" data-motion="hover" data-note="самолётик улетает и возвращается">
+      <path class="icon__part icon__part_motion_fly" d="M20.5 3.5 3.5 10.3l6.7 3 3 6.7 7.3-16.5ZM10.2 13.3l4.3-4.3" style="--x: 7px; --y: -7px"/>
+    </symbol>
+    <symbol id="phone" viewBox="0 0 24 24" data-motion="hover" data-note="телефон вибрирует">
+      <g class="icon__part icon__part_motion_wiggle" style="--a: 7deg; --dur: 450ms; --count: 2">
+        <rect x="7" y="2.8" width="10" height="18.4" rx="2.6"/>
+        <path d="M11 17.8h2"/>
+      </g>
+    </symbol>
+    <symbol id="phone-call" viewBox="0 0 24 24" data-motion="hold" data-note="трубка звонит, волны расходятся">
+      <path class="icon__part icon__part_motion_wiggle" d="M5.5 3.5h2.8a1 1 0 0 1 1 .8l.7 3.4a1 1 0 0 1-.3.9L8 10.3a12.5 12.5 0 0 0 5.7 5.7l1.7-1.7a1 1 0 0 1 .9-.3l3.4.7a1 1 0 0 1 .8 1v2.8a1.5 1.5 0 0 1-1.6 1.5C11.3 19.5 4.5 12.7 4 5.1a1.5 1.5 0 0 1 1.5-1.6Z" style="--a: 10deg; --dur: 500ms"/>
+      <path class="icon__part icon__part_motion_appear" d="M14.5 7a2.5 2.5 0 0 1 2.5 2.5" style="--o: 14.5px 9.5px"/>
+      <path class="icon__part icon__part_motion_appear" d="M14.5 3.5a6 6 0 0 1 6 6" style="--o: 14.5px 9.5px; --delay: 150ms; --delay-loop: 300ms"/>
+    </symbol>
+    <symbol id="video" viewBox="0 0 24 24" data-motion="hold" data-note="идёт запись">
+      <rect x="3" y="6.5" width="12.5" height="11" rx="2.5"/>
+      <path d="M15.5 10.5 21 7.5v9l-5.5-3"/>
+      <path class="icon__part icon__part_motion_blip" d="M7 10h.01" stroke-width="2.6" style="--dur: 600ms"/>
+    </symbol>
+    <symbol id="camera" viewBox="0 0 24 24" data-motion="hover" data-note="затвор щёлкает, вспышка">
+      <path d="M4.5 7.5h3l1.5-2.5h6l1.5 2.5h3A1.5 1.5 0 0 1 21 9v9a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 18V9a1.5 1.5 0 0 1 1.5-1.5Z"/>
+      <circle class="icon__part icon__part_motion_pulse" cx="12" cy="13" r="3.5" style="--o: 12px 13px; --s: .6; --dur: 420ms"/>
+      <circle class="icon__part icon__part_motion_ripple" cx="12" cy="13" r="5" opacity="0" style="--o: 12px 13px; --s0: .6; --s: 1.15; --delay: 150ms"/>
+    </symbol>
+    <symbol id="image" viewBox="0 0 24 24" data-motion="hover" data-note="солнце всходит, горы прорисовываются">
+      <rect x="3.5" y="4.5" width="17" height="15" rx="2.5"/>
+      <circle class="icon__part icon__part_motion_pop" cx="9" cy="10" r="1.8" style="--o: 9px 10px; --delay: 250ms"/>
+      <path class="icon__part icon__part_motion_draw" d="m4 17.5 5-4.5 4 3.5 3-2.5 4.5 3.8" pathLength="1" style="--dur: 600ms"/>
+    </symbol>
+    <symbol id="wifi" viewBox="0 0 24 24" data-motion="hover" data-note="дуги загораются снизу вверх">
+      <path class="icon__part icon__part_motion_pop" d="M12 19h.01" stroke-width="2.8" style="--o: 12px 19px"/>
+      <path class="icon__part icon__part_motion_appear" d="M8.8 15.8A4.5 4.5 0 0 1 15.2 15.8" style="--o: 12px 19px; --delay: 100ms; --delay-loop: 200ms"/>
+      <path class="icon__part icon__part_motion_appear" d="M5.6 12.6A9 9 0 0 1 18.4 12.6" style="--o: 12px 19px; --delay: 200ms; --delay-loop: 400ms"/>
+      <path class="icon__part icon__part_motion_appear" d="M2.5 9.5A13.5 13.5 0 0 1 21.5 9.5" style="--o: 12px 19px; --delay: 300ms; --delay-loop: 600ms"/>
+    </symbol>
+    <symbol id="signal" viewBox="0 0 24 24" data-motion="hover" data-note="столбики растут по очереди">
+      <path class="icon__part icon__part_motion_draw" d="M5 19.5v-3" pathLength="1" style="--dur: 300ms"/>
+      <path class="icon__part icon__part_motion_draw" d="M9.5 19.5v-6" pathLength="1" style="--dur: 300ms; --delay: 100ms"/>
+      <path class="icon__part icon__part_motion_draw" d="M14 19.5v-9.5" pathLength="1" style="--dur: 300ms; --delay: 200ms"/>
+      <path class="icon__part icon__part_motion_draw" d="M18.5 19.5v-14" pathLength="1" style="--dur: 300ms; --delay: 300ms"/>
+    </symbol>
+    <symbol id="bluetooth" viewBox="0 0 24 24" data-motion="hover" data-note="знак прорисовывается">
+      <path class="icon__part icon__part_motion_draw" d="M7 7.5l10 9-5 4.5v-17l5 4.5-10 9" pathLength="1" style="--dur: 900ms"/>
+    </symbol>
+    <symbol id="broadcast" viewBox="0 0 24 24" data-motion="loop" data-note="сигнал расходится в обе стороны">
+      <circle class="icon__part icon__part_motion_pulse" cx="12" cy="12" r="1.8" style="--s: 1.3"/>
+      <path class="icon__part icon__part_motion_appear" d="M8.5 8.5a5 5 0 0 0 0 7M15.5 8.5a5 5 0 0 1 0 7" style="--delay: 100ms; --delay-loop: 250ms"/>
+      <path class="icon__part icon__part_motion_appear" d="M5.6 5.6a9 9 0 0 0 0 12.8M18.4 5.6a9 9 0 0 1 0 12.8" style="--delay: 250ms; --delay-loop: 600ms"/>
+    </symbol>
+    <symbol id="radar" viewBox="0 0 24 24" data-motion="loop" data-note="луч обходит круг">
+      <circle cx="12" cy="12" r="9"/>
+      <circle cx="12" cy="12" r="4.5"/>
+      <path class="icon__part icon__part_motion_spin" d="M12 12 18.4 5.6" style="--dur: 1400ms; --dur-loop: 2.4s"/>
+      <path class="icon__part icon__part_motion_appear" d="M8 15.2h.01" stroke-width="2.6" style="--o: 8px 15.2px; --delay: 500ms; --delay-loop: 1100ms"/>
+    </symbol>
+    <symbol id="at-sign" viewBox="0 0 24 24" data-motion="hover" data-note="собачка делает оборот">
+      <g class="icon__part icon__part_motion_spin" style="--dur: 900ms">
+        <circle cx="12" cy="12" r="3.5"/>
+        <path d="M15.5 8.5v4.8a2.2 2.2 0 0 0 4.4 0V12a8 8 0 1 0-3.2 6.4"/>
+      </g>
+    </symbol>
+    <symbol id="globe" viewBox="0 0 24 24" data-motion="hold" data-note="глобус вращается">
+      <circle cx="12" cy="12" r="9"/>
+      <path d="M3 12h18"/>
+      <path class="icon__part icon__part_motion_squeeze" d="M12 3a4.5 9 0 0 1 0 18 4.5 9 0 0 1 0-18Z" style="--sx: -1; --ease: linear"/>
+      <path class="icon__part icon__part_motion_squeeze" d="M12 3a4.5 9 0 0 1 0 18 4.5 9 0 0 1 0-18Z" style="--sx: -1; --ease: linear; --delay: -350ms; --delay-loop: -700ms"/>
+    </symbol>
+    <symbol id="user" viewBox="0 0 24 24" data-motion="hover" data-note="кивает">
+      <circle class="icon__part icon__part_motion_hop" cx="12" cy="8.5" r="3.8" style="--o: 12px 12.3px; --y: -1.5px"/>
+      <path d="M4.5 20a7.5 7.5 0 0 1 15 0"/>
+    </symbol>
+    <symbol id="users" viewBox="0 0 24 24" data-motion="hover" data-note="кивают по очереди">
+      <circle class="icon__part icon__part_motion_hop" cx="9" cy="9" r="3.3" style="--o: 9px 12.3px; --y: -1.5px"/>
+      <path class="icon__part icon__part_motion_hop" d="M15.5 5.8a3.3 3.3 0 0 1 0 6.4" style="--o: 15.5px 12.2px; --y: -1.5px; --delay: 120ms"/>
+      <path d="M3 19.5a6 6 0 0 1 12 0M17.5 14a6 6 0 0 1 3.5 5.5"/>
+    </symbol>
+    <symbol id="user-plus" viewBox="0 0 24 24" data-motion="hover" data-note="плюс поворачивается">
+      <circle cx="9.5" cy="8.5" r="3.6"/>
+      <path d="M2.5 20a7 7 0 0 1 14 0"/>
+      <path class="icon__part icon__part_motion_spin" d="M19 7.5v6M16 10.5h6" style="--o: 19px 10.5px; --a: 90deg; --dur: 500ms"/>
+    </symbol>
+    <symbol id="user-check" viewBox="0 0 24 24" data-motion="hover" data-note="галочка дорисовывается">
+      <circle cx="9.5" cy="8.5" r="3.6"/>
+      <path d="M2.5 20a7 7 0 0 1 14 0"/>
+      <path class="icon__part icon__part_motion_draw" d="M15.8 10.8l2 2 3.8-4" pathLength="1"/>
+    </symbol>
+  </g>
+
+  <g data-group="Время">
+    <symbol id="clock" viewBox="0 0 24 24" data-motion="hold" data-note="стрелка бежит по кругу">
+      <circle cx="12" cy="12" r="9"/>
+      <path d="M12 12l3 2"/>
+      <path class="icon__part icon__part_motion_spin" d="M12 12V7" style="--dur: 1200ms"/>
+    </symbol>
+    <symbol id="alarm-clock" viewBox="0 0 24 24" data-motion="hold" data-note="будильник трезвонит">
+      <g class="icon__part icon__part_motion_wiggle" style="--o: 12px 13px; --a: 8deg; --dur: 450ms">
+        <circle cx="12" cy="13" r="7"/>
+        <path d="M12 9.5V13l2.2 1.6"/>
+        <path d="M4 7.2a3.2 3.2 0 0 1 3.9-3.9M16.1 3.3a3.2 3.2 0 0 1 3.9 3.9"/>
+        <path d="M7.3 18.3 5.5 20.5M16.7 18.3l1.8 2.2"/>
+      </g>
+    </symbol>
+    <symbol id="timer" viewBox="0 0 24 24" data-motion="hover" data-note="кнопка нажата, стрелка пошла">
+      <circle cx="12" cy="13.5" r="7.5"/>
+      <path class="icon__part icon__part_motion_nudge" d="M10 2.5h4M12 2.5V6M18.3 6.8l1.2-1.2" style="--y: .8px; --dur: 300ms"/>
+      <path class="icon__part icon__part_motion_spin" d="M12 13.5V9.5" style="--o: 12px 13.5px; --dur: 1200ms; --delay: 150ms"/>
+    </symbol>
+    <symbol id="history" viewBox="0 0 24 24" data-motion="hover" data-note="время отматывается назад">
+      <path class="icon__part icon__part_motion_spin" d="M4.5 12a7.5 7.5 0 1 0 2.2-5.3M4.5 4.5v4h4" style="--a: -360deg; --dur: 900ms"/>
+      <path d="M12 12l2.8 1.8"/>
+      <path class="icon__part icon__part_motion_spin" d="M12 12V8" style="--a: -360deg; --dur: 900ms"/>
+    </symbol>
+    <symbol id="calendar" viewBox="0 0 24 24" data-motion="hover" data-note="дни появляются по очереди">
+      <rect x="3.5" y="5" width="17" height="15.5" rx="3"/>
+      <path d="M3.5 10h17M8 3v4M16 3v4"/>
+      <path class="icon__part icon__part_motion_pop" d="M8 14h.01" stroke-width="2.4" style="--o: 8px 14px; --delay: 0ms"/>
+      <path class="icon__part icon__part_motion_pop" d="M12 14h.01" stroke-width="2.4" style="--o: 12px 14px; --delay: 60ms"/>
+      <path class="icon__part icon__part_motion_pop" d="M16 14h.01" stroke-width="2.4" style="--o: 16px 14px; --delay: 120ms"/>
+      <path class="icon__part icon__part_motion_pop" d="M8 17.2h.01" stroke-width="2.4" style="--o: 8px 17.2px; --delay: 180ms"/>
+      <path class="icon__part icon__part_motion_pop" d="M12 17.2h.01" stroke-width="2.4" style="--o: 12px 17.2px; --delay: 240ms"/>
+    </symbol>
+    <symbol id="calendar-check" viewBox="0 0 24 24" data-motion="hover" data-note="день отмечается галочкой">
+      <rect x="3.5" y="5" width="17" height="15.5" rx="3"/>
+      <path d="M3.5 10h17M8 3v4M16 3v4"/>
+      <path class="icon__part icon__part_motion_draw" d="M9 15l2 2 4-4.3" pathLength="1"/>
+    </symbol>
+  </g>
+
+  <g data-group="Звук и медиа">
+    <symbol id="pause" viewBox="0 0 24 24" data-motion="hover" data-note="полоски вдыхают">
+      <path class="icon__part icon__part_motion_eq" d="M9 6v12" pathLength="1" style="--s: .6; --count: 1"/>
+      <path class="icon__part icon__part_motion_eq" d="M15 6v12" pathLength="1" style="--s: .6; --count: 1; --delay: 120ms"/>
+    </symbol>
+    <symbol id="forward" viewBox="0 0 24 24" data-motion="hover" data-note="перемотка вперёд">
+      <path class="icon__part icon__part_motion_nudge" d="M4.5 7v10l7-5-7-5Z" style="--x: 1.5px"/>
+      <path class="icon__part icon__part_motion_nudge" d="M12.5 7v10l7-5-7-5Z" style="--x: 1.5px; --delay: 90ms"/>
+    </symbol>
+    <symbol id="rewind" viewBox="0 0 24 24" data-motion="hover" data-note="перемотка назад">
+      <path class="icon__part icon__part_motion_nudge" d="M19.5 7v10l-7-5 7-5Z" style="--x: -1.5px"/>
+      <path class="icon__part icon__part_motion_nudge" d="M11.5 7v10l-7-5 7-5Z" style="--x: -1.5px; --delay: 90ms"/>
+    </symbol>
+    <symbol id="skip-next" viewBox="0 0 24 24" data-motion="hover" data-note="толчок к следующему">
+      <path class="icon__part icon__part_motion_nudge" d="M6 6.5v11l9-5.5-9-5.5Z" style="--x: 2px"/>
+      <path d="M18 6v12"/>
+    </symbol>
+    <symbol id="skip-prev" viewBox="0 0 24 24" data-motion="hover" data-note="толчок к предыдущему">
+      <path class="icon__part icon__part_motion_nudge" d="M18 6.5v11l-9-5.5 9-5.5Z" style="--x: -2px"/>
+      <path d="M6 6v12"/>
+    </symbol>
+    <symbol id="volume" viewBox="0 0 24 24" data-motion="hold" data-note="звук расходится волнами">
+      <path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4a1 1 0 0 1-1-1v-3a1 1 0 0 1 1-1Z"/>
+      <path class="icon__part icon__part_motion_appear" d="M15.5 9a4 4 0 0 1 0 6"/>
+      <path class="icon__part icon__part_motion_appear" d="M18.2 6.3a8 8 0 0 1 0 11.4" style="--delay: 150ms; --delay-loop: 300ms"/>
+    </symbol>
+    <symbol id="volume-off" viewBox="0 0 24 24" data-motion="hover" data-note="крестик выскакивает">
+      <path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4a1 1 0 0 1-1-1v-3a1 1 0 0 1 1-1Z"/>
+      <path class="icon__part icon__part_motion_pop" d="M16 9.5l5 5M21 9.5l-5 5" style="--o: 18.5px 12px"/>
+    </symbol>
+    <symbol id="music" viewBox="0 0 24 24" data-motion="hold" data-note="ноты подпрыгивают в такт">
+      <g class="icon__part icon__part_motion_hop" style="--o: 12px 20px; --y: -2px">
+        <path d="M9 17.5V5.5l10-2v12"/>
+        <circle cx="6.5" cy="17.5" r="2.5"/>
+        <circle cx="16.5" cy="15.5" r="2.5"/>
+      </g>
+    </symbol>
+    <symbol id="headphones" viewBox="0 0 24 24" data-motion="hold" data-note="качают головой в такт">
+      <g class="icon__part icon__part_motion_bob" style="--y: -1.2px; --dur: 550ms">
+        <path d="M4 15.5V13a8 8 0 0 1 16 0v2.5"/>
+        <path d="M4 14.5h2.5a1 1 0 0 1 1 1V19a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1v-4.5ZM20 14.5h-2.5a1 1 0 0 0-1 1V19a1 1 0 0 0 1 1H19a1 1 0 0 0 1-1v-4.5Z"/>
+      </g>
+    </symbol>
+    <symbol id="speaker" viewBox="0 0 24 24" data-motion="hold" data-note="динамик качает басом">
+      <rect x="6" y="3" width="12" height="18" rx="3"/>
+      <path d="M12 7.2h.01" stroke-width="2.6"/>
+      <circle class="icon__part icon__part_motion_pulse" cx="12" cy="14.5" r="3.3" style="--o: 12px 14.5px; --s: 1.15; --dur: 380ms"/>
+    </symbol>
+    <symbol id="equalizer" viewBox="0 0 24 24" data-motion="loop" data-note="эквалайзер прыгает">
+      <path class="icon__part icon__part_motion_eq" d="M5 20v-8" pathLength="1" style="--s: .45; --dur: 800ms; --delay: 0ms; --eq-shift: 0"/>
+      <path class="icon__part icon__part_motion_eq" d="M9.5 20V6" pathLength="1" style="--s: .3; --dur: 950ms; --delay: -250ms; --eq-shift: 0"/>
+      <path class="icon__part icon__part_motion_eq" d="M14 20V9" pathLength="1" style="--s: .4; --dur: 700ms; --delay: -400ms; --eq-shift: 0"/>
+      <path class="icon__part icon__part_motion_eq" d="M18.5 20v-6" pathLength="1" style="--s: .5; --dur: 880ms; --delay: -120ms; --eq-shift: 0"/>
+    </symbol>
+    <symbol id="record" viewBox="0 0 24 24" data-motion="hold" data-note="точка записи дышит">
+      <circle cx="12" cy="12" r="8"/>
+      <circle class="icon__part icon__part_motion_pulse" cx="12" cy="12" r="3.5" fill="currentColor" style="--s: .75"/>
+    </symbol>
+    <symbol id="repeat" viewBox="0 0 24 24" data-motion="hover" data-note="стрелки меняются местами">
+      <path class="icon__part icon__part_motion_spin" d="M17 3.5l3 3-3 3M20 6.5H8a4 4 0 0 0-4 4v1M7 20.5l-3-3 3-3M4 17.5h12a4 4 0 0 0 4-4v-1" style="--a: 180deg; --dur: 800ms"/>
+    </symbol>
+    <symbol id="shuffle" viewBox="0 0 24 24" data-motion="hover" data-note="стрелки перескакивают вперёд">
+      <path d="M3 7h3.2c2.1 0 3.4 1 4.5 2.7l2.6 4.1c1.1 1.7 2.4 2.7 4.5 2.7H20M3 17h3.2c1.5 0 2.5-.5 3.4-1.4M14.4 8.4c.9-.9 1.9-1.4 3.4-1.4H20"/>
+      <path class="icon__part icon__part_motion_nudge" d="M17.5 4l3 3-3 3" style="--x: 2px"/>
+      <path class="icon__part icon__part_motion_nudge" d="M17.5 14l3 3-3 3" style="--x: 2px; --delay: 90ms"/>
+    </symbol>
+    <symbol id="queue" viewBox="0 0 24 24" data-motion="hover" data-note="следующий трек подъезжает">
+      <path d="M4 6h12M4 11h12M4 16h7"/>
+      <path class="icon__part icon__part_motion_nudge" d="M15.5 14v6l5-3-5-3Z" style="--x: 2px"/>
+    </symbol>
+    <symbol id="mic-off" viewBox="0 0 24 24" data-motion="hover" data-note="микрофон зачёркивается">
+      <rect x="9" y="3" width="6" height="11" rx="3"/>
+      <path d="M5.5 11.5a6.5 6.5 0 0 0 13 0M12 18v3"/>
+      <path class="icon__part icon__part_motion_draw" d="M4 4l16 16" pathLength="1"/>
+    </symbol>
+  </g>
+
+  <g data-group="Погода и природа">
+    <symbol id="sun" viewBox="0 0 24 24" data-motion="hold" data-note="лучи вращаются, солнце дышит">
+      <circle class="icon__part icon__part_motion_pulse" cx="12" cy="12" r="4" style="--s: 1.1; --dur: 900ms"/>
+      <path class="icon__part icon__part_motion_spin" d="M12 2.8v1.8M12 19.4v1.8M2.8 12h1.8M19.4 12h1.8M5.5 5.5l1.3 1.3M17.2 17.2l1.3 1.3M18.5 5.5l-1.3 1.3M6.8 17.2l-1.3 1.3" style="--a: 45deg; --dur: 900ms"/>
+    </symbol>
+    <symbol id="moon" viewBox="0 0 24 24" data-motion="loop" data-note="луна покачивается, звёзды мерцают">
+      <path class="icon__part icon__part_motion_sway" d="M19.5 14.5A8 8 0 1 1 9.5 4.5a6.5 6.5 0 0 0 10 10Z" style="--a: 8deg"/>
+      <path class="icon__part icon__part_motion_twinkle" d="M16.5 4.3v2.4M15.3 5.5h2.4" style="--o: 16.5px 5.5px; --s: .4; --a: 45deg"/>
+      <path class="icon__part icon__part_motion_twinkle" d="M20 9h.01" stroke-width="2.4" style="--o: 20px 9px; --s: .3; --delay: 600ms; --delay-loop: 900ms"/>
+    </symbol>
+    <symbol id="cloud" viewBox="0 0 24 24" data-motion="hold" data-note="облако плывёт">
+      <path class="icon__part icon__part_motion_bob" d="M6.5 18h11a4 4 0 0 0 .5-7.97A5.5 5.5 0 0 0 7.3 11.1 3.5 3.5 0 0 0 6.5 18Z" style="--x: 1.5px; --y: 0px"/>
+    </symbol>
+    <symbol id="cloud-rain" viewBox="0 0 24 24" data-motion="loop" data-note="идёт дождь">
+      <path d="M6.5 15h11a4 4 0 0 0 .5-7.97A5.5 5.5 0 0 0 7.3 8.1 3.5 3.5 0 0 0 6.5 15Z"/>
+      <path class="icon__part icon__part_motion_fall" d="M8.5 17.5l-.8 2" style="--x: -.6px; --y: 1.5px"/>
+      <path class="icon__part icon__part_motion_fall" d="M12.5 17.5l-.8 2" style="--x: -.6px; --y: 1.5px; --delay: 300ms"/>
+      <path class="icon__part icon__part_motion_fall" d="M16.5 17.5l-.8 2" style="--x: -.6px; --y: 1.5px; --delay: 150ms"/>
+    </symbol>
+    <symbol id="cloud-snow" viewBox="0 0 24 24" data-motion="loop" data-note="падает снег">
+      <path d="M6.5 15h11a4 4 0 0 0 .5-7.97A5.5 5.5 0 0 0 7.3 8.1 3.5 3.5 0 0 0 6.5 15Z"/>
+      <path class="icon__part icon__part_motion_fall" d="M8 18h.01" stroke-width="2.4" style="--o: 8px 18px; --x: .6px; --y: 1.8px; --dur: 1400ms"/>
+      <path class="icon__part icon__part_motion_fall" d="M12 19.5h.01" stroke-width="2.4" style="--o: 12px 19.5px; --x: -.6px; --y: 1.8px; --dur: 1400ms; --delay: 450ms"/>
+      <path class="icon__part icon__part_motion_fall" d="M16 18h.01" stroke-width="2.4" style="--o: 16px 18px; --x: .6px; --y: 1.8px; --dur: 1400ms; --delay: 900ms"/>
+    </symbol>
+    <symbol id="cloud-lightning" viewBox="0 0 24 24" data-motion="loop" data-note="гроза: молния вспыхивает">
+      <path d="M6.5 15h11a4 4 0 0 0 .5-7.97A5.5 5.5 0 0 0 7.3 8.1 3.5 3.5 0 0 0 6.5 15Z"/>
+      <path class="icon__part icon__part_motion_flash" d="M13 15.5l-2.2 3.2h3l-1.8 3.3"/>
+    </symbol>
+    <symbol id="bolt" viewBox="0 0 24 24" data-motion="hover" data-note="молния вспыхивает">
+      <path class="icon__part icon__part_motion_flash" d="M13.5 3 5.5 13.5h6l-1 7.5 8-10.5h-6l1-7.5Z"/>
+    </symbol>
+    <symbol id="wind" viewBox="0 0 24 24" data-motion="hold" data-note="дует порывами">
+      <path class="icon__part icon__part_motion_nudge" d="M3 8.5h10a2.5 2.5 0 1 0-2.5-2.5" style="--x: 1.5px"/>
+      <path class="icon__part icon__part_motion_nudge" d="M3 12.5h14.5a2.5 2.5 0 1 1-2.5 2.5" style="--x: 1.5px; --delay: 90ms"/>
+      <path class="icon__part icon__part_motion_nudge" d="M3 16.5h6" style="--x: 1.5px; --delay: 180ms"/>
+    </symbol>
+    <symbol id="umbrella" viewBox="0 0 24 24" data-motion="hover" data-note="зонт покачивается">
+      <g class="icon__part icon__part_motion_swing" style="--o: 12px 19px; --a: 7deg">
+        <path d="M3.5 12a8.5 8.5 0 0 1 17 0ZM12 3.5V2.6"/>
+        <path d="M12 12v6.5a2 2 0 0 1-4 0"/>
+      </g>
+    </symbol>
+    <symbol id="droplet" viewBox="0 0 24 24" data-motion="hover" data-note="капля падает и приседает">
+      <g class="icon__part icon__part_motion_drop" style="--o: 12px 20px; --y: -5px">
+        <path d="M12 3.5c3 4.2 6 7.3 6 10.5a6 6 0 0 1-12 0c0-3.2 3-6.3 6-10.5Z"/>
+        <path d="M9.3 14.3a2.8 2.8 0 0 0 2.4 2.7"/>
+      </g>
+    </symbol>
+    <symbol id="snowflake" viewBox="0 0 24 24" data-motion="hold" data-note="снежинка вращается">
+      <g class="icon__part icon__part_motion_spin" style="--a: 60deg; --dur: 1200ms">
+        <g>
+          <path d="M12 3v18M9.8 4.6 12 6.4l2.2-1.8M9.8 19.4 12 17.6l2.2 1.8"/>
+        </g>
+        <g transform="rotate(60 12 12)">
+          <path d="M12 3v18M9.8 4.6 12 6.4l2.2-1.8M9.8 19.4 12 17.6l2.2 1.8"/>
+        </g>
+        <g transform="rotate(120 12 12)">
+          <path d="M12 3v18M9.8 4.6 12 6.4l2.2-1.8M9.8 19.4 12 17.6l2.2 1.8"/>
+        </g>
+      </g>
+    </symbol>
+    <symbol id="thermometer" viewBox="0 0 24 24" data-motion="hover" data-note="столбик поднимается">
+      <path d="M10 14.3V5a2 2 0 0 1 4 0v9.3a4 4 0 1 1-4 0Z"/>
+      <path class="icon__part icon__part_motion_draw" d="M12 17v-6" pathLength="1" style="--dur: 900ms"/>
+    </symbol>
+    <symbol id="rainbow" viewBox="0 0 24 24" data-motion="hover" data-note="дуги прорисовываются">
+      <path class="icon__part icon__part_motion_draw" d="M3 18a9 9 0 0 1 18 0" pathLength="1"/>
+      <path class="icon__part icon__part_motion_draw" d="M6.5 18a5.5 5.5 0 0 1 11 0" pathLength="1" style="--delay: 120ms"/>
+      <path class="icon__part icon__part_motion_draw" d="M10 18a2 2 0 0 1 4 0" pathLength="1" style="--delay: 240ms"/>
+    </symbol>
+    <symbol id="sunrise" viewBox="0 0 24 24" data-motion="hover" data-note="солнце поднимается над горизонтом">
+      <path d="M3 19.5h18"/>
+      <g class="icon__part icon__part_motion_slide" style="--y: -1.8px">
+        <path d="M7 19.5a5 5 0 0 1 10 0"/>
+        <path d="M12 12V9.5M6.7 14.2 5.3 12.8M17.3 14.2l1.4-1.4"/>
+      </g>
+    </symbol>
+    <symbol id="leaf" viewBox="0 0 24 24" data-motion="hold" data-note="лист колышется">
+      <g class="icon__part icon__part_motion_sway" style="--o: 5px 19px; --a: 8deg">
+        <path d="M5 19C5 10.5 10 5 19.5 4.5 19.5 14 14 19 5 19Z"/>
+        <path d="M5 19 13.5 10.5M5 19l-1.5 1.5"/>
+      </g>
+    </symbol>
+    <symbol id="plant" viewBox="0 0 24 24" data-motion="hold" data-note="листья колышутся">
+      <path d="M12 20.5V11M7.5 20.5h9"/>
+      <path class="icon__part icon__part_motion_sway" d="M12 14.5C12 11.5 10 9 6 9c0 3 2 5.5 6 5.5Z" style="--o: 12px 14.5px; --a: -8deg"/>
+      <path class="icon__part icon__part_motion_sway" d="M12 11.5c0-3 2-5.5 6-5.5 0 3-2 5.5-6 5.5Z" style="--o: 12px 11.5px; --a: 8deg; --delay: -400ms"/>
+    </symbol>
+    <symbol id="tree" viewBox="0 0 24 24" data-motion="hold" data-note="ель качается на ветру">
+      <path d="M12 21v-4.5"/>
+      <path class="icon__part icon__part_motion_sway" d="M12 3 6 11.5h2.8L5.5 16.5h13l-3.3-5H18L12 3Z" style="--o: 12px 21px; --a: 3deg"/>
+    </symbol>
+    <symbol id="flame" viewBox="0 0 24 24" data-motion="loop" data-note="пламя пляшет">
+      <path class="icon__part icon__part_motion_flicker" d="M12 21a6 6 0 0 0 6-6c0-4.5-4-6.5-4.5-11.5-2.5 2-4.5 5-4.5 8-1-1-1.5-2.3-1.5-3.5C6.5 10 6 12.5 6 15a6 6 0 0 0 6 6Z" style="--o: 12px 21px"/>
+      <path class="icon__part icon__part_motion_flicker" d="M12 21a2.5 2.5 0 0 0 2.5-2.5c0-2-2.5-3-2.5-5-1.2 1.2-2.5 2.8-2.5 5A2.5 2.5 0 0 0 12 21Z" style="--o: 12px 21px; --dur: 650ms; --delay: -200ms"/>
+    </symbol>
+    <symbol id="paw" viewBox="0 0 24 24" data-motion="hover" data-note="пальцы лапки по очереди">
+      <path d="M12 12.5c-2.6 0-5 2.6-5 4.9 0 1.5 1.2 2.3 2.6 2.3.9 0 1.6-.5 2.4-.5s1.5.5 2.4.5c1.4 0 2.6-.8 2.6-2.3 0-2.3-2.4-4.9-5-4.9Z"/>
+      <circle class="icon__part icon__part_motion_pop" cx="5.8" cy="10.2" r="1.8" style="--o: 5.8px 10.2px"/>
+      <circle class="icon__part icon__part_motion_pop" cx="9.2" cy="6.3" r="1.9" style="--o: 9.2px 6.3px; --delay: 80ms"/>
+      <circle class="icon__part icon__part_motion_pop" cx="14.8" cy="6.3" r="1.9" style="--o: 14.8px 6.3px; --delay: 160ms"/>
+      <circle class="icon__part icon__part_motion_pop" cx="18.2" cy="10.2" r="1.8" style="--o: 18.2px 10.2px; --delay: 240ms"/>
+    </symbol>
+  </g>
+
+  <g data-group="Дом и устройства">
+    <symbol id="home" viewBox="0 0 24 24" data-motion="hover" data-note="дверь открывается">
+      <path d="M9.5 20.5H5.5A1.5 1.5 0 0 1 4 19v-8.5L12 4l8 6.5V19a1.5 1.5 0 0 1-1.5 1.5h-4"/>
+      <path class="icon__part icon__part_motion_fold" d="M9.5 20.5V15a1 1 0 0 1 1-1h3a1 1 0 0 1 1 1v5.5" style="--o: 9.5px 17px; --sx: .3"/>
+    </symbol>
+    <symbol id="lightbulb" viewBox="0 0 24 24" data-motion="hover" data-note="лампа загорается, лучи расходятся">
+      <path d="M9.5 18h5M10.5 21h3M12 3a6 6 0 0 0-3.6 10.8c.7.5 1.1 1.3 1.1 2.1V16h5v-.1c0-.8.4-1.6 1.1-2.1A6 6 0 0 0 12 3Z"/>
+      <path class="icon__part icon__part_motion_ripple" d="M3.2 9h1.6M19.2 9h1.6M5.6 3.4l1.1 1.1M18.4 3.4l-1.1 1.1" opacity="0" style="--o: 12px 9px; --s0: .75; --s: 1.12; --dur: 1000ms"/>
+    </symbol>
+    <symbol id="lamp" viewBox="0 0 24 24" data-motion="hover" data-note="торшер светит вниз">
+      <path d="M8.5 3.5h7l3 7h-13l3-7ZM12 10.5v10M8.5 20.5h7"/>
+      <path class="icon__part icon__part_motion_ripple" d="M8 13 6.5 16M16 13l1.5 3" opacity="0" style="--o: 12px 10.5px; --s0: .8; --s: 1.08; --dur: 1000ms"/>
+    </symbol>
+    <symbol id="blinds" viewBox="0 0 24 24" data-motion="hover" data-note="шторы поднимаются и опускаются">
+      <rect x="4" y="3.5" width="16" height="17" rx="2"/>
+      <path class="icon__part icon__part_motion_fold" d="M4 8h16M4 12h16M4 16h16" style="--o: 12px 3.5px; --sy: .3"/>
+    </symbol>
+    <symbol id="door" viewBox="0 0 24 24" data-motion="hover" data-note="створка открывается">
+      <path d="M5.5 20.5V3.5h13v17M3.5 20.5h17"/>
+      <g class="icon__part icon__part_motion_fold" style="--o: 5.5px 12px; --sx: .3">
+        <rect x="5.5" y="3.5" width="13" height="17"/>
+        <path d="M15.5 12.5h.01" stroke-width="2.6"/>
+      </g>
+    </symbol>
+    <symbol id="fan" viewBox="0 0 24 24" data-motion="hold" data-note="лопасти вращаются">
+      <circle cx="12" cy="12" r="1.8"/>
+      <g class="icon__part icon__part_motion_spin" style="--a: 120deg; --dur: 450ms; --dur-loop: 700ms">
+        <path d="M12 10.2c-.8-3.4.4-6.7 3-6.7 1.9 0 2.9 1.7 2.2 3.5-.7 1.7-2.8 2.9-5.2 3.2Z"/>
+        <path d="M12 10.2c-.8-3.4.4-6.7 3-6.7 1.9 0 2.9 1.7 2.2 3.5-.7 1.7-2.8 2.9-5.2 3.2Z" transform="rotate(120 12 12)"/>
+        <path d="M12 10.2c-.8-3.4.4-6.7 3-6.7 1.9 0 2.9 1.7 2.2 3.5-.7 1.7-2.8 2.9-5.2 3.2Z" transform="rotate(240 12 12)"/>
+      </g>
+    </symbol>
+    <symbol id="plug" viewBox="0 0 24 24" data-motion="hover" data-note="вилка входит в розетку">
+      <g class="icon__part icon__part_motion_nudge" style="--y: -1.5px">
+        <path d="M8 8.5h8V12a4 4 0 0 1-8 0V8.5Z"/>
+        <path d="M10 8.5V4.5M14 8.5V4.5"/>
+      </g>
+      <path d="M12 16v4.5"/>
+    </symbol>
+    <symbol id="power" viewBox="0 0 24 24" data-motion="hover" data-note="кольцо включения прорисовывается">
+      <path class="icon__part icon__part_motion_draw" d="M7.5 6.5a7.5 7.5 0 1 0 9 0" pathLength="1"/>
+      <path class="icon__part icon__part_motion_nudge" d="M12 3.5v8" style="--y: -1px; --delay: 200ms"/>
+    </symbol>
+    <symbol id="battery" viewBox="0 0 24 24" data-motion="hover" data-note="заряд набирается делениями">
+      <rect x="2.5" y="7.5" width="17" height="9" rx="2"/>
+      <path d="M21.5 10.5v3"/>
+      <path class="icon__part icon__part_motion_appear" d="M6 10.5v3"/>
+      <path class="icon__part icon__part_motion_appear" d="M9.5 10.5v3" style="--delay: 150ms; --delay-loop: 300ms"/>
+      <path class="icon__part icon__part_motion_appear" d="M13 10.5v3" style="--delay: 300ms; --delay-loop: 600ms"/>
+    </symbol>
+    <symbol id="battery-charging" viewBox="0 0 24 24" data-motion="loop" data-note="идёт зарядка">
+      <rect x="2.5" y="7.5" width="17" height="9" rx="2"/>
+      <path d="M21.5 10.5v3"/>
+      <path class="icon__part icon__part_motion_pulse" d="M11.8 9.3 9.3 12.3h3.4l-2.5 3" style="--o: 11px 12.3px; --s: 1.2"/>
+    </symbol>
+    <symbol id="tv" viewBox="0 0 24 24" data-motion="hover" data-note="антенна ловит сигнал">
+      <rect x="3" y="6.5" width="18" height="12" rx="2"/>
+      <path d="M8.5 21h7"/>
+      <path class="icon__part icon__part_motion_wiggle" d="M8.5 2.5 12 6l3.5-3.5" style="--o: 12px 6px; --a: 12deg"/>
+    </symbol>
+    <symbol id="monitor" viewBox="0 0 24 24" data-motion="hover" data-note="экран подпрыгивает">
+      <rect class="icon__part icon__part_motion_hop" x="3" y="4" width="18" height="12.5" rx="2" style="--o: 12px 16.5px; --y: -1.2px"/>
+      <path d="M8.5 20h7M12 16.5V20"/>
+    </symbol>
+    <symbol id="laptop" viewBox="0 0 24 24" data-motion="hover" data-note="крышка закрывается и открывается">
+      <rect class="icon__part icon__part_motion_fold" x="4.5" y="5" width="15" height="10" rx="1.5" style="--o: 12px 15px; --sy: .12"/>
+      <path d="M4 15h16l1.5 3.5h-19L4 15Z"/>
+    </symbol>
+    <symbol id="watch" viewBox="0 0 24 24" data-motion="hold" data-note="стрелка бежит">
+      <rect x="6.5" y="6.5" width="11" height="11" rx="3"/>
+      <path d="M9 6.5 9.5 3h5l.5 3.5M9 17.5l.5 3.5h5l.5-3.5M18.8 10.8v2.4"/>
+      <path class="icon__part icon__part_motion_spin" d="M12 12V9.3" style="--dur: 1200ms"/>
+    </symbol>
+    <symbol id="router" viewBox="0 0 24 24" data-motion="loop" data-note="индикаторы перемигиваются">
+      <rect x="3" y="12.5" width="18" height="7" rx="2"/>
+      <path d="M7 12.5 5.8 7M17 12.5l1.2-5.5"/>
+      <path class="icon__part icon__part_motion_blip" d="M7 16h.01" stroke-width="2.4" style="--delay: 0ms"/>
+      <path class="icon__part icon__part_motion_blip" d="M10 16h.01" stroke-width="2.4" style="--delay: 300ms"/>
+      <path class="icon__part icon__part_motion_blip" d="M13 16h.01" stroke-width="2.4" style="--delay: 600ms"/>
+    </symbol>
+    <symbol id="cctv" viewBox="0 0 24 24" data-motion="loop" data-note="камера поворачивается, осматривает">
+      <path d="M4 4.5v8M4 8.5h3"/>
+      <g class="icon__part icon__part_motion_sway" style="--o: 7px 8.5px; --a: 9deg">
+        <rect x="7" y="5.5" width="12.5" height="6" rx="1.5" transform="rotate(16 7 8.5)"/>
+        <path d="M16.2 11.4h.01" stroke-width="2.2"/>
+      </g>
+    </symbol>
+    <symbol id="washer" viewBox="0 0 24 24" data-motion="loop" data-note="барабан крутится">
+      <rect x="4" y="3" width="16" height="18" rx="2.5"/>
+      <path d="M4 7.5h16"/>
+      <path d="M7 5.2h.01" stroke-width="2.2"/>
+      <path d="M9.8 5.2h.01" stroke-width="2.2"/>
+      <circle cx="12" cy="14" r="4.5"/>
+      <path class="icon__part icon__part_motion_spin" d="M8.4 14.8c1.2.9 2.4.9 3.6 0s2.4-.9 3.6 0" style="--o: 12px 14px; --dur: 800ms; --dur-loop: 1200ms"/>
+    </symbol>
+    <symbol id="coffee" viewBox="0 0 24 24" data-motion="loop" data-note="над чашкой поднимается пар">
+      <path d="M5.5 10h11v4.5a5 5 0 0 1-5 5h-1a5 5 0 0 1-5-5V10ZM16.5 11.5h1.3a2.5 2.5 0 0 1 0 5h-1.6"/>
+      <path class="icon__part icon__part_motion_float" d="M9 7.5c-.8-.9-.8-1.9 0-2.8s.8-1.9 0-2.8" style="--o: 9px 5px; --y: 1px"/>
+      <path class="icon__part icon__part_motion_float" d="M13 7.5c-.8-.9-.8-1.9 0-2.8s.8-1.9 0-2.8" style="--o: 13px 5px; --y: 1px; --delay: 700ms"/>
+    </symbol>
+    <symbol id="bed" viewBox="0 0 24 24" data-motion="loop" data-note="спят: всплывает «з»">
+      <path d="M3 18.5V8.5M3 14.5h18v4M21 14.5v-2a2.5 2.5 0 0 0-2.5-2.5H11v4.5"/>
+      <circle cx="7" cy="11.8" r="1.8"/>
+      <path class="icon__part icon__part_motion_float" d="M14 3.5h3l-3 3.5h3" style="--o: 15.5px 5.2px; --y: 1px; --dur: 1800ms"/>
+    </symbol>
+  </g>
+
+  <g data-group="Дорога и места">
+    <symbol id="pin" viewBox="0 0 24 24" data-motion="hover" data-note="метка падает на карту">
+      <g class="icon__part icon__part_motion_drop" style="--o: 12px 21px; --y: -5px">
+        <path d="M12 21s-6.5-5.6-6.5-11a6.5 6.5 0 0 1 13 0c0 5.4-6.5 11-6.5 11Z"/>
+        <circle cx="12" cy="10" r="2.3"/>
+      </g>
+    </symbol>
+    <symbol id="car" viewBox="0 0 24 24" data-motion="hold" data-note="машина едет: колёса крутятся">
+      <g class="icon__part icon__part_motion_bob" style="--y: -.6px; --dur: 360ms">
+        <path d="M4.6 16.5H3v-3.3a1.5 1.5 0 0 1 1.1-1.4l2.4-.7 2.2-3.3A1.5 1.5 0 0 1 10 7.1h4.6a1.5 1.5 0 0 1 1.2.6l2.7 3.6 1.9.5a1.5 1.5 0 0 1 1.1 1.4v3.3h-2.1M9 16.5h6"/>
+        <path d="M6.5 11.1h12M12.3 7.1v4"/>
+      </g>
+      <g class="icon__part icon__part_motion_spin" style="--o: 6.8px 16.8px; --dur: 700ms">
+        <circle cx="6.8" cy="16.8" r="2.2"/>
+        <path d="M6.8 15.6v2.4"/>
+      </g>
+      <g class="icon__part icon__part_motion_spin" style="--o: 17.2px 16.8px; --dur: 700ms">
+        <circle cx="17.2" cy="16.8" r="2.2"/>
+        <path d="M17.2 15.6v2.4"/>
+      </g>
+    </symbol>
+    <symbol id="walk" viewBox="0 0 24 24" data-motion="hold" data-note="человек шагает: ноги и руки ходят">
+      <circle cx="13.5" cy="4.3" r="2"/>
+      <path d="M12.6 8.2 10.8 14.4"/>
+      <path class="icon__part icon__part_motion_swing" d="M12.4 8.9 9.3 11l-.9 2.9M12.6 8.7l2.6 2.8 2.9.9" style="--o: 12.5px 8.6px; --a: -8deg; --dur: 700ms"/>
+      <path class="icon__part icon__part_motion_swing" d="M10.8 14.4 8.6 20.7" style="--o: 10.8px 14.4px; --a: 16deg; --dur: 700ms"/>
+      <path class="icon__part icon__part_motion_swing" d="m10.8 14.4 3 2.7 1 4.1" style="--o: 10.8px 14.4px; --a: -16deg; --dur: 700ms"/>
+    </symbol>
+    <symbol id="bus" viewBox="0 0 24 24" data-motion="hold" data-note="автобус покачивается на ходу">
+      <g class="icon__part icon__part_motion_bob" style="--y: -.7px; --dur: 420ms">
+        <rect x="4.5" y="3" width="15" height="14.5" rx="3"/>
+        <path d="M4.5 11h15M8.5 6.2h7"/>
+        <circle cx="8.3" cy="14.3" r=".6" fill="currentColor"/>
+        <circle cx="15.7" cy="14.3" r=".6" fill="currentColor"/>
+      </g>
+      <path d="M7.5 17.5v2.6M16.5 17.5v2.6"/>
+    </symbol>
+    <symbol id="bike" viewBox="0 0 24 24" data-motion="hold" data-note="колёса крутятся">
+      <path d="M6 16h6l-2-6.5M6 16l4-6.5h5.5M12 16l3.5-6.5L18 16M15.5 9.5 14.8 7h1.8M9 8.8h2.4"/>
+      <g class="icon__part icon__part_motion_spin" style="--o: 6px 16px; --dur: 900ms">
+        <circle cx="6" cy="16" r="3.8"/>
+        <path d="M6 13.2v5.6"/>
+      </g>
+      <g class="icon__part icon__part_motion_spin" style="--o: 18px 16px; --dur: 900ms">
+        <circle cx="18" cy="16" r="3.8"/>
+        <path d="M18 13.2v5.6"/>
+      </g>
+    </symbol>
+    <symbol id="plane" viewBox="0 0 24 24" data-motion="hover" data-note="самолёт улетает и возвращается">
+      <path class="icon__part icon__part_motion_fly" d="M21 12c0-.8-.7-1.5-1.5-1.5H15L10.5 3.5H8.5l2.2 7H6.5L4.8 8.5H3.2l1 3.5-1 3.5h1.6l1.7-2h4.2l-2.2 7h2L15 13.5h4.5c.8 0 1.5-.7 1.5-1.5Z" style="--x: 7px; --y: -2px"/>
+    </symbol>
+    <symbol id="rocket" viewBox="0 0 24 24" data-motion="hold" data-note="ракета дрожит, пламя бьётся">
+      <g class="icon__part icon__part_motion_shake" style="--x: .5px; --dur: 260ms">
+        <path d="M12 3c2.8 1.8 4.5 4.8 4.5 8.8L15 16H9l-1.5-4.2C7.5 7.8 9.2 4.8 12 3Z"/>
+        <path d="M7.9 13 5 15.5l.4 3 2.9-1.3M16.1 13l2.9 2.5-.4 3-2.9-1.3"/>
+        <circle cx="12" cy="9.5" r="1.7"/>
+      </g>
+      <path class="icon__part icon__part_motion_flicker" d="M10.2 18c.4 1.3 1 2.4 1.8 3.5.8-1.1 1.4-2.2 1.8-3.5" style="--o: 12px 18px; --dur: 300ms"/>
+    </symbol>
+    <symbol id="map" viewBox="0 0 24 24" data-motion="hover" data-note="карта складывается и раскрывается">
+      <path class="icon__part icon__part_motion_fold" d="M9 4.5 3.5 6.5v13l5.5-2 6 2 5.5-2v-13l-5.5 2-6-2ZM9 4.5v13M15 6.5v13" style="--sx: .45"/>
+    </symbol>
+    <symbol id="navigation" viewBox="0 0 24 24" data-motion="hold" data-note="стрелка ведёт вперёд">
+      <path class="icon__part icon__part_motion_hop" d="M12 3 19 20.5l-7-3.5-7 3.5L12 3Z" style="--o: 12px 20px; --y: -2px"/>
+    </symbol>
+    <symbol id="compass" viewBox="0 0 24 24" data-motion="hover" data-note="стрелка колеблется и успокаивается">
+      <circle cx="12" cy="12" r="9"/>
+      <path class="icon__part icon__part_motion_swing" d="M14.8 9.2 13 13l-3.8 1.8L11 11l3.8-1.8Z" style="--a: 30deg; --dur: 1400ms"/>
+    </symbol>
+    <symbol id="locate" viewBox="0 0 24 24" data-motion="loop" data-note="точка на месте, круг расходится">
+      <circle cx="12" cy="12" r="6.5"/>
+      <path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3"/>
+      <circle class="icon__part icon__part_motion_pulse" cx="12" cy="12" r="2" fill="currentColor" style="--s: 1.3"/>
+      <circle class="icon__part icon__part_motion_ripple" cx="12" cy="12" r="6.5" opacity="0" style="--s0: .3; --s: 1.1"/>
+    </symbol>
+    <symbol id="route" viewBox="0 0 24 24" data-motion="hover" data-note="маршрут прокладывается">
+      <circle cx="6" cy="18.5" r="2"/>
+      <circle cx="18" cy="4.5" r="2"/>
+      <path class="icon__part icon__part_motion_draw" d="M8 18.5h7a3.5 3.5 0 0 0 0-7H9a3.5 3.5 0 0 1 0-7h7" pathLength="1" style="--dur: 1100ms"/>
+    </symbol>
+    <symbol id="anchor" viewBox="0 0 24 24" data-motion="hold" data-note="якорь качается">
+      <g class="icon__part icon__part_motion_swing" style="--o: 12px 5px; --a: 10deg">
+        <circle cx="12" cy="5" r="2"/>
+        <path d="M12 7v14M8.5 10h7M4.5 13.5a7.5 7.5 0 0 0 15 0M3 15l1.5-1.5L6 15M18 15l1.5-1.5L21 15"/>
+      </g>
+    </symbol>
+  </g>
+
+  <g data-group="Работа, данные и деньги">
+    <symbol id="folder" viewBox="0 0 24 24" data-motion="hover" data-note="папка приоткрывается">
+      <path d="M3.5 18V6A1.5 1.5 0 0 1 5 4.5h4.2l2 2.5h7.8A1.5 1.5 0 0 1 20.5 8.5V18a1.5 1.5 0 0 1-1.5 1.5H5A1.5 1.5 0 0 1 3.5 18Z"/>
+      <path class="icon__part icon__part_motion_nudge" d="M3.5 10.5h17" style="--y: 1.8px"/>
+    </symbol>
+    <symbol id="file" viewBox="0 0 24 24" data-motion="hover" data-note="лист подпрыгивает">
+      <path class="icon__part icon__part_motion_hop" d="M6.5 3.5h7L18 8v11a1.5 1.5 0 0 1-1.5 1.5h-10A1.5 1.5 0 0 1 5 19V5a1.5 1.5 0 0 1 1.5-1.5ZM13.5 3.5V8H18" style="--o: 12px 20.5px; --y: -1.5px"/>
+    </symbol>
+    <symbol id="file-text" viewBox="0 0 24 24" data-motion="hover" data-note="строки дописываются">
+      <path d="M6.5 3.5h7L18 8v11a1.5 1.5 0 0 1-1.5 1.5h-10A1.5 1.5 0 0 1 5 19V5a1.5 1.5 0 0 1 1.5-1.5ZM13.5 3.5V8H18"/>
+      <path class="icon__part icon__part_motion_draw" d="M8.5 12.5h7" pathLength="1" style="--dur: 450ms"/>
+      <path class="icon__part icon__part_motion_draw" d="M8.5 16h5" pathLength="1" style="--dur: 400ms; --delay: 120ms"/>
+    </symbol>
+    <symbol id="clipboard-check" viewBox="0 0 24 24" data-motion="hover" data-note="зажим щёлкает, галочка появляется">
+      <rect x="5" y="4.5" width="14" height="16.5" rx="2"/>
+      <rect class="icon__part icon__part_motion_nudge" x="9" y="3" width="6" height="3" rx="1" style="--y: -1px; --dur: 350ms"/>
+      <path class="icon__part icon__part_motion_draw" d="M8.8 13.5l2.4 2.4 4.2-4.6" pathLength="1" style="--delay: 120ms"/>
+    </symbol>
+    <symbol id="briefcase" viewBox="0 0 24 24" data-motion="hover" data-note="портфель подпрыгивает">
+      <g class="icon__part icon__part_motion_hop" style="--o: 12px 19.5px; --y: -1.5px">
+        <rect x="3.5" y="7.5" width="17" height="12" rx="2"/>
+        <path d="M9 7.5V6a1.5 1.5 0 0 1 1.5-1.5h3A1.5 1.5 0 0 1 15 6v1.5M3.5 12.5h17"/>
+      </g>
+    </symbol>
+    <symbol id="chart-bar" viewBox="0 0 24 24" data-motion="hover" data-note="столбики растут">
+      <path d="M4 20.5h16"/>
+      <path class="icon__part icon__part_motion_draw" d="M7 17.5v-5" pathLength="1" style="--dur: 400ms"/>
+      <path class="icon__part icon__part_motion_draw" d="M12 17.5V7" pathLength="1" style="--dur: 500ms; --delay: 100ms"/>
+      <path class="icon__part icon__part_motion_draw" d="M17 17.5v-8" pathLength="1" style="--dur: 450ms; --delay: 200ms"/>
+    </symbol>
+    <symbol id="chart-line" viewBox="0 0 24 24" data-motion="hover" data-note="линия графика прорисовывается">
+      <path d="M4 4v16h16"/>
+      <path class="icon__part icon__part_motion_draw" d="M7.5 15.5 11 12l3 3 5.5-6.5" pathLength="1" style="--dur: 700ms"/>
+    </symbol>
+    <symbol id="chart-pie" viewBox="0 0 24 24" data-motion="hover" data-note="доля выдвигается">
+      <path d="M11 5a8 8 0 1 0 8 8h-8V5Z"/>
+      <path class="icon__part icon__part_motion_nudge" d="M14 3.5v7h7a7 7 0 0 0-7-7Z" style="--x: 1px; --y: -1px"/>
+    </symbol>
+    <symbol id="trend-up" viewBox="0 0 24 24" data-motion="hover" data-note="рост прорисовывается">
+      <path class="icon__part icon__part_motion_draw" d="M3.5 17 9.5 11l4 4 7-7" pathLength="1" style="--dur: 600ms"/>
+      <path class="icon__part icon__part_motion_nudge" d="M15.5 8h5v5" style="--x: 1px; --y: -1px; --delay: 450ms"/>
+    </symbol>
+    <symbol id="trend-down" viewBox="0 0 24 24" data-motion="hover" data-note="спад прорисовывается">
+      <path class="icon__part icon__part_motion_draw" d="M3.5 7l6 6 4-4 7 7" pathLength="1" style="--dur: 600ms"/>
+      <path class="icon__part icon__part_motion_nudge" d="M15.5 16h5v-5" style="--x: 1px; --y: 1px; --delay: 450ms"/>
+    </symbol>
+    <symbol id="activity" viewBox="0 0 24 24" data-motion="hover" data-note="пульс пробегает по линии">
+      <path class="icon__part icon__part_motion_draw" d="M3 12h4l2.5-6 5 12 2.5-6H21" pathLength="1" style="--dur: 900ms"/>
+    </symbol>
+    <symbol id="database" viewBox="0 0 24 24" data-motion="hover" data-note="слои базы приподнимаются">
+      <path class="icon__part icon__part_motion_nudge" d="M4.5 6c0-1.7 3.4-3 7.5-3s7.5 1.3 7.5 3-3.4 3-7.5 3-7.5-1.3-7.5-3Z" style="--y: -1.5px"/>
+      <path d="M4.5 6v12c0 1.7 3.4 3 7.5 3s7.5-1.3 7.5-3V6"/>
+      <path class="icon__part icon__part_motion_nudge" d="M4.5 12c0 1.7 3.4 3 7.5 3s7.5-1.3 7.5-3" style="--y: -.7px; --delay: 60ms"/>
+    </symbol>
+    <symbol id="server" viewBox="0 0 24 24" data-motion="loop" data-note="индикаторы стойки мигают">
+      <rect x="3.5" y="4" width="17" height="7" rx="2"/>
+      <rect x="3.5" y="13" width="17" height="7" rx="2"/>
+      <path d="M11 7.5h6M11 16.5h6"/>
+      <path class="icon__part icon__part_motion_blip" d="M7 7.5h.01" stroke-width="2.6"/>
+      <path class="icon__part icon__part_motion_blip" d="M7 16.5h.01" stroke-width="2.6" style="--delay: 450ms"/>
+    </symbol>
+    <symbol id="code" viewBox="0 0 24 24" data-motion="hover" data-note="скобки раздвигаются">
+      <path class="icon__part icon__part_motion_nudge" d="M8.5 7 3.5 12l5 5" style="--x: -1.5px"/>
+      <path class="icon__part icon__part_motion_nudge" d="M15.5 7l5 5-5 5" style="--x: 1.5px"/>
+      <path d="M13.5 5 10.5 19"/>
+    </symbol>
+    <symbol id="terminal" viewBox="0 0 24 24" data-motion="loop" data-note="курсор мигает">
+      <rect x="2.5" y="4" width="19" height="16" rx="2.5"/>
+      <path d="M6.5 9.5l3 2.5-3 2.5"/>
+      <path class="icon__part icon__part_motion_blip" d="M12 15h5"/>
+    </symbol>
+    <symbol id="bug" viewBox="0 0 24 24" data-motion="hold" data-note="жук ползёт">
+      <g class="icon__part icon__part_motion_shake" style="--x: .6px; --dur: 260ms">
+        <path d="M8.5 10.5a3.5 3.5 0 0 1 7 0v4a3.5 3.5 0 0 1-7 0v-4ZM10 7a2 2 0 0 1 4 0M12 10v8"/>
+        <path d="M8.5 11.5H5M8.5 15H5.5M15.5 11.5H19M15.5 15h3M9.3 17.8 7.5 19.8M14.7 17.8l1.8 2M10.5 5.5 9 3.5M13.5 5.5 15 3.5"/>
+      </g>
+    </symbol>
+    <symbol id="cloud-upload" viewBox="0 0 24 24" data-motion="hover" data-note="стрелка уходит в облако">
+      <path d="M6.5 18h11a4 4 0 0 0 .5-7.97A5.5 5.5 0 0 0 7.3 11.1 3.5 3.5 0 0 0 6.5 18Z"/>
+      <path class="icon__part icon__part_motion_nudge" d="M12 20v-7.5M9.2 15.3 12 12.5l2.8 2.8" style="--y: -2px"/>
+    </symbol>
+    <symbol id="cloud-download" viewBox="0 0 24 24" data-motion="hover" data-note="стрелка спускается из облака">
+      <path d="M6.5 18h11a4 4 0 0 0 .5-7.97A5.5 5.5 0 0 0 7.3 11.1 3.5 3.5 0 0 0 6.5 18Z"/>
+      <path class="icon__part icon__part_motion_nudge" d="M12 11v8M9.2 16.2 12 19l2.8-2.8" style="--y: 1.5px"/>
+    </symbol>
+    <symbol id="cart" viewBox="0 0 24 24" data-motion="hover" data-note="тележка катится">
+      <g class="icon__part icon__part_motion_nudge" style="--x: 2px">
+        <path d="M3 4h2.2l2.1 10.2a1.5 1.5 0 0 0 1.5 1.2h8.4a1.5 1.5 0 0 0 1.4-1.1L20.5 8H6.2"/>
+        <circle cx="9.5" cy="19" r="1.5"/>
+        <circle cx="17" cy="19" r="1.5"/>
+      </g>
+    </symbol>
+    <symbol id="bag" viewBox="0 0 24 24" data-motion="hover" data-note="пакет подпрыгивает">
+      <g class="icon__part icon__part_motion_hop" style="--o: 12px 20.5px; --y: -1.5px">
+        <path d="M5.5 8h13l-1 12.5h-11L5.5 8Z"/>
+        <path d="M9 10.5V7a3 3 0 0 1 6 0v3.5"/>
+      </g>
+    </symbol>
+    <symbol id="wallet" viewBox="0 0 24 24" data-motion="hover" data-note="застёжка кошелька отходит">
+      <path d="M19 8.5V6.5A1.5 1.5 0 0 0 17.5 5h-12A1.5 1.5 0 0 0 4 6.5v11A1.5 1.5 0 0 0 5.5 19h12a1.5 1.5 0 0 0 1.5-1.5v-3"/>
+      <g class="icon__part icon__part_motion_nudge" style="--x: 1.2px">
+        <path d="M20.5 8.5H16a3 3 0 0 0 0 6h4.5v-6Z"/>
+        <path d="M16.3 11.5h.01" stroke-width="2.6"/>
+      </g>
+    </symbol>
+    <symbol id="card" viewBox="0 0 24 24" data-motion="hover" data-note="карта переворачивается">
+      <g class="icon__part icon__part_motion_fold" style="--sx: -1; --dur: 1000ms">
+        <rect x="2.5" y="5" width="19" height="14" rx="2.5"/>
+        <path d="M2.5 9.5h19M6 15h3.5"/>
+      </g>
+    </symbol>
+    <symbol id="coin" viewBox="0 0 24 24" data-motion="hold" data-note="монета вращается">
+      <g class="icon__part icon__part_motion_squeeze" style="--sx: -1; --dur: 1000ms">
+        <circle cx="12" cy="12" r="8.5"/>
+        <path d="M10 16.5v-9h3.2a2.5 2.5 0 0 1 0 5H8.5M8.5 14.5H13"/>
+      </g>
+    </symbol>
+    <symbol id="receipt" viewBox="0 0 24 24" data-motion="hover" data-note="строки чека пропечатываются">
+      <path d="M6 3.5h12v17l-2-1.4-2 1.4-2-1.4-2 1.4-2-1.4-2 1.4v-17Z"/>
+      <path class="icon__part icon__part_motion_draw" d="M9 8h6" pathLength="1" style="--dur: 350ms"/>
+      <path class="icon__part icon__part_motion_draw" d="M9 11.5h6" pathLength="1" style="--dur: 350ms; --delay: 100ms"/>
+      <path class="icon__part icon__part_motion_draw" d="M9 15h3.5" pathLength="1" style="--dur: 300ms; --delay: 200ms"/>
+    </symbol>
+    <symbol id="gift" viewBox="0 0 24 24" data-motion="hover" data-note="крышка подарка подпрыгивает">
+      <rect x="4" y="11" width="16" height="9.5" rx="1.2"/>
+      <path d="M12 11v9.5"/>
+      <g class="icon__part icon__part_motion_nudge" style="--y: -2.5px">
+        <rect x="3" y="7.5" width="18" height="3.5" rx="1"/>
+        <path d="M12 7.5v3.5M12 7.5C10.5 4.2 7 3.8 7 5.7 7 7 9 7.5 12 7.5ZM12 7.5c1.5-3.3 5-3.7 5-1.8 0 1.3-2 1.8-5 1.8Z"/>
+      </g>
+    </symbol>
+    <symbol id="trophy" viewBox="0 0 24 24" data-motion="hover" data-note="кубок подпрыгивает и блестит">
+      <g class="icon__part icon__part_motion_hop" style="--o: 12px 20.5px; --y: -1.5px">
+        <path d="M7 4h10v5a5 5 0 0 1-10 0V4Z"/>
+        <path d="M7 5.5H5.5a2 2 0 0 0 0 4H7.3M17 5.5h1.5a2 2 0 0 1 0 4h-1.8M12 14v3M9 20.5h6M10 17h4"/>
+      </g>
+      <path class="icon__part icon__part_motion_ripple" d="M19.5 12.2v3.6M17.7 14h3.6" opacity="0" style="--o: 19.5px 14px; --s0: .2; --s: 1; --delay: 250ms"/>
+    </symbol>
+    <symbol id="target" viewBox="0 0 24 24" data-motion="hover" data-note="стрела попадает в центр">
+      <circle class="icon__part icon__part_motion_pulse" cx="12" cy="12" r="9" style="--s: 1.05; --delay: 380ms; --dur: 400ms"/>
+      <circle cx="12" cy="12" r="5.5"/>
+      <circle cx="12" cy="12" r="2"/>
+      <path class="icon__part icon__part_motion_drop" d="M12 12 19 5M19 5V2.5M19 5h2.5" style="--x: 5px; --y: -5px; --dur: 700ms"/>
+    </symbol>
+    <symbol id="book" viewBox="0 0 24 24" data-motion="hover" data-note="страница перелистывается">
+      <path d="M12 6.5C10 5 7.5 4.5 3.5 4.5v14c4 0 6.5.5 8.5 2M12 6.5v14"/>
+      <path class="icon__part icon__part_motion_fold" d="M12 6.5c2-1.5 4.5-2 8.5-2v14c-4 0-6.5.5-8.5 2" style="--o: 12px 12px; --sx: -1; --dur: 1200ms"/>
+    </symbol>
+    <symbol id="eyedropper" viewBox="0 0 24 24" data-motion="hover" data-note="с пипетки падает капля">
+      <g transform="rotate(45 12 12)">
+        <rect x="10" y="1.8" width="4" height="5.2" rx="2"/>
+        <path d="M8.3 7h7.4M10.4 7v9.6l1.6 3 1.6-3V7"/>
+      </g>
+      <circle class="icon__part icon__part_motion_fall" cx="5.2" cy="20.4" r=".9" fill="currentColor" style="--y: 2px"/>
+    </symbol>
+    <symbol id="palette" viewBox="0 0 24 24" data-motion="hover" data-note="краски появляются по очереди">
+      <path d="M12 3.5a8.5 8.5 0 1 0 0 17c1.2 0 1.8-.8 1.8-1.7 0-1.3-1.1-1.6-1.1-2.7 0-.9.7-1.6 1.6-1.6h2.1a4.1 4.1 0 0 0 4.1-4.1c0-3.8-3.8-6.9-8.5-6.9Z"/>
+      <path class="icon__part icon__part_motion_pop" d="M7.5 12h.01" stroke-width="2.8" style="--o: 7.5px 12px"/>
+      <path class="icon__part icon__part_motion_pop" d="M9.5 8h.01" stroke-width="2.8" style="--o: 9.5px 8px; --delay: 90ms"/>
+      <path class="icon__part icon__part_motion_pop" d="M14.5 8h.01" stroke-width="2.8" style="--o: 14.5px 8px; --delay: 180ms"/>
+    </symbol>
+  </g>
+
+  <g data-group="Здоровье и лицо">
+    <symbol id="pill" viewBox="0 0 24 24" data-motion="hover" data-note="капсула разделяется">
+      <g transform="rotate(-45 12 12)">
+        <path class="icon__part icon__part_motion_nudge" d="M12 8.5H7.5a3.5 3.5 0 0 0 0 7H12Z" style="--x: -1.2px"/>
+        <path class="icon__part icon__part_motion_nudge" d="M12 8.5h4.5a3.5 3.5 0 0 1 0 7H12Z" style="--x: 1.2px"/>
+      </g>
+    </symbol>
+    <symbol id="dumbbell" viewBox="0 0 24 24" data-motion="hover" data-note="гантель поднимают дважды">
+      <g class="icon__part icon__part_motion_nudge" style="--y: -3px; --dur: 600ms; --count: 2">
+        <path d="M7 12h10M7 8v8M4.5 9.5v5M17 8v8M19.5 9.5v5"/>
+      </g>
+    </symbol>
+    <symbol id="smile" viewBox="0 0 24 24" data-motion="hover" data-note="подмигивает">
+      <circle cx="12" cy="12" r="9"/>
+      <path d="M9 9.2v1.6" stroke-width="2.2"/>
+      <path class="icon__part icon__part_motion_blink" d="M15 9.2v1.6" stroke-width="2.2" style="--o: 15px 10px"/>
+      <path class="icon__part icon__part_motion_pulse" d="M8.5 14.5a4.5 4.5 0 0 0 7 0" style="--o: 12px 15px; --s: 1.1; --delay: 100ms"/>
+    </symbol>
+    <symbol id="fingerprint" viewBox="0 0 24 24" data-motion="hover" data-note="отпечаток прорисовывается">
+      <path class="icon__part icon__part_motion_draw" d="M6.5 5.5a8.5 8.5 0 0 1 11 0" pathLength="1" style="--dur: 450ms"/>
+      <path class="icon__part icon__part_motion_draw" d="M5 16.5V13a7 7 0 0 1 14 0v1" pathLength="1" style="--dur: 550ms; --delay: 90ms"/>
+      <path class="icon__part icon__part_motion_draw" d="M8.5 19.5V13a3.5 3.5 0 0 1 7 0v2.5c0 1.5-.3 3-.8 4.3" pathLength="1" style="--dur: 550ms; --delay: 180ms"/>
+      <path class="icon__part icon__part_motion_draw" d="M12 12.5V16c0 1.8-.4 3.3-1 4.5" pathLength="1" style="--dur: 400ms; --delay: 270ms"/>
+    </symbol>
+    <symbol id="face-id" viewBox="0 0 24 24" data-motion="hover" data-note="рамка ловит лицо, лицо моргает">
+      <path class="icon__part icon__part_motion_pulse" d="M4 8.5V6a2 2 0 0 1 2-2h2.5M15.5 4H18a2 2 0 0 1 2 2v2.5M20 15.5V18a2 2 0 0 1-2 2h-2.5M8.5 20H6a2 2 0 0 1-2-2v-2.5" style="--s: .92"/>
+      <path class="icon__part icon__part_motion_blink" d="M9 9.5V11M15 9.5V11" style="--o: 12px 10.25px; --delay: 250ms"/>
+      <path d="M12 9.5V13h-1M9.2 15.5a4 4 0 0 0 5.6 0"/>
+    </symbol>
+  </g>
+</svg>

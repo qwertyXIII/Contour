@@ -1,0 +1,62 @@
+/*
+ * Блок toast: короткий отклик на действие — «сохранено», «не отправилось».
+ * Не для того, что человек обязан прочитать: такое — callout или диалог.
+ *
+ *   __icon (микс с icon) · __text · __action (микс с button) · __close (микс с button)
+ *   toast_tone_{ok|danger|warn|info} · toast_leaving (уходит; ставит Toaster)
+ */
+.toast {
+  --toast-fg: var(--color-text-muted);
+
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  width: 100%;
+  max-width: 440px;
+  min-height: var(--control-h-l);
+  padding: var(--space-2) var(--space-2) var(--space-2) var(--space-4);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-l);
+  background: var(--color-bg-elevated);
+  color: var(--color-text);
+  box-shadow: var(--shadow-l);
+  pointer-events: auto;
+  animation: toast-in var(--duration-normal) var(--ease-out);
+}
+
+.toast_tone_ok { --toast-fg: var(--color-ok); }
+.toast_tone_danger { --toast-fg: var(--color-danger); }
+.toast_tone_warn { --toast-fg: var(--color-warn); }
+.toast_tone_info { --toast-fg: var(--color-info); }
+
+.toast__icon {
+  color: var(--toast-fg);
+}
+
+.toast__text {
+  flex: 1 1 auto;
+  min-width: 0;
+  margin: 0;
+  padding-block: var(--space-2);
+  font-size: var(--text-body);
+  font-weight: var(--weight-medium);
+  line-height: 1.35;
+}
+
+.toast_leaving {
+  animation: toast-out var(--duration-fast) ease forwards;
+}
+
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(var(--toast-from)) scale(.98);
+  }
+}
+
+@keyframes toast-out {
+  to {
+    opacity: 0;
+    transform: scale(.96);
+  }
+}

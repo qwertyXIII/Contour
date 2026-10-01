@@ -1,0 +1,32 @@
+/*
+ * Блок sticky: полка, прилипающая к верху прокрутки — поиск и чипы над сеткой
+ * или списком. Во всю ширину места (через поля --bleed-x / --bleed-top у тела
+ * панели), на фоне страницы: то, что уезжает под неё, не просвечивает.
+ *
+ *   <div class="sticky sticky_shy"> поле поиска · чипы </div>
+ *
+ * sticky_shy — застенчивая: листают вниз — уезжает вверх, вверх — возвращается
+ * (как панель адреса в Safari). Прячет её компонент Sticky классом
+ * sticky_hidden; сама полка место в потоке держит — содержимое не прыгает.
+ */
+.sticky {
+  position: sticky;
+  top: calc(var(--bleed-top, 0px) * -1);
+  z-index: 2;
+  display: grid;
+  gap: var(--space-3);
+  margin: calc(var(--bleed-top, 0px) * -1) calc(var(--bleed-x, 0px) * -1) 0;
+  padding: var(--bleed-top, 0px) var(--bleed-x, 0px) var(--space-3);
+  background: var(--color-bg);
+  transition: translate var(--duration-normal) var(--ease-out), opacity var(--duration-fast) ease;
+}
+
+.sticky_hidden {
+  translate: 0 calc(-100% - var(--space-2));
+  opacity: 0;
+  pointer-events: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sticky { transition: none; }
+}

@@ -4,6 +4,7 @@ import type { Consumers } from '../consumers.ts';
 import { errorText, type Logger } from '../log.ts';
 import type { Outlet } from '../outlets/outlet.ts';
 import type { Chooser } from '../select/chooser.ts';
+import type { Meter } from '../stats/meter.ts';
 import { checkDestination } from './fence.ts';
 import { MAX_ATTEMPTS, relay, type RelayDeps, type Target } from './relay.ts';
 
@@ -29,6 +30,7 @@ export type HttpInletOptions = {
   chooser: Chooser;
   consumers: Consumers;
   log: Logger;
+  meter?: Meter;
 };
 
 type Deps = RelayDeps;
@@ -75,7 +77,7 @@ function serveConnect(client: Socket, head: Buffer, who: string, target: Target,
 // ─── Проброс http: запрос целиком, повтор для запросов без тела ────────────
 
 function serveForward(req: http.IncomingMessage, res: http.ServerResponse, who: string, target: URL, deps: Deps): void {
-  const { chooser, consumers, log } = deps;
+  const { chooser, consumers, log, meter } = deps;
   const host = target.hostname.replace(/^\[|\]$/g, '');
   const port = Number(target.port) || 80;
   const where = `${who}: ${host}:${port}`;
@@ -111,7 +113,7 @@ function serveForward(req: http.IncomingMessage, res: http.ServerResponse, who: 
     let answered = false;
     const out = http.request({ createConnection: () => socket, host, port, method: req.method, path: `${target.pathname}${target.search}`, headers }, (answer) => {
       answered = true;
-      answer.on('data', (chunk: Buffer) => { down += chunk.length; });
+      answer.on('data', (chunk: Buffer) => { down += chunk.length; meter?.add(who, outlet.name, host, 0, chunk.length); });
       res.writeHead(answer.statusCode ?? 502, answer.headers);
       answer.pipe(res);
     });
@@ -138,7 +140,7 @@ function serveForward(req: http.IncomingMessage, res: http.ServerResponse, who: 
 
 export function startHttpInlet(opts: HttpInletOptions): Promise<http.Server> {
   const { chooser, consumers, log } = opts;
-  const deps: Deps = { chooser, consumers, log };
+  const deps: Deps = { chooser, consumers, log, meter: opts.meter };
   const server = http.createServer();
   // Туннели живут долго (докачка на часы) — таймаут соединения без дела не нужен.
   server.timeout = 0;

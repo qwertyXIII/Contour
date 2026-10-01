@@ -1,0 +1,38 @@
+/*
+ * Элемент player__queue: очередь на экране «Сейчас играет». Строки строит
+ * компонент Player из состояния сеанса — это блок row с элементом
+ * player__track; текущий трек — aria-current, у него вместо длительности
+ * эквалайзер (__now), замирающий на паузе.
+ */
+.player__queue {
+  display: grid;
+  min-width: 0;
+}
+
+.player__track-time {
+  color: var(--player-muted);
+  font-size: var(--text-caption);
+  font-variant-numeric: tabular-nums;
+}
+
+.player__now {
+  display: none;
+  color: var(--color-accent-text);
+}
+
+.player__track[aria-current] .row__title {
+  color: var(--color-accent-text);
+}
+
+.player__track[aria-current] .player__track-time {
+  display: none;
+}
+
+.player__track[aria-current] .player__now {
+  display: block;
+}
+
+/* Эквалайзер текущего замирает на паузе, а не пропадает: видно, что трек этот. */
+.player__now_paused .icon__part {
+  animation-play-state: paused;
+}

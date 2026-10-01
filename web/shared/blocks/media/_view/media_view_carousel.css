@@ -1,0 +1,129 @@
+/*
+ * Лента: одна плитка по центру, у соседей видны краешки. Листается пальцем,
+ * колесом, стрелками клавиатуры; прилипает к центру по одной.
+ *
+ * Ширина плитки и отступы считаются от ширины блока (cqi): проценты в ленте
+ * брались бы от ширины без отступов, и первая плитка не вставала бы в центр.
+ * Общая пропорция кадра — --media-ratio: плитки ленты одной высоты.
+ *
+ * Поверх — счётчик «3 / 12» в углу текущей, точки снизу, стрелки только у
+ * курсора (на пальце листают жестом).
+ */
+.media_view_carousel {
+  --media-slide: 86cqi;
+  --media-ratio: 1.333;
+  --media-edge: calc((100cqi - var(--media-slide)) / 2);
+}
+
+/* На широком — плитка уже. Переменные переопределяются у потомков: запрос
+   контейнера не может задать стиль самому контейнеру, а --media-edge,
+   объявленная на корне, уже подставила там свои 86cqi. */
+@container (min-width: 560px) {
+  .media_view_carousel .media__track,
+  .media_view_carousel .media__count,
+  .media_view_carousel .media__nav {
+    --media-slide: 62cqi;
+    --media-edge: 19cqi;
+  }
+}
+
+.media_view_carousel .media__track {
+  position: relative; /* от неё считаются offsetLeft плиток — и прокрутка ленты их не сдвигает */
+  display: flex;
+  gap: var(--space-2);
+  padding-inline: var(--media-edge);
+  border-radius: 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+  overscroll-behavior-x: contain;
+  scroll-snap-type: x mandatory;
+  scroll-padding-inline: var(--media-edge);
+  scrollbar-width: none;
+}
+
+.media_view_carousel .media__track::-webkit-scrollbar {
+  display: none;
+}
+
+.media_view_carousel .media__item {
+  flex: 0 0 var(--media-slide);
+  aspect-ratio: var(--media-ratio);
+  border-radius: var(--radius-l);
+  scroll-snap-align: center;
+  scroll-snap-stop: always;
+  --media-play: 56px;
+}
+
+.media__count {
+  position: absolute;
+  top: var(--space-3);
+  right: calc(var(--media-edge, 0px) + var(--space-3));
+  padding: var(--space-half) var(--space-2);
+  border-radius: var(--radius-full);
+  background: var(--color-media-shade);
+  color: var(--color-on-media);
+  font-size: var(--text-caption);
+  font-weight: var(--weight-semibold);
+  font-variant-numeric: tabular-nums;
+  pointer-events: none;
+  -webkit-backdrop-filter: blur(var(--blur-glass));
+  backdrop-filter: blur(var(--blur-glass));
+}
+
+.media__dots {
+  position: absolute;
+  bottom: var(--space-3);
+  left: 50%;
+  display: flex;
+  gap: 5px;
+  padding: 5px var(--space-2);
+  border-radius: var(--radius-full);
+  background: var(--color-media-shade);
+  pointer-events: none;
+  translate: -50% 0;
+  -webkit-backdrop-filter: blur(var(--blur-glass));
+  backdrop-filter: blur(var(--blur-glass));
+}
+
+.media__dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--color-on-media);
+  opacity: .45;
+  transition: opacity var(--duration-fast) ease, scale var(--duration-fast) var(--ease-out);
+}
+
+.media__dot_current {
+  opacity: 1;
+  scale: 1.15;
+}
+
+/* Стрелки — у курсора; появляются, когда мышь над лентой или фокус внутри. */
+.media__nav {
+  position: absolute;
+  top: 50%;
+  display: none;
+  translate: 0 -50%;
+}
+
+.media__nav_dir_prev { left: calc(var(--media-edge, 0px) + var(--space-2)); }
+.media__nav_dir_next { right: calc(var(--media-edge, 0px) + var(--space-2)); }
+
+@media (hover: hover) {
+  .media__nav {
+    display: inline-flex;
+    opacity: 0;
+    transition: opacity var(--duration-fast) ease;
+  }
+
+  .media:hover .media__nav,
+  .media:focus-within .media__nav {
+    opacity: 1;
+  }
+
+  .media__nav:disabled {
+    opacity: 0;
+    pointer-events: none;
+  }
+}

@@ -1,0 +1,78 @@
+/*
+ * Шкалы, не зависящие от плотности: отступы, радиусы, шрифты, слои, тени.
+ * Размеры, которые на десктопе меньше, чем на телефоне, — в sizes.css.
+ */
+:root {
+  /* Отступы — шаг 4px. Номер = число шагов. */
+  --space-half: 2px;
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-7: 28px;
+  --space-8: 32px;
+  --space-10: 40px;
+  --space-12: 48px;
+  --space-14: 56px;
+  --space-16: 64px;
+
+  /*
+   * Радиусы. Вложенный прямоугольник вплотную к отступу родителя:
+   *   calc(радиус родителя − отступ родителя).
+   * Таблетки и круги (кнопки, метки) правилу не подчиняются — у них --radius-full.
+   */
+  --radius-xs: 6px;
+  --radius-s: 10px;
+  --radius-m: 14px;
+  --radius-l: 20px;
+  --radius-xl: 26px;
+  --radius-2xl: 44px;
+  --radius-full: 999px;
+
+  /* Шрифты. Inter лежит локально: приложение обязано работать офлайн. */
+  --font-sans: Inter, -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, monospace;
+
+  /* Тонкий — только для крупного: приветствия, большие числа, циферблаты. */
+  --weight-light: 300;
+  --weight-regular: 400;
+  --weight-medium: 500;
+  --weight-semibold: 600;
+  --weight-bold: 700;
+
+  --leading-hero: 1.02;
+  --leading-tight: 1.1;
+  --leading-title: 1.18;
+  --leading-snug: 1.32;
+  --leading-normal: 1.45;
+
+  --tracking-hero: -.04em;
+  --tracking-display: -.03em;
+  --tracking-title: -.025em;
+  --tracking-snug: -.014em;
+  --tracking-caps: .06em;
+
+  /* Метки графиков (правила dataviz): скругление только у конца с данными, толщина с потолком. */
+  --mark-radius: 4px;
+  --mark-max: 24px;
+  --mark-min: 2px;
+
+  /* Слои. Диалог живёт в верхнем слое браузера и в шкале не нуждается. */
+  --z-raised: 10;
+  --z-sheet: 20;
+  --z-voice: 30;
+  --z-panel: 40;
+  --z-dropdown: 100;
+  --z-toast: 2000;
+
+  /* Глубина */
+  --shadow-s: 0 1px 2px var(--color-shadow), 0 1px 1px var(--color-shadow);
+  --shadow-m: 0 6px 20px var(--color-shadow);
+  --shadow-l: 0 18px 48px var(--color-shadow);
+  --shadow-knob: 0 2px 8px rgba(0, 0, 0, .28), 0 0 0 .5px rgba(0, 0, 0, .06);
+  --shadow-text: 0 1px 1px rgba(0, 0, 0, .35);
+  --blur-glass: 18px;
+  --blur-overlay: 6px;
+}

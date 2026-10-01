@@ -1,0 +1,24 @@
+/*
+ * Элемент button__circle: значок в своём круге в начале кнопки — «→ Начать».
+ * Круг — акцент на любом виде кнопки; сама кнопка при этом тише (contrast,
+ * secondary). Модификатор button_lead_circle подтягивает левый край к кругу.
+ *
+ *   <button class="button button_view_contrast button_lead_circle">
+ *     <span class="button__circle"><svg class="icon">…</svg></span><span class="button__text">Начать</span>
+ *   </button>
+ */
+.button__circle {
+  display: grid;
+  flex: 0 0 auto;
+  place-items: center;
+  width: calc(var(--button-h) - 8px);
+  height: calc(var(--button-h) - 8px);
+  border-radius: 50%;
+  background: var(--color-accent);
+  color: var(--color-on-accent);
+}
+
+.button_lead_circle {
+  padding-inline-start: var(--space-1);
+  gap: var(--space-3);
+}

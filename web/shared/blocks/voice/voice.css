@@ -1,0 +1,100 @@
+/*
+ * Блок voice: экран голосового режима — сцена кольца, что сейчас (слушаю,
+ * думаю, говорю), субтитры и выход. Фон чёрный: кольцо светится от белого к
+ * цвету, и на цветном фоне тихие капсулы пропали бы.
+ *
+ *   <section class="voice">
+ *     <div class="orb-stage voice__stage">…</div>
+ *     <p class="voice__status">Слушаю</p>
+ *     <p class="voice__caption"><span class="voice__line">…</span>
+ *       <span class="voice__line voice__line_who_alter">…</span></p>
+ *     <button class="button voice__close">Закрыть</button>
+ *   </section>
+ *
+ *   __status_tone_danger — разговор не открылся или оборвался
+ *   __line_tone_danger — строка субтитров об ошибке
+ *   __ticker › __ticker-text — бегущая строка: что Alter говорит, одной строкой;
+ *   видна, когда голос лежит в свёрнутой панели разговора (sheet__voice, ADR-0072
+ *   Alter'а). Там же у голоса нет своей подложки и кнопки «Закрыть» — кольцо тянут вниз.
+ *   Текст едет влево, чтобы конец сказанного был виден; скорость — --ticker-ms от JS.
+ *
+ * Безопасные зоны оболочка передаёт переменными --voice-safe-top/-bottom (как у
+ * panel): env() здесь дал бы отступ под «чёлку» и макету в витрине.
+ */
+.voice {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  height: 100%;
+  min-height: 0;
+  padding:
+    calc(var(--voice-safe-top, 0px) + var(--space-6))
+    var(--space-5)
+    calc(var(--voice-safe-bottom, 0px) + var(--space-5));
+  background: var(--color-media-bg);
+  color-scheme: dark;
+  color: var(--color-text);
+}
+
+.voice__stage {
+  flex: 1 1 auto;
+}
+
+.voice__status {
+  min-height: 1lh;
+  margin: 0;
+  font-size: var(--text-title);
+  font-weight: var(--weight-bold);
+  letter-spacing: var(--tracking-title);
+  line-height: var(--leading-title);
+  text-align: center;
+}
+
+/* Субтитры: место держится всегда — иначе кольцо прыгает, когда текст приходит. */
+.voice__caption {
+  min-height: 3lh;
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: var(--text-body);
+  line-height: var(--leading-snug);
+  text-align: center;
+}
+
+.voice__line {
+  display: block;
+}
+
+.voice__line_who_alter {
+  color: var(--color-text);
+}
+
+.voice__status_tone_danger,
+.voice__line_tone_danger {
+  color: var(--color-danger);
+}
+
+.voice__close {
+  align-self: center;
+}
+
+.voice__ticker {
+  display: none;
+  margin: 0;
+  overflow: hidden;
+  font-size: var(--text-message);
+  font-weight: var(--weight-semibold);
+  line-height: var(--leading-snug);
+  letter-spacing: var(--tracking-snug);
+  white-space: nowrap;
+  -webkit-mask-image: linear-gradient(to right, transparent, var(--color-mask) 28px);
+  mask-image: linear-gradient(to right, transparent, var(--color-mask) 28px);
+}
+
+.voice__ticker-text {
+  display: inline-block;
+  transition: translate var(--ticker-ms, .6s) linear;
+}
+
+.voice__ticker_quiet .voice__ticker-text {
+  opacity: .7;
+}

@@ -1,0 +1,89 @@
+/*
+ * Блок orb-stage: сцена кольца — само кольцо и место под то, что Alter
+ * показывает, пока говорит. Кольцо лежит на сцене абсолютно, положение и размер —
+ * переменными; раскладка — модификатор, то есть три числа: круг уезжает и
+ * уменьшается, освобождая место. Числа — как у сцены приложения (.orbstage).
+ *
+ *   <div class="orb-stage">
+ *     <div class="orb-stage__orb"></div>          ← кольцо рисует компонент
+ *     [<div class="player player_view_voice" …>]  ← музыка: обложка в центре кольца
+ *     <div class="orb-stage__content">…</div>     ← что показать (data-reveal="manual")
+ *   </div>
+ *
+ *   orb-stage_layout_{top|corner} (без — по центру) · от JS: orb-stage_music
+ *   orb-stage_view_preview — превью (экран «Кольцо и звук»): квадрат своей
+ *   высоты на своей тёмной подложке, а не поле родителя
+ *   data-look — вид кольца при создании (JSON ключей движка), data-mode — режим
+ *
+ * Всегда тёмная. Переменные кольца — в единицах сцены (cqw / cqh): их читают и
+ * вложенные блоки (вид плеера ставит обложку ровно в центр круга).
+ */
+.orb-stage {
+  --orb-size: 74cqw;
+  --orb-x: 50cqw;
+  --orb-y: 46cqh;
+  --content-top: 100cqh;
+  /* Доля круга без капсул: внутрь они не растут, когда кольцо слушает только трек. */
+  --orb-hole: .62;
+  --orb-move: var(--duration-slow) var(--ease-out);
+
+  position: relative;
+  min-height: 0;
+  overflow: hidden;
+  color-scheme: dark;
+  color: var(--color-text);
+  container-type: size;
+}
+
+.orb-stage_layout_top {
+  --orb-size: 34cqw;
+  --orb-y: 19cqh;
+  --content-top: 40cqh;
+}
+
+.orb-stage_layout_corner {
+  --orb-size: 20cqw;
+  --orb-x: 89cqw;
+  --orb-y: 12cqh;
+  --content-top: 26cqh;
+}
+
+.orb-stage__orb {
+  position: absolute;
+  top: var(--orb-y);
+  left: var(--orb-x);
+  width: var(--orb-size);
+  aspect-ratio: 1;
+  translate: -50% -50%;
+  transition: top var(--orb-move), left var(--orb-move), width var(--orb-move);
+}
+
+.orb-stage__content {
+  position: absolute;
+  top: var(--content-top);
+  right: 0;
+  bottom: 0;
+  left: 0;
+  padding: 0 var(--space-4) var(--space-4);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  transition: top var(--orb-move);
+}
+
+/*
+ * Превью: сцена сама держит квадрат — в столбике настроек у неё нет растянутого
+ * родителя, а container-type: size без высоты даёт ноль. Подложка своя: белые
+ * капсулы тишины в светлой теме иначе не видны; рамка — чтобы в тёмной превью
+ * не сливалось с экраном.
+ */
+.orb-stage_view_preview {
+  aspect-ratio: 1;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-xl);
+  background: var(--color-media-bg);
+}
+
+/* Музыка: центр кольца — под обложку, знака Alter нет. */
+.orb-stage_music .orb__mark {
+  opacity: 0;
+}

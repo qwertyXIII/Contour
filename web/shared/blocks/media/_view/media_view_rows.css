@@ -1,0 +1,83 @@
+/*
+ * Вид media_view_rows — плашки строками: файл, ссылка, звук среди вложений реплики
+ * в ленте разговора. Плашка — та же плитка без превью, что в сетке «Файлов»
+ * (media__item_kind_file: значок, название, факты), только лёжа: значок слева в
+ * круге, справа название и строка фактов. Цвет — от того, на чём лежит
+ * (currentColor), как у голосового (voice-note): в открытой панели разговора
+ * плашка Alter'а — акцентом, своя — белым, на коралле свёрнутой — белым.
+ *
+ *   <div class="media media_view_rows">
+ *     <div class="media__track">
+ *       <button class="media__item media__item_kind_file" type="button" data-kind="document" …>
+ *         <span class="media__glyph"><svg class="icon">…</svg></span>
+ *         <span class="media__name">договор.pdf</span>
+ *         <span class="media__meta">Документ · PDF</span>
+ *       </button>
+ *     </div>
+ *   </div>
+ *
+ * Ширину плашек задаёт хозяин — шириной блока.
+ */
+.media_view_rows .media__track {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  overflow: visible;
+  border-radius: 0;
+}
+
+.media_view_rows .media__item {
+  display: grid;
+  grid-template: "glyph name" auto "glyph meta" auto / auto minmax(0, 1fr);
+  align-content: center;
+  align-items: center;
+  justify-items: start;
+  column-gap: var(--space-3);
+  row-gap: var(--space-half);
+  width: 100%;
+  min-height: var(--control-h-l);
+  aspect-ratio: auto;
+  padding: var(--space-2) var(--space-4) var(--space-2) var(--space-2);
+  border-radius: var(--media-radius);
+  background: color-mix(in srgb, currentColor 12%, transparent);
+  color: inherit;
+  text-align: start;
+  transition: background-color var(--duration-fast) ease;
+}
+
+@media (hover: hover) {
+  .media_view_rows .media__item:hover {
+    background: color-mix(in srgb, currentColor 16%, transparent);
+  }
+}
+
+.media_view_rows .media__item:active {
+  background: color-mix(in srgb, currentColor 20%, transparent);
+}
+
+.media_view_rows .media__glyph {
+  grid-area: glyph;
+  width: var(--control-h-m);
+  aspect-ratio: 1;
+  border-radius: var(--radius-full);
+  background: color-mix(in srgb, currentColor 14%, transparent);
+  color: inherit;
+  --icon-size: var(--icon-m);
+}
+
+.media_view_rows .media__name {
+  grid-area: name;
+  font-size: var(--text-body);
+  font-weight: var(--weight-semibold);
+  letter-spacing: 0;
+  line-height: var(--leading-snug);
+}
+
+.media_view_rows .media__meta {
+  grid-area: meta;
+  color: inherit;
+  font-size: var(--text-small);
+  font-weight: var(--weight-medium);
+  letter-spacing: 0;
+  opacity: .72;
+}

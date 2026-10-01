@@ -1,0 +1,172 @@
+/*
+ * Блок video: видео со своими элементами управления поверх нативного <video>.
+ * Нативный элемент — источник времени и событий; без JS он виден сам, со
+ * своими controls. Компонент Video убирает controls и строит своё.
+ *
+ *   <div class="video" style="--ratio: 1.778">
+ *     <video class="video__native" src="clip.mp4" poster="poster.jpg"
+ *            preload="metadata" playsinline controls aria-label="…"></video>
+ *   </div>
+ *
+ *   от JS: __big (играть / сначала — в центре) · __spinner · __badge
+ *   (длительность до старта) · __error · __bar › __button · __time ·
+ *   __seek (+ range range_view_thin) · __gap
+ *
+ *   состояния от JS: video_enhanced · _started · _playing · _waiting ·
+ *   _ended · _error · _idle (элементы спрятаны во время показа) · _muted ·
+ *   _fullscreen
+ *
+ * Всегда тёмный: у видео своё поле, чёрное в любой теме.
+ */
+.video {
+  --video-radius: var(--radius-m);
+
+  position: relative;
+  display: block;
+  width: 100%;
+  aspect-ratio: var(--ratio, 1.778);
+  border-radius: var(--video-radius);
+  background: var(--color-media-bg);
+  color: var(--color-on-media);
+  color-scheme: dark;
+  overflow: hidden;
+  isolation: isolate;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.video__native {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.video_enhanced .video__native {
+  cursor: pointer;
+}
+
+.video_fullscreen {
+  aspect-ratio: auto;
+  border-radius: 0;
+}
+
+.video_idle {
+  cursor: none;
+}
+
+.video_idle .video__native {
+  cursor: none;
+}
+
+/* Центр: играть — пока стоит; крутилка — пока ждёт данных. */
+.video__big,
+.video__spinner,
+.video__error {
+  position: absolute;
+  inset: 0;
+  margin: auto;
+}
+
+.video__big {
+  transition: opacity var(--duration-fast) ease, scale var(--duration-fast) var(--ease-out), transform var(--duration-press) var(--ease-out);
+  --button-h: 64px;
+  --icon-size: var(--icon-l);
+}
+
+.video_playing .video__big,
+.video_waiting .video__big,
+.video_error .video__big {
+  opacity: 0;
+  pointer-events: none;
+  scale: .88;
+}
+
+.video__spinner {
+  display: none;
+}
+
+.video_waiting .video__spinner {
+  display: block;
+}
+
+.video__error {
+  display: none;
+  width: max-content;
+  height: max-content;
+  max-width: calc(100% - var(--space-8));
+  color: var(--color-text-muted);
+  font-size: var(--text-small);
+  font-weight: var(--weight-medium);
+  text-align: center;
+}
+
+.video_error .video__error {
+  display: block;
+}
+
+/* До первого запуска — длительность в углу, как у плитки медиа. */
+.video__badge {
+  position: absolute;
+  right: var(--space-2);
+  bottom: var(--space-2);
+  padding: 1px var(--space-2);
+  border-radius: var(--radius-xs);
+  background: var(--color-media-shade);
+  font-size: var(--text-caption);
+  font-weight: var(--weight-semibold);
+  font-variant-numeric: tabular-nums;
+  pointer-events: none;
+}
+
+.video_started .video__badge,
+.video_error .video__badge {
+  display: none;
+}
+
+/* Полоса: перемотка на всю ширину, под ней кнопки и время. */
+.video__bar {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0 var(--space-1);
+  padding: var(--space-8) var(--space-2) var(--space-1);
+  background: var(--gradient-media-foot);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--duration-normal) ease;
+}
+
+.video_started .video__bar {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.video_idle .video__bar,
+.video_error .video__bar {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.video__seek {
+  flex: 1 0 100%;
+  padding-inline: var(--space-2);
+  --range-color: var(--color-on-media);
+  --range-buffer-color: var(--color-text-faint);
+  --range-empty: var(--color-fill-2);
+}
+
+.video__time {
+  padding-inline: var(--space-1);
+  font-size: var(--text-caption);
+  font-weight: var(--weight-semibold);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.video__gap {
+  flex: 1 1 auto;
+}

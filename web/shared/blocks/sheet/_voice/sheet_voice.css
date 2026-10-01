@@ -1,0 +1,142 @@
+/*
+ * Голосовой режим в панели разговора (ADR-0072 Alter'а): слой sheet__voice (микс с
+ * блоком voice) лежит в sheet_layered между лентой и полем. Ход — доля --voice-p
+ * (0…1), кольцо — --voice-orb (та же доля, догнанная пружиной: с запозданием и
+ * перелётом) и --voice-jelly (растяжение от его скорости); всё пишет компонент
+ * SheetVoice прямо на слой (--voice-p — ещё и на поле). Из них здесь выводится всё,
+ * кроме реплик:
+ *   - кольцо растёт с места значка микрофона до своего в сцене (его размер и сдвиг
+ *     компонент меряет раз на жест: --voice-mic-dx/-dy/-s);
+ *   - поле и «Отправить» уезжают вниз к трети хода;
+ *   - что сейчас и субтитры проявляются к концу хода.
+ * Панель свернули при открытом голосе — по --sheet-p кольцо уходит в левую часть
+ * пилюли (--voice-pill-dx/-dy/-s), справа — бегущая строка (voice__ticker). Пилюля
+ * при голосе чёрная, с рамкой: на тёмном главном без рамки её не видно (владелец).
+ *
+ *   sheet_voice — голос включён или его тянут: слой виден (компонент)
+ *   sheet_voice-open — голос открыт до конца: лента спрятана (компонент)
+ *
+ * ⚠️ WebKit не пересчитывает `inherit` ненаследуемой переменной (на iPhone кольцо
+ * стояло прозрачным). Поэтому долю хода панели слою пишет сам лист (SHEET.followers,
+ * он же считает из неё --sheet-cut — см. sheet_live), а дальше она идёт обычными
+ * наследуемыми переменными: --voice-sheet, --voice-cut.
+ */
+.sheet_layered .sheet__voice {
+  display: none;
+}
+
+.sheet_layered.sheet_voice .sheet__voice {
+  --voice-sheet: var(--sheet-p);
+  --voice-cut: var(--sheet-cut);
+  --voice-side: var(--sheet-side);
+  --voice-below: var(--sheet-below);
+
+  position: absolute;
+  inset: 0;
+  display: flex;
+  height: auto;
+  padding: calc(var(--sheet-safe-top, 0px) + var(--sheet-handle-open)) var(--space-5) calc(var(--sheet-safe-bottom, 0px) + var(--space-8));
+  background: none;
+  /* Касания — только кольцу: остальной слой пропускает их к ручке и ленте. */
+  pointer-events: none;
+}
+
+.sheet_voice .sheet__voice .voice__stage {
+  /* Кольцо уходит в пилюлю — за пределы сцены: не обрезать. */
+  overflow: visible;
+  pointer-events: auto;
+  touch-action: none;
+}
+
+.sheet_voice .sheet__voice .orb-stage__orb {
+  /* Насколько панель свёрнута и насколько кольцо ушло от микрофона: растёт сразу, за
+     пальцем, к месту — плавно (t·(2 − t)); перелёт пружины за 1 — сверху. */
+  --voice-k: calc(1 - var(--voice-sheet, 1));
+  --voice-t: clamp(0, (var(--voice-orb, 0) - .03) / .97, 1);
+  --voice-e: calc(var(--voice-t) * (2 - var(--voice-t)) + max(0, var(--voice-orb, 0) - 1));
+  /* Место в раскрытой панели или в пилюле — по доле хода панели. */
+  --voice-x: calc(var(--voice-pill-dx, 0px) * var(--voice-k));
+  --voice-y: calc(var(--voice-cut, 0px) + var(--voice-pill-dy, 0px) * var(--voice-k));
+  --voice-s: calc(var(--voice-mic-s, 1) + (1 + (var(--voice-pill-s, 1) - 1) * var(--voice-k) - var(--voice-mic-s, 1)) * var(--voice-e));
+
+  opacity: clamp(0, var(--voice-p, 0) / .08, 1);
+  transform:
+    translate(
+      calc(var(--voice-mic-dx, 0px) + (var(--voice-x) - var(--voice-mic-dx, 0px)) * var(--voice-e)),
+      calc(var(--voice-mic-dy, 0px) + (var(--voice-y) - var(--voice-mic-dy, 0px)) * var(--voice-e)))
+    scale(calc(var(--voice-s) * (1 - var(--voice-jelly, 0) / 2)), calc(var(--voice-s) * (1 + var(--voice-jelly, 0))));
+  will-change: transform;
+}
+
+.sheet_voice .sheet__voice .voice__status,
+.sheet_voice .sheet__voice .voice__caption {
+  opacity: calc(clamp(0, (var(--voice-p, 0) - .7) / .3, 1) * clamp(0, (var(--voice-sheet, 1) - .6) / .4, 1));
+}
+
+/*
+ * Субтитры — постоянной высоты, свежее снизу: иначе сцена над ними ужималась бы с
+ * каждой строкой, и кольцо уезжало бы от места, где его меряли на жест.
+ */
+.sheet_voice .sheet__voice .voice__caption {
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  flex: 0 0 auto;
+  height: 4lh;
+  min-height: 0;
+  overflow: hidden;
+  -webkit-mask-image: linear-gradient(to bottom, transparent, var(--color-mask) 1lh);
+  mask-image: linear-gradient(to bottom, transparent, var(--color-mask) 1lh);
+}
+
+/* Бегущая строка — в пилюле справа от кольца, только у свёрнутой. */
+.sheet_voice .sheet__voice .voice__ticker {
+  position: absolute;
+  top: calc(var(--voice-cut, 0px) + var(--sheet-low, var(--sheet-closed)) / 2 + 4px);
+  right: calc(var(--sheet-gap, 0px) + var(--space-5));
+  left: calc(var(--voice-pill-end, 96px) + var(--space-3));
+  display: block;
+  translate: 0 -50%;
+  opacity: calc(clamp(0, var(--voice-p, 0) * 2 - 1, 1) * clamp(0, 1 - var(--voice-sheet, 1) * 4, 1));
+}
+
+/* Поле и «Отправить» (и полоса файлов над ними) уходят вниз к трети хода — и не выезжают, пока голос открыт. */
+.sheet_layered.sheet_voice .sheet__foot {
+  transform: translateY(calc(clamp(0, var(--voice-p, 0) / .35, 1) * (var(--sheet-foot-hidden) + var(--sheet-foot-extra, 0px))));
+  transition: none;
+}
+
+/* Голос открыт до конца: лента спрятана — новые строки, дописанные разговором, не видны. */
+.sheet_layered.sheet_voice-open .sheet__body {
+  visibility: hidden;
+}
+
+/*
+ * Пилюля при голосе — чёрная, как раскрытая панель, и с рамкой по вырезу: коралл
+ * сменяется чёрным, пока панель раскрыта (голос включают только там), — перехода не
+ * видно. Рамка — псевдоэлементом слоя голоса по краю видимой части: у корня рамка
+ * ушла бы под вырез.
+ */
+.sheet_layered.sheet_voice {
+  --sheet-from: var(--sheet-to);
+}
+
+.sheet_layered.sheet_voice .sheet__voice::after {
+  --voice-rt: calc(var(--sheet-radius) * clamp(0, (1 - var(--voice-sheet)) * 20, 1));
+  --voice-rb: calc(var(--sheet-radius) * max(0, 1 - var(--voice-sheet) / .6));
+
+  content: "";
+  position: absolute;
+  top: var(--voice-cut);
+  right: var(--voice-side);
+  bottom: var(--voice-below);
+  left: var(--voice-side);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--voice-rt) var(--voice-rt) var(--voice-rb) var(--voice-rb);
+  opacity: calc(1 - var(--voice-sheet));
+  pointer-events: none;
+}
+
+.sheet_layered .composer__voice {
+  touch-action: none;
+}

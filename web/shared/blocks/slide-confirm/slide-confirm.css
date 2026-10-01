@@ -1,0 +1,240 @@
+/*
+ * Блок slide-confirm: подтверждение жестом — «проведи, чтобы отправить».
+ * Для действий, которые нельзя отменить: случайное касание их не запустит,
+ * а само движение и есть согласие.
+ *
+ *   <div class="slide-confirm" data-done="Отправлено">
+ *     <div class="slide-confirm__track">
+ *       <span class="slide-confirm__fill"></span>
+ *       <span class="slide-confirm__text">Проведи, чтобы отправить</span>
+ *       <span class="slide-confirm__result" aria-live="polite"></span>
+ *       <button class="slide-confirm__thumb" type="button" aria-label="Отправить Стасу">
+ *         <svg class="icon icon_motion_loop slide-confirm__icon slide-confirm__icon_kind_go">…chevrons-right</svg>
+ *         <svg class="icon slide-confirm__icon slide-confirm__icon_kind_done">…check</svg>
+ *         <span class="spinner slide-confirm__icon slide-confirm__icon_kind_busy"></span>
+ *       </button>
+ *     </div>
+ *   </div>
+ *
+ *   slide-confirm_tone_danger · slide-confirm_size_s · slide-confirm_both (две стороны: да / нет)
+ *   Состояния ставит компонент SlideConfirm: _dragging · _busy · _done · _side_decline · _hint · _failed · _error
+ *
+ * Положение ручки — одна переменная --slide от 0 до 1 (у _both — от −1 до 1).
+ * Путь ручки считается от ширины дорожки (единицы cqw), поэтому JS не
+ * меряет пиксели: он только пишет долю.
+ */
+.slide-confirm {
+  --slide: 0;
+  --slide-h: var(--control-h-l);
+  --slide-pad: 4px;
+  --slide-thumb: calc(var(--slide-h) - var(--slide-pad) * 2);
+  --slide-travel: calc(100cqw - var(--slide-thumb) - var(--slide-pad) * 2);
+  --slide-color: var(--color-accent);
+  --slide-on: var(--color-on-accent);
+  --slide-soft: var(--color-accent-soft);
+  --slide-ease: var(--duration-slow) var(--ease-out);
+
+  display: block;
+  width: 100%;
+  min-width: 0;
+}
+
+.slide-confirm_size_s {
+  --slide-h: var(--control-h-m);
+  --slide-pad: 3px;
+}
+
+.slide-confirm_tone_danger {
+  --slide-color: var(--color-danger);
+  --slide-on: var(--color-on-contrast);
+  --slide-soft: var(--color-danger-soft);
+}
+
+.slide-confirm__track {
+  position: relative;
+  height: var(--slide-h);
+  border-radius: var(--radius-full);
+  background: var(--color-fill-1);
+  overflow: hidden;
+  container-type: inline-size;
+  /* Вертикальная прокрутка страницы остаётся пальцу, горизонталь — наша. */
+  touch-action: pan-y;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.slide-confirm__fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: calc(var(--slide-thumb) + var(--slide-pad) * 2 + max(0, var(--slide)) * var(--slide-travel));
+  border-radius: inherit;
+  background: var(--slide-soft);
+  pointer-events: none;
+  transition: width var(--slide-ease), background-color var(--duration-normal);
+}
+
+.slide-confirm__text,
+.slide-confirm__result {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding-inline: calc(var(--slide-thumb) + var(--slide-pad) * 3);
+  font-size: var(--text-body);
+  font-weight: var(--weight-semibold);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  pointer-events: none;
+}
+
+/* Подсказка уходит, пока ручку тянут; по ней пробегает блик, как у «Разблокируйте». */
+.slide-confirm__text {
+  background: linear-gradient(100deg, var(--color-text-muted) 40%, var(--color-text) 50%, var(--color-text-muted) 60%) 0 0 / 250% 100%;
+  color: transparent;
+  -webkit-background-clip: text;
+  background-clip: text;
+  opacity: calc(1 - max(0, var(--slide)) * 1.8);
+  transition: opacity var(--slide-ease);
+  animation: slide-confirm-shine 2.6s linear infinite;
+}
+
+.slide-confirm__result {
+  color: var(--slide-on);
+  opacity: 0;
+  transition: opacity var(--duration-normal);
+}
+
+.slide-confirm__thumb {
+  position: absolute;
+  top: var(--slide-pad);
+  left: var(--slide-pad);
+  z-index: 1;
+  display: grid;
+  place-items: center;
+  width: var(--slide-thumb);
+  height: var(--slide-thumb);
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-full);
+  background: var(--slide-color);
+  box-shadow: var(--shadow-s);
+  color: var(--slide-on);
+  cursor: grab;
+  translate: calc(var(--slide) * var(--slide-travel)) 0;
+  transition: translate var(--slide-ease), background-color var(--duration-normal), scale var(--duration-press);
+  touch-action: none;
+  -webkit-tap-highlight-color: transparent;
+  --icon-size: var(--icon-m);
+}
+
+.slide-confirm__thumb:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 2px;
+}
+
+.slide-confirm__thumb:disabled {
+  cursor: default;
+}
+
+.slide-confirm__icon {
+  grid-area: 1 / 1;
+}
+
+.slide-confirm__icon_kind_done,
+.slide-confirm__icon_kind_busy {
+  display: none;
+}
+
+/* Тянут: ручка идёт за пальцем без запаздывания, чуть крупнее — «взял». */
+.slide-confirm_dragging .slide-confirm__thumb {
+  cursor: grabbing;
+  scale: 1.04;
+  transition: background-color var(--duration-normal), scale var(--duration-press);
+}
+
+.slide-confirm_dragging .slide-confirm__fill,
+.slide-confirm_dragging .slide-confirm__text {
+  transition: none;
+}
+
+/* Коснулись, но не повели — ручка сама показывает, куда вести. */
+.slide-confirm_hint .slide-confirm__thumb {
+  animation: slide-confirm-hint 700ms var(--ease-out);
+}
+
+.slide-confirm_busy .slide-confirm__fill,
+.slide-confirm_done .slide-confirm__fill {
+  background: var(--slide-color);
+}
+
+.slide-confirm_busy .slide-confirm__result,
+.slide-confirm_done .slide-confirm__result {
+  opacity: 1;
+}
+
+.slide-confirm_busy .slide-confirm__text,
+.slide-confirm_done .slide-confirm__text {
+  opacity: 0;
+}
+
+.slide-confirm_busy .slide-confirm__thumb,
+.slide-confirm_done .slide-confirm__thumb {
+  background: var(--slide-on);
+  box-shadow: none;
+  color: var(--slide-color);
+  cursor: default;
+}
+
+.slide-confirm_busy .slide-confirm__icon_kind_go,
+.slide-confirm_done .slide-confirm__icon_kind_go {
+  display: none;
+}
+
+.slide-confirm_busy .slide-confirm__icon_kind_busy,
+.slide-confirm_done .slide-confirm__icon_kind_done {
+  display: inline-block;
+}
+
+/* Не вышло: ручка вернулась, дорожка качнула головой, вместо подсказки — почему. */
+.slide-confirm_failed .slide-confirm__track {
+  animation: slide-confirm-no 500ms var(--ease-out);
+}
+
+.slide-confirm_error .slide-confirm__text {
+  opacity: 0;
+}
+
+.slide-confirm_error .slide-confirm__result {
+  color: var(--color-danger);
+  font-size: var(--text-small);
+  opacity: 1;
+}
+
+@keyframes slide-confirm-shine {
+  from { background-position: 100% 0; }
+  to { background-position: -150% 0; }
+}
+
+@keyframes slide-confirm-hint {
+  0%, 100% { translate: 0 0; }
+  35% { translate: 14px 0; }
+  60% { translate: -2px 0; }
+}
+
+@keyframes slide-confirm-no {
+  0%, 100% { translate: 0 0; }
+  20% { translate: -6px 0; }
+  40% { translate: 5px 0; }
+  60% { translate: -3px 0; }
+  80% { translate: 1px 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .slide-confirm__text {
+    animation: none;
+    background: none;
+    color: var(--color-text-muted);
+  }
+}

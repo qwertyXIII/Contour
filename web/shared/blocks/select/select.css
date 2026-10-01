@@ -1,0 +1,149 @@
+/*
+ * Блок select: выбор одного из списка — модель, часовой пояс, канал.
+ *
+ * Везде выглядит одинаково: компонент Select строит свой триггер и список
+ * поверх нативного <select>. Нативный остаётся в разметке источником значения —
+ * name, форма и событие change работают как обычно, а без JS виден он сам.
+ *
+ *   <div class="select">
+ *     <select class="select__native" name="tz" data-placeholder="Выбери пояс">
+ *       <option value="nsk" data-hint="+07" data-icon="pin">Новосибирск</option>
+ *       <optgroup label="Европа">…</optgroup>
+ *     </select>
+ *     <svg class="icon select__arrow" aria-hidden="true"><use href="…#chevron-down"/></svg>
+ *   </div>
+ *
+ *   select_size_s · select_searchable (поиск в списке) · select_invalid
+ *   select_enhanced — ставит Select; тогда видны __trigger → __icon · __value · __hint · __arrow
+ *   Список — __popup (микс с popup), его элементы в __popup/.
+ *   data-hint / data-icon у <option> — вторая строка и значок пункта.
+ */
+.select {
+  --select-h: var(--control-h-m);
+  --select-font: var(--text-field);
+
+  position: relative;
+  display: flex;
+  align-items: center;
+  width: 100%;
+  min-width: 0;
+}
+
+.select_size_s {
+  --select-h: var(--control-h-s);
+  --select-font: var(--text-body);
+}
+
+/* Нативный — пока не пришёл JS (или браузер без popover). */
+.select__native {
+  width: 100%;
+  min-width: 0;
+  height: var(--select-h);
+  margin: 0;
+  padding: 0 calc(var(--icon-s) + var(--space-6)) 0 var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-m);
+  background: var(--color-well);
+  color: var(--color-text);
+  font: inherit;
+  font-size: var(--select-font);
+  text-overflow: ellipsis;
+  cursor: pointer;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+.select__native:focus-visible {
+  outline: none;
+  border-color: var(--color-focus);
+  box-shadow: 0 0 0 3px var(--color-accent-soft);
+}
+
+.select_enhanced .select__native {
+  display: none;
+}
+
+/* Свой триггер: та же рамка, что у поля ввода. */
+.select__trigger {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  width: 100%;
+  min-width: 0;
+  height: var(--select-h);
+  margin: 0;
+  padding: 0 var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-m);
+  background: var(--color-well);
+  color: var(--color-text);
+  font: inherit;
+  font-size: var(--select-font);
+  text-align: start;
+  cursor: pointer;
+  --icon-size: var(--icon-s);
+  transition: border-color var(--duration-fast) ease, box-shadow var(--duration-fast) ease;
+}
+
+@media (hover: hover) {
+  .select__trigger:hover {
+    border-color: var(--color-border-strong);
+  }
+}
+
+.select__trigger:focus-visible,
+.select__trigger[aria-expanded="true"] {
+  outline: none;
+  border-color: var(--color-focus);
+  box-shadow: 0 0 0 3px var(--color-accent-soft);
+}
+
+.select__trigger:disabled {
+  opacity: .5;
+  cursor: not-allowed;
+}
+
+.select__icon {
+  color: var(--color-text-muted);
+}
+
+.select__value {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.select__value_placeholder {
+  color: var(--color-text-faint);
+}
+
+.select__hint {
+  flex: 0 0 auto;
+  color: var(--color-text-muted);
+  font-size: var(--text-small);
+}
+
+.select__arrow {
+  flex: 0 0 auto;
+  color: var(--color-text-muted);
+  --icon-size: var(--icon-s);
+  transition: transform var(--duration-normal) var(--ease-out);
+}
+
+/* Без JS стрелка лежит поверх нативного поля. */
+.select:not(.select_enhanced) .select__arrow {
+  position: absolute;
+  right: var(--space-3);
+  pointer-events: none;
+}
+
+.select__trigger[aria-expanded="true"] .select__arrow {
+  transform: rotate(180deg);
+}
+
+.select_invalid .select__trigger,
+.select_invalid .select__native {
+  border-color: var(--color-danger);
+}

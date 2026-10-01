@@ -1,0 +1,10 @@
+/*
+ * Модификатор media_fit_contain: картинка вписана в рамку целиком, а не
+ * заполняет её с обрезкой краёв — схема, скриншот, логотип, где край важен.
+ * Поля рамки — заливка плитки (--color-fill-1).
+ *
+ *   <div class="media media_view_single media_fit_contain">…</div>
+ */
+.media_fit_contain .media__image {
+  object-fit: contain;
+}

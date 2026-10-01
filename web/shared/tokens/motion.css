@@ -1,0 +1,47 @@
+/*
+ * Движение. Одна кривая на все перемещения — «сделано одной рукой»: панель
+ * чата, кольцо, листы и диалоги едут одинаково.
+ *
+ * Пружин две (ADR-0013): мягкая — открыть, закрыть, перестроить, без
+ * отскока; упругая — то, что отпустил палец (бегунок пилюль, смахнутый
+ * просмотр, упавшая метка). Задаются как в iOS: отскок (−1…1, 0 — без него)
+ * и время, за которое движение кажется законченным. Читает их обёртка
+ * utils/motion.js в момент перехода — токен можно подстроить на лету.
+ */
+:root {
+  --ease-out: cubic-bezier(.22, 1, .36, 1);
+  --ease-in-out: cubic-bezier(.65, 0, .35, 1);
+
+  --duration-press: 120ms;   /* отклик на нажатие */
+  --duration-fast: 160ms;    /* цвет, фон, прозрачность */
+  --duration-normal: 280ms;  /* выезд листа, диалога, уведомления */
+  --duration-slow: 420ms;    /* перестройка раскладки */
+  --duration-draw: 900ms;    /* линия маршрута от начала к концу */
+  --duration-stagger: 45ms;  /* шаг «по очереди» */
+  --duration-loop: 1250ms;   /* дыхание точек «думает» */
+  --duration-spin: 800ms;    /* оборот спиннера */
+
+  --spring-soft-bounce: 0;
+  --spring-soft-duration: 420ms;
+  --spring-bouncy-bounce: .28;
+  --spring-bouncy-duration: 480ms;
+
+  --motion-shift: 12px;      /* откуда появляется и куда уходит */
+
+  --press-scale: .97;
+  --press-scale-strong: .93;
+}
+
+/* Меньше движения: переходы мгновенные, но смысловые циклы (спиннер) живут.
+   Пружины и «по очереди» гасит обёртка utils/motion.js. */
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --duration-press: 1ms;
+    --duration-fast: 1ms;
+    --duration-normal: 1ms;
+    --duration-slow: 1ms;
+    --duration-draw: 1ms;
+    --press-scale: 1;
+    --press-scale-strong: 1;
+  }
+}

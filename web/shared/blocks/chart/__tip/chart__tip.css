@@ -1,0 +1,66 @@
+/*
+ * Элемент chart__tip: подсказка графика — все ряды в этой точке. Значение
+ * главное (жирно), имя ряда вторично; ряд помечен короткой чертой его цвета.
+ * Положение — --tip-x / --tip-y от компонента.
+ */
+.chart__tip {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 2;
+  display: grid;
+  gap: 4px;
+  min-width: 132px;
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-m);
+  background: var(--color-bg-elevated);
+  box-shadow: var(--shadow-m);
+  font-size: var(--text-small);
+  opacity: 0;
+  pointer-events: none;
+  translate: var(--tip-x, 0) var(--tip-y, 0);
+  transition: opacity var(--duration-fast) ease;
+}
+
+.chart__tip_shown {
+  opacity: 1;
+}
+
+.chart__tip-head {
+  color: var(--color-text-muted);
+  font-size: var(--text-caption);
+  font-weight: var(--weight-medium);
+}
+
+.chart__tip-row {
+  display: grid;
+  grid-template-columns: 12px auto 1fr;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+
+.chart__tip-key {
+  width: 12px;
+  height: 2px;
+  border-radius: 1px;
+  background: var(--key-color);
+}
+
+.chart__tip-value {
+  color: var(--color-text);
+  font-weight: var(--weight-semibold);
+  font-variant-numeric: tabular-nums;
+}
+
+.chart__tip-name {
+  color: var(--color-text-muted);
+}
+
+.chart__tip-total {
+  padding-top: 4px;
+  border-top: 1px solid var(--color-border);
+  color: var(--color-text);
+  font-weight: var(--weight-semibold);
+}

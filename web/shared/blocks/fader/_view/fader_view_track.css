@@ -1,0 +1,41 @@
+/* Тонкая дорожка с ручкой */
+.fader_view_track {
+  --fader-w: 6px;
+  --fader-h: 180px;
+  --fader-radius: var(--radius-full);
+  --fader-fill: var(--color-accent);
+}
+
+.fader_view_track .fader__track {
+  overflow: visible;
+  background: var(--color-fill-3);
+}
+
+/* Дорожка тонкая, а ловить палец должна широко. */
+.fader_view_track .fader__track::before {
+  content: "";
+  position: absolute;
+  inset: calc(-1 * var(--space-2)) calc(-1 * var(--space-4));
+}
+
+.fader_view_track .fader__fill {
+  border-radius: inherit;
+}
+
+.fader_view_track .fader__knob {
+  position: absolute;
+  bottom: calc(var(--fader-value) * 100%);
+  left: 50%;
+  display: block;
+  width: var(--knob-size);
+  height: var(--knob-size);
+  border-radius: 50%;
+  background: var(--color-knob);
+  box-shadow: var(--shadow-knob);
+  transform: translate(-50%, 50%);
+  transition: bottom var(--duration-fast) ease;
+}
+
+.fader_view_track.fader_dragging .fader__track {
+  transform: none;
+}

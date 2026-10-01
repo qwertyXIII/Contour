@@ -1,0 +1,74 @@
+/*
+ * Блок voice-note: голосовое в ленте — ▶, волна из самого звука, время (ADR-0072
+ * Alter'а). Цвет — от того, на чём лежит (currentColor): в открытой панели чата
+ * голосовое Alter'а акцентом, своё — белым, на коралле свёрнутой — белым, как реплики.
+ * Проигранная часть волны — полным цветом, остальное — его долей.
+ *
+ *   <div class="voice-note">
+ *     <button class="voice-note__play" type="button" aria-label="Слушать голосовое">…</button>
+ *     <span class="waveform voice-note__wave" role="slider">…</span>
+ *     <span class="voice-note__time">0:12</span>
+ *   </div>
+ *
+ *   voice-note_playing (ставит компонент) · voice-note_broken — звук не загрузился
+ */
+.voice-note {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  max-width: 100%;
+  color: inherit;
+  --icon-size: var(--icon-s);
+}
+
+.voice-note__play {
+  display: grid;
+  flex: 0 0 auto;
+  place-items: center;
+  width: 36px;
+  aspect-ratio: 1;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-full);
+  background: color-mix(in srgb, currentColor 16%, transparent);
+  color: inherit;
+  cursor: pointer;
+  transition: background-color var(--duration-fast) ease;
+}
+
+.voice-note__play:disabled {
+  opacity: .5;
+  cursor: default;
+}
+
+.voice-note__wave {
+  --wave-h: 26px;
+
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  cursor: pointer;
+}
+
+.voice-note__wave .waveform__bar {
+  flex: 0 0 auto;
+  background: color-mix(in srgb, currentColor 32%, transparent);
+}
+
+.voice-note__wave .waveform__bar_played {
+  background: currentColor;
+}
+
+.voice-note__time {
+  flex: 0 0 auto;
+  min-width: 4ch;
+  font-size: var(--text-small);
+  font-weight: var(--weight-medium);
+  font-variant-numeric: tabular-nums;
+  opacity: .8;
+}
+
+.voice-note_broken .voice-note__time {
+  color: var(--color-danger);
+  opacity: 1;
+}

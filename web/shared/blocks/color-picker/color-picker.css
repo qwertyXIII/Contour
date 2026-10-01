@@ -1,0 +1,128 @@
+/*
+ * Блок color-picker: свой цвет. Два вида одного компонента: квадрат с полосой
+ * оттенка — точный выбор (акцент в настройках), круг оттенков — быстрый,
+ * крупный, пальцем (лампы, подсветка).
+ *
+ *   <div class="color-picker color-picker_view_square" data-presets="#fe6344 #0a84ff">
+ *     <input class="color-picker__native" type="color" value="#fe6344" aria-label="Акцент">
+ *   </div>
+ *
+ * Источник значения — нативный <input type="color">: он хранит цвет и шлёт
+ * input / change, без JS виден сам. Остальное строит компонент ColorPicker:
+ *
+ *   __area (квадрат: насыщенность × яркость) | __wheel (круг: оттенок × насыщенность)
+ *   · __thumb · __hue (+ range, оттенок) · __value (+ range, яркость у круга)
+ *   · __foot › __preview · __hex (+ input) · __drop (пипетка) · __presets › swatch
+ *
+ * Положение ручки и цвета — переменными: --picker-x / --picker-y (0…1),
+ * --picker-hue (чистый оттенок), --picker-color (выбранный), --picker-full
+ * (выбранный на полной яркости — конец полосы яркости).
+ */
+.color-picker {
+  --picker-x: 1;
+  --picker-y: 0;
+  --picker-hue: #f00;
+  --picker-color: #f00;
+  --picker-full: #f00;
+  --picker-thumb: 22px;
+  /* Чёрный и белый здесь — не цвета темы, а края модели HSV: яркость 0 и насыщенность 0. */
+  --picker-black: #000;
+  --picker-white: #fff;
+
+  display: grid;
+  gap: var(--space-4);
+  min-width: 0;
+}
+
+.color-picker_view_wheel {
+  justify-items: center;
+}
+
+/* Квадрат: слева направо — насыщенность, снизу вверх — яркость. */
+.color-picker__area,
+.color-picker__wheel {
+  position: relative;
+  cursor: crosshair;
+  touch-action: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.color-picker__area {
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  border-radius: var(--radius-m);
+  background:
+    linear-gradient(to top, var(--picker-black), transparent),
+    linear-gradient(to right, var(--picker-white), transparent),
+    var(--picker-hue);
+}
+
+.color-picker__wheel {
+  width: min(100%, 260px);
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background:
+    radial-gradient(closest-side, var(--picker-white), transparent),
+    var(--gradient-hue-wheel);
+  box-shadow: var(--shadow-s);
+}
+
+.color-picker__area:focus-visible,
+.color-picker__wheel:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 3px;
+}
+
+.color-picker__thumb {
+  position: absolute;
+  top: calc(var(--picker-y) * 100%);
+  left: calc(var(--picker-x) * 100%);
+  width: var(--picker-thumb);
+  height: var(--picker-thumb);
+  border: 3px solid var(--color-knob);
+  border-radius: 50%;
+  background: var(--picker-color);
+  box-shadow: var(--shadow-knob), inset 0 0 0 1px var(--color-border);
+  pointer-events: none;
+  translate: -50% -50%;
+}
+
+.color-picker__hue {
+  --range-color: transparent;
+  --range-track: 12px;
+  --range-track-bg: var(--gradient-hue-strip);
+}
+
+.color-picker__value {
+  width: min(100%, 260px);
+  --range-color: transparent;
+  --range-track: 12px;
+  --range-track-bg: linear-gradient(to right, var(--picker-black), var(--picker-full));
+}
+
+.color-picker__foot {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+.color-picker__preview {
+  flex: 0 0 auto;
+  width: var(--control-h-s);
+  height: var(--control-h-s);
+  border-radius: 50%;
+  background: var(--picker-color);
+  box-shadow: inset 0 0 0 1px var(--color-border);
+}
+
+.color-picker__hex {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.color-picker__presets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}

@@ -1,0 +1,124 @@
+/*
+ * Движения поворотом: вокруг оси --o на угол --a.
+ *   swing  — затухающий маятник (колокольчик, бирка, якорь)
+ *   wiggle — быстрая дрожь (звонок телефона, будильник)
+ *   tilt   — повернуться, задержаться, вернуться (крышка, ножницы, ключ)
+ *   spin   — оборот на --a (по умолчанию полный); в цикле — равномерно
+ *   sway   — плавное покачивание туда-обратно (лист, зонт, камера)
+ *   flip   — два полуоборота с остановкой (песочные часы)
+ */
+.icon__part_motion_swing {
+  --motion: icon-swing;
+  --motion-loop: icon-swing-loop;
+  --dur: 1000ms;
+  --ease: ease-in-out;
+}
+
+.icon__part_motion_wiggle {
+  --motion: icon-wiggle;
+  --motion-loop: icon-wiggle-loop;
+  --dur: 650ms;
+  --ease: linear;
+}
+
+.icon__part_motion_tilt {
+  --motion: icon-tilt;
+  --motion-loop: icon-tilt-loop;
+  --dur: 900ms;
+  --ease: ease-in-out;
+}
+
+.icon__part_motion_spin {
+  --motion: icon-spin;
+  --motion-loop: icon-spin;
+  --dur: 900ms;
+  --ease: cubic-bezier(.65, 0, .25, 1);
+  --ease-hold: linear;
+  --dur-loop: 2.4s;
+  --ease-loop: linear;
+}
+
+.icon__part_motion_sway {
+  --motion: icon-sway;
+  --motion-loop: icon-sway;
+  --dur: 1600ms;
+  --dur-loop: 3.2s;
+}
+
+.icon__part_motion_flip {
+  --motion: icon-flip;
+  --motion-loop: icon-flip;
+  --dur: 1600ms;
+  --ease: ease-in-out;
+  --dur-loop: 3.2s;
+}
+
+@keyframes icon-swing {
+  0%, 100% { rotate: 0deg; }
+  15% { rotate: var(--a, 14deg); }
+  35% { rotate: calc(var(--a, 14deg) * -.75); }
+  55% { rotate: calc(var(--a, 14deg) * .45); }
+  72% { rotate: calc(var(--a, 14deg) * -.2); }
+  87% { rotate: calc(var(--a, 14deg) * .06); }
+}
+
+@keyframes icon-swing-loop {
+  0%, 45%, 100% { rotate: 0deg; }
+  6% { rotate: var(--a, 14deg); }
+  15% { rotate: calc(var(--a, 14deg) * -.75); }
+  24% { rotate: calc(var(--a, 14deg) * .45); }
+  32% { rotate: calc(var(--a, 14deg) * -.2); }
+  39% { rotate: calc(var(--a, 14deg) * .06); }
+}
+
+@keyframes icon-wiggle {
+  0%, 100% { rotate: 0deg; }
+  10% { rotate: var(--a, 10deg); }
+  25% { rotate: calc(var(--a, 10deg) * -1); }
+  40% { rotate: calc(var(--a, 10deg) * .8); }
+  55% { rotate: calc(var(--a, 10deg) * -.6); }
+  70% { rotate: calc(var(--a, 10deg) * .35); }
+  85% { rotate: calc(var(--a, 10deg) * -.15); }
+}
+
+@keyframes icon-wiggle-loop {
+  0%, 40%, 100% { rotate: 0deg; }
+  4% { rotate: var(--a, 10deg); }
+  10% { rotate: calc(var(--a, 10deg) * -1); }
+  16% { rotate: calc(var(--a, 10deg) * .8); }
+  22% { rotate: calc(var(--a, 10deg) * -.6); }
+  28% { rotate: calc(var(--a, 10deg) * .35); }
+  34% { rotate: calc(var(--a, 10deg) * -.15); }
+}
+
+@keyframes icon-tilt {
+  0%, 100% { rotate: 0deg; }
+  22% { rotate: calc(var(--a, -18deg) * 1.1); }
+  32%, 62% { rotate: var(--a, -18deg); }
+  84% { rotate: calc(var(--a, -18deg) * -.1); }
+}
+
+@keyframes icon-tilt-loop {
+  0%, 50%, 100% { rotate: 0deg; }
+  11% { rotate: calc(var(--a, -18deg) * 1.1); }
+  16%, 31% { rotate: var(--a, -18deg); }
+  42% { rotate: calc(var(--a, -18deg) * -.1); }
+}
+
+@keyframes icon-spin {
+  from { rotate: 0deg; }
+  to { rotate: var(--a, 360deg); }
+}
+
+/* Синус из четырёх отрезков: к краю замедляемся, от края разгоняемся. */
+@keyframes icon-sway {
+  0%, 50%, 100% { rotate: 0deg; animation-timing-function: ease-out; }
+  25% { rotate: var(--a, 6deg); animation-timing-function: ease-in; }
+  75% { rotate: calc(var(--a, 6deg) * -1); animation-timing-function: ease-in; }
+}
+
+@keyframes icon-flip {
+  0% { rotate: 0deg; }
+  30%, 55% { rotate: 180deg; }
+  85%, 100% { rotate: 360deg; }
+}

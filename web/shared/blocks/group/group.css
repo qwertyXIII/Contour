@@ -1,0 +1,55 @@
+/*
+ * Блок group: смысловой раздел — заголовок, пояснение и то, что в нём.
+ * «Ручки кольца», «Кто ведёт разговор», «Доступ к Alter'у».
+ *
+ *   __head → __title · __note ;  __body (столбик с промежутком списка)
+ *   group_view_quiet — заголовок мелкими прописными, как подпись секции
+ *
+ * Тело — контейнер для @container: поля field_layout_adaptive внутри
+ * раскладываются по его ширине.
+ */
+.group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+.group__head {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  padding-inline: var(--space-half);
+}
+
+.group__title {
+  margin: 0;
+  font-size: var(--text-heading);
+  font-weight: var(--weight-bold);
+  line-height: 1.25;
+  letter-spacing: var(--tracking-snug);
+}
+
+.group__note {
+  margin: 0;
+  max-width: 68ch;
+  color: var(--color-text-muted);
+  font-size: var(--text-small);
+  line-height: 1.4;
+}
+
+.group__body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--list-gap);
+  min-width: 0;
+  container-type: inline-size;
+}
+
+.group_view_quiet .group__title {
+  color: var(--color-text-muted);
+  font-size: var(--text-caption);
+  font-weight: var(--weight-semibold);
+  letter-spacing: var(--tracking-caps);
+  text-transform: uppercase;
+}

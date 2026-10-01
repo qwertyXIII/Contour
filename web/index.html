@@ -1,0 +1,123 @@
+<!doctype html>
+<!-- Панель Contour: дома, по паролю. Облик — дизайн-система Alter'а (копия в /shared/,
+     scripts/vendor-alter-ui.sh). Разметка здесь — скелет; строки и карточки собирают
+     компоненты из components/. -->
+<html lang="ru" class="theme page" data-theme-key="contour.theme">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Contour</title>
+<meta name="color-scheme" content="light dark">
+<link rel="stylesheet" href="/shared/vendor/normalize.css">
+<link rel="stylesheet" href="/shared/assets/fonts/inter.css">
+<link rel="stylesheet" href="/shared/pages/alter.css">
+<link rel="stylesheet" href="/pages/contour.css">
+</head>
+<body>
+
+<!-- Вход -->
+<main class="console console_login" data-view="login" hidden>
+  <form class="card stack stack_gap_l" data-login>
+    <header class="bar">
+      <span class="glyph glyph_tone_accent"><svg class="icon" aria-hidden="true"><use href="/shared/assets/icons/sprite.svg#shield-check"/></svg></span>
+      <div class="bar__text"><h1 class="bar__title">Contour</h1><p class="bar__subtitle">VPN-выходы дома</p></div>
+    </header>
+    <div class="field">
+      <div class="field__text"><label class="field__label" for="login-password">Пароль</label></div>
+      <div class="input field__control"><input class="input__control" id="login-password" name="password" type="password" autocomplete="current-password" required></div>
+      <p class="field__error" data-login-error hidden></p>
+    </div>
+    <button class="button button_view_primary button_wide" type="submit"><span class="button__text">Войти</span></button>
+  </form>
+</main>
+
+<!-- Панель -->
+<div class="console" data-view="app" hidden>
+  <header class="bar bar_size_l console__head">
+    <div class="bar__text"><h1 class="bar__title">Contour</h1><p class="bar__subtitle" data-headline>…</p></div>
+    <div class="bar__end">
+      <button class="button button_view_ghost button_shape_round" type="button" data-logout aria-label="Выйти"><svg class="icon button__icon" aria-hidden="true"><use href="/shared/assets/icons/sprite.svg#logout"/></svg></button>
+    </div>
+  </header>
+
+  <div class="tabs">
+    <div class="tabs__list" role="tablist" aria-label="Разделы">
+      <button class="tabs__tab" role="tab" id="tab-overview" aria-controls="panel-overview" aria-selected="true" type="button">Обзор</button>
+      <button class="tabs__tab" role="tab" id="tab-devices" aria-controls="panel-devices" aria-selected="false" type="button">Устройства</button>
+      <button class="tabs__tab" role="tab" id="tab-sites" aria-controls="panel-sites" aria-selected="false" type="button">Сайты</button>
+      <button class="tabs__tab" role="tab" id="tab-outlets" aria-controls="panel-outlets" aria-selected="false" type="button">Выходы</button>
+      <button class="tabs__tab" role="tab" id="tab-journal" aria-controls="panel-journal" aria-selected="false" type="button">Журнал</button>
+    </div>
+    <section class="tabs__panel stack stack_gap_l" role="tabpanel" id="panel-overview" aria-labelledby="tab-overview" data-overview></section>
+    <section class="tabs__panel stack stack_gap_l" role="tabpanel" id="panel-devices" aria-labelledby="tab-devices" data-devices hidden></section>
+    <section class="tabs__panel stack stack_gap_l" role="tabpanel" id="panel-sites" aria-labelledby="tab-sites" data-sites hidden></section>
+    <section class="tabs__panel stack stack_gap_l" role="tabpanel" id="panel-outlets" aria-labelledby="tab-outlets" data-outlets hidden></section>
+    <section class="tabs__panel stack stack_gap_l" role="tabpanel" id="panel-journal" aria-labelledby="tab-journal" data-journal hidden></section>
+  </div>
+</div>
+
+<!-- Имя устройства -->
+<dialog class="dialog dialog_size_s" id="dlg-device" aria-labelledby="dlg-device-title">
+  <form method="dialog" class="stack stack_gap_l" data-device-form>
+    <header class="dialog__head bar bar_size_s">
+      <div class="bar__text"><h2 class="bar__title" id="dlg-device-title">Имя устройства</h2><p class="bar__subtitle" data-device-about></p></div>
+      <div class="bar__end"><button class="button button_view_ghost button_shape_round button_size_s dialog__close" type="button" aria-label="Закрыть"><svg class="icon button__icon" aria-hidden="true"><use href="/shared/assets/icons/sprite.svg#close"/></svg></button></div>
+    </header>
+    <div class="dialog__body">
+      <div class="field">
+        <div class="field__text"><label class="field__label" for="device-name">Как называть</label><p class="field__hint">Например, «Телевизор». Пусто — снять имя.</p></div>
+        <div class="input field__control"><input class="input__control" id="device-name" name="name" maxlength="40" autocomplete="off"></div>
+      </div>
+    </div>
+    <footer class="dialog__foot cluster cluster_justify_end"><button class="button button_view_primary" type="submit" value="save"><span class="button__text">Сохранить</span></button></footer>
+  </form>
+</dialog>
+
+<!-- Новый выход -->
+<dialog class="dialog" id="dlg-outlet" aria-labelledby="dlg-outlet-title">
+  <form method="dialog" class="stack stack_gap_l" data-outlet-form>
+    <header class="dialog__head bar bar_size_s">
+      <div class="bar__text"><h2 class="bar__title" id="dlg-outlet-title">Новый выход</h2></div>
+      <div class="bar__end"><button class="button button_view_ghost button_shape_round button_size_s dialog__close" type="button" aria-label="Закрыть"><svg class="icon button__icon" aria-hidden="true"><use href="/shared/assets/icons/sprite.svg#close"/></svg></button></div>
+    </header>
+    <div class="dialog__body stack stack_gap_l">
+      <div class="segmented segmented_wide" role="radiogroup" aria-label="Что добавить">
+        <label class="segmented__option"><input class="segmented__input visually-hidden" type="radio" name="source" value="conf" checked><span class="segmented__label">AmneziaWG / WG</span></label>
+        <label class="segmented__option"><input class="segmented__input visually-hidden" type="radio" name="source" value="link"><span class="segmented__label">Ссылка</span></label>
+        <label class="segmented__option"><input class="segmented__input visually-hidden" type="radio" name="source" value="subscription"><span class="segmented__label">Подписка</span></label>
+        <label class="segmented__option"><input class="segmented__input visually-hidden" type="radio" name="source" value="ovpn"><span class="segmented__label">OpenVPN</span></label>
+      </div>
+      <p class="text text_style_small text_tone_muted" data-source-hint></p>
+      <div class="field">
+        <div class="field__text"><label class="field__label" for="outlet-name">Имя</label><p class="field__hint">Латиница, цифры, «-»: nl-1, home-awg</p></div>
+        <div class="input field__control"><input class="input__control" id="outlet-name" name="name" maxlength="32" pattern="[a-z0-9][a-z0-9_\-]{0,31}" autocomplete="off" required></div>
+      </div>
+      <div class="field">
+        <div class="field__text"><label class="field__label" for="outlet-text">Ключ или ссылка</label><p class="field__hint">Вставь текст или выбери файл ниже</p></div>
+        <textarea class="textarea textarea_mono field__control" id="outlet-text" name="text" rows="6" required spellcheck="false"></textarea>
+        <input class="text text_style_small" type="file" name="file" accept=".conf,.ovpn,.txt" aria-label="Файл ключа">
+      </div>
+      <div class="field">
+        <div class="field__text"><label class="field__label" for="outlet-priority">Приоритет</label><p class="field__hint">Меньше — раньше в очереди. Основной выход — 10</p></div>
+        <div class="input field__control"><input class="input__control" id="outlet-priority" name="priority" type="number" min="0" max="10000" value="50"></div>
+      </div>
+      <p class="field__error" data-outlet-error hidden></p>
+    </div>
+    <footer class="dialog__foot cluster cluster_justify_end"><button class="button button_view_primary" type="submit" value="add" data-outlet-submit><span class="button__text">Добавить</span></button></footer>
+  </form>
+</dialog>
+
+<!-- Подтверждение -->
+<dialog class="dialog dialog_size_s" id="dlg-confirm" aria-labelledby="dlg-confirm-title">
+  <form method="dialog" class="stack stack_gap_l">
+    <header class="dialog__head bar bar_size_s"><div class="bar__text"><h2 class="bar__title" id="dlg-confirm-title" data-confirm-title></h2><p class="bar__subtitle" data-confirm-text></p></div></header>
+    <footer class="dialog__foot cluster cluster_justify_end">
+      <button class="button" type="submit" value="no"><span class="button__text">Отмена</span></button>
+      <button class="button button_view_danger" type="submit" value="yes"><span class="button__text" data-confirm-yes>Да</span></button>
+    </footer>
+  </form>
+</dialog>
+
+<script type="module" src="/index.js"></script>
+</body>
+</html>
