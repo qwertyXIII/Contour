@@ -57,6 +57,13 @@ export type Config = {
     upstream: string[];
     /** Сайты (с поддоменами), которые идут через выходы. */
     domains: string[];
+    /**
+     * Внутренние порты входа. :443 и :80 на всех адресах держит nginx, поэтому
+     * пакеты на `address:443/80` переадресует сюда своя таблица nft
+     * (`contour-addr`), и Contour слушает эти порты.
+     */
+    tlsPort: number;
+    httpPort: number;
   };
 };
 
@@ -96,6 +103,8 @@ export const DEFAULTS: Config = {
     allow: '192.168.0.0/24',
     upstream: ['192.168.0.1', '1.1.1.1'],
     domains: LAN_DOMAINS,
+    tlsPort: 18443,
+    httpPort: 18080,
   },
 };
 
@@ -222,7 +231,7 @@ export function parseConfig(text: string): Config {
   const sticky = section(raw, 'sticky');
   onlyKnown(sticky, 'sticky', ['hours']);
   const lan = section(raw, 'lan');
-  onlyKnown(lan, 'lan', ['enabled', 'address', 'allow', 'upstream', 'domains', 'extraDomains']);
+  onlyKnown(lan, 'lan', ['enabled', 'address', 'allow', 'upstream', 'domains', 'extraDomains', 'tlsPort', 'httpPort']);
 
   const outletsRaw = raw.outlets ?? [];
   if (!Array.isArray(outletsRaw)) throw new ConfigError('outlets: нужен список выходов');
@@ -267,6 +276,8 @@ export function parseConfig(text: string): Config {
       allow: cidr(lan, 'allow', d.lan.allow),
       upstream: lan.upstream === undefined ? d.lan.upstream : dnsList(lan.upstream, 'lan.upstream'),
       domains: [...new Set([...domainList(lan.domains, 'lan.domains', d.lan.domains), ...domainList(lan.extraDomains, 'lan.extraDomains', [])])],
+      tlsPort: num(lan, 'tlsPort', d.lan.tlsPort, 'lan', 1024, 65_535),
+      httpPort: num(lan, 'httpPort', d.lan.httpPort, 'lan', 1024, 65_535),
     },
   };
 }

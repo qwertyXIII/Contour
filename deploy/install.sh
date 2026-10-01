@@ -304,7 +304,7 @@ Wants=network-online.target
 [Service]
 Type=simple
 EnvironmentFile=$ETC/lan.env
-ExecStart=$PREFIX/sbin/contour-addr \${ADDRESS}
+ExecStart=$PREFIX/sbin/contour-addr \${ADDRESS} \${TLS_PORT} \${HTTP_PORT}
 Restart=always
 RestartSec=10s
 StandardOutput=append:$LOG/addr.log

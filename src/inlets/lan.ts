@@ -102,9 +102,11 @@ export const serveForTest = serve;
 
 export function startLanInlet(lan: LanConfig, deps: RelayDeps): net.Server[] {
   const servers: net.Server[] = [];
-  for (const [kind, port] of [['tls', 443], ['http', 80]] as const) {
+  // Слушаем внутренние порты; на них пакеты к address:443/80 переадресует таблица
+  // nft от contour-addr (сами :443/:80 на всех адресах держит nginx).
+  for (const [kind, port, listenPort] of [['tls', 443, lan.tlsPort], ['http', 80, lan.httpPort]] as const) {
     const server = net.createServer((client) => serve(kind, port, client, lan, deps));
-    void listen(server, lan.address, port, deps.log);
+    void listen(server, lan.address, listenPort, deps.log);
     servers.push(server);
   }
   deps.log.info(`домашняя сеть: ${lan.allow}, сайтов в списке ${lan.domains.length}`);

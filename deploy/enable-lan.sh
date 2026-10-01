@@ -41,7 +41,9 @@ lan:                          # вход для устройств домашн�
 EOF
   note "раздел lan дописан (прежняя версия: $ETC/contour.yaml.before-lan)"
 fi
-printf 'ADDRESS=%s\n' "$ADDRESS" > "$ETC/lan.env"
+# Внутренние порты SNI-входа — умолчания Contour (lan.tlsPort / lan.httpPort);
+# :443/:80 держит nginx, туда переадресует таблица nft сторожа contour-addr.
+printf 'ADDRESS=%s\nTLS_PORT=18443\nHTTP_PORT=18080\n' "$ADDRESS" > "$ETC/lan.env"
 
 sudo -u contour env CONTOUR_CONFIG="$ETC/contour.yaml" CONTOUR_LOG_PRETTY=1 \
   /opt/contour/node/bin/node "$SRC/src/main.ts" --check >/dev/null || die "настройки не прошли проверку: sudo -u contour /opt/contour/node/bin/node $SRC/src/main.ts --check"
@@ -53,6 +55,9 @@ systemctl restart contour-addr.service
 for i in $(seq 1 10); do ip -o -4 addr show | grep -q " inet $ADDRESS/" && break; sleep 1; done
 ip -o -4 addr show | grep -q " inet $ADDRESS/" || { tail -n 5 "$LOG/addr.log"; die "адрес $ADDRESS не повесился — лог выше"; }
 note "$ADDRESS на месте"
+for i in $(seq 1 10); do nft list table ip contour >/dev/null 2>&1 && break; sleep 1; done
+nft list table ip contour >/dev/null 2>&1 || { tail -n 5 "$LOG/addr.log"; die "таблица nft contour не встала — лог выше"; }
+note "переадресация $ADDRESS:443/80 → внутренние порты Contour (nginx не тронут)"
 
 echo "DNS и SNI:"
 systemctl enable contour-dns.service >/dev/null 2>&1
@@ -74,10 +79,18 @@ aaaa=$(dig +short +time=2 +tries=1 @"$ADDRESS" www.youtube.com AAAA | head -1)
 other=$(dig +short +time=2 +tries=1 @"$ADDRESS" ya.ru A | head -1)
 [ -n "$other" ] && [ "$other" != "$ADDRESS" ] || die "DNS: ya.ru → «$other» — обычный DNS не отвечает"
 note "DNS: ya.ru → $other (обычный, мимо туннеля)"
-code=$(curl -sS --max-time 20 -o /dev/null -w '%{http_code} за %{time_total}s' --resolve "www.youtube.com:443:$ADDRESS" https://www.youtube.com/ 2>&1 || true)
+sleep 2
+code=$(curl -s --max-time 20 -o /dev/null -w '%{http_code} за %{time_total}s' --resolve "www.youtube.com:443:$ADDRESS" https://www.youtube.com/ 2>/dev/null || true)
+[[ "$code" == 200* ]] || { tail -n 8 "$LOG/log.log" | sed -E 's/.*"content":\["(.*)"\],"trace".*/\1/' | cut -c1-200; die "YouTube через SNI-вход: «$code» — лог выше"; }
 note "YouTube через SNI-вход: HTTP $code"
-code=$(curl -sS --max-time 20 -o /dev/null -w '%{http_code}' --resolve "ya.ru:443:$ADDRESS" https://ya.ru/ 2>/dev/null || echo 'отказ')
-note "чужой сайт через SNI-вход: $code (ждал отказ — это не открытый прокси)"
+gv=$(curl -s --max-time 20 -o /dev/null -w '%{http_code}' --resolve "redirector.googlevideo.com:443:$ADDRESS" https://redirector.googlevideo.com/ 2>/dev/null || true)
+note "видео-сервер (googlevideo) через SNI-вход: HTTP $gv"
+code=$(curl -s --max-time 10 -o /dev/null -w '%{http_code}' --resolve "www.youtube.com:80:$ADDRESS" http://www.youtube.com/ 2>/dev/null || true)
+note "http://youtube через Host-вход: HTTP $code"
+if curl -s --max-time 10 -o /dev/null --resolve "ya.ru:443:$ADDRESS" https://ya.ru/ 2>/dev/null; then
+  die "чужой сайт (ya.ru) прошёл через SNI-вход — так быть не должно"
+fi
+note "чужой сайт через SNI-вход — отказ (как надо: это не открытый прокси)"
 
 echo
 echo "Готово. На телевизоре Hisense (VIDAA):"
