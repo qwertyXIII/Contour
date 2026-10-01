@@ -72,7 +72,12 @@ export function rootCall<T = unknown>(req: RootRequest, timeoutMs = 120_000, soc
     });
     socket.on('error', (e: NodeJS.ErrnoException) => {
       clearTimeout(timer);
-      reject(new Error(e.code === 'ENOENT' || e.code === 'ECONNREFUSED' ? 'помощник от root не запущен (contour-root)' : e.message));
+      const words: Record<string, string> = {
+        ENOENT: 'помощник от root не запущен (contour-root)',
+        ECONNREFUSED: 'помощник от root не запущен (contour-root)',
+        EACCES: 'нет прав на сокет помощника — процесс не в группе contour',
+      };
+      reject(new Error(words[e.code ?? ''] ?? e.message));
     });
   });
 }

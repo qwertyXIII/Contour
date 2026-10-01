@@ -4,6 +4,13 @@
 //
 // Рисуется в пикселях поля, а не растяжением viewBox: волоски сетки остаются
 // в 1px, линии — в 2px. Поле поменяло ширину — график перерисовывается.
+//
+// ⚠️ ЛОКАЛЬНАЯ ПРАВКА копии в Contour (2026-10-01, владелец: «график должен
+// обновляться именно данными»; в Alter перенесёт его агент): график следит за
+// своей таблицей. Поменялись ячейки, строки или ряды — данные перечитываются и
+// график перерисовывается на месте: без пересоздания узла и без вступления,
+// скрытые в легенде ряды остаются скрытыми. Пустая при запуске таблица — тоже
+// не конец: график оживёт, когда в ней появятся данные.
 import { CHART } from '../../utils/constants.js';
 import { h } from '../../utils/dom.js';
 import { drawColumns, columnsMax } from './columns.js';
@@ -34,7 +41,10 @@ export class Chart {
   init() {
     if (!this.#table) return this;
     this.#data = readTable(this.#table);
-    if (!this.#data.categories.length || !this.#data.series.length) return this;
+    if (!this.#data.categories.length || !this.#data.series.length) {
+      this.#waitForData();
+      return this;
+    }
     markCells(this.#table);
     this.#form = CHART.forms.find((form) => this.#root.classList.contains(`chart_form_${form}`)) ?? 'grouped';
     this.#build();
@@ -77,7 +87,50 @@ export class Chart {
       }, h('span', { class: `chart__swatch${kind}`, style: { '--key-color': colorOf(item.slot) } }), item.name))));
   }
 
+  /** Таблица пока пустая — ждать данных и тогда ожить. */
+  #waitForData() {
+    const watch = new MutationObserver(() => {
+      if (!readTable(this.#table).categories.length) return;
+      watch.disconnect();
+      this.init();
+    });
+    watch.observe(this.#table, { childList: true, subtree: true, characterData: true });
+  }
+
+  #schedule() {
+    cancelAnimationFrame(this.#frame);
+    this.#frame = requestAnimationFrame(() => this.#render());
+  }
+
+  /** Таблица поменялась — перечитать данные, сохранить скрытые ряды, перерисовать. */
+  #refresh() {
+    const next = readTable(this.#table);
+    if (!next.categories.length || !next.series.length) return;
+    const hidden = new Set(this.#data.series.filter((item) => item.hidden).map((item) => item.name));
+    next.series.forEach((item) => { item.hidden = hidden.has(item.name); });
+    if (next.series.every((item) => item.hidden)) next.series[0].hidden = false;
+    const names = (d) => d.series.map((item) => `${item.name}:${item.slot}`).join('|');
+    const legendChanged = names(next) !== names(this.#data);
+    this.#data = next;
+    markCells(this.#table);
+    if (legendChanged) this.#rebuildLegend();
+    if (this.#active >= next.categories.length) this.#hide();
+    this.#schedule();
+  }
+
+  #rebuildLegend() {
+    const legend = this.#data.series.length > 1 ? this.#buildLegend() : null;
+    if (this.#legend) this.#legend.replaceWith(...(legend ? [legend] : []));
+    else if (legend) this.#plot.before(legend);
+    this.#legend = legend;
+    this.#legend?.querySelectorAll('.chart__key').forEach((key, i) => key.setAttribute('aria-pressed', String(!this.#data.series[i].hidden)));
+  }
+
   #bind() {
+    // Данные — данными: правка таблицы (ячейки, строки, ряды) перерисовывает график на месте.
+    new MutationObserver(() => this.#refresh()).observe(this.#table, {
+      childList: true, subtree: true, characterData: true, attributes: true, attributeFilter: ['data-value', 'data-series'],
+    });
     new ResizeObserver(() => {
       cancelAnimationFrame(this.#frame);
       this.#frame = requestAnimationFrame(() => this.#render());

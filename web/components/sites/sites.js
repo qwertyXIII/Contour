@@ -1,15 +1,49 @@
 // Сайты: что идёт через VPN и почему — ручные решения, выученное, трафик.
 // Ручное решение сильнее общего списка и самообучения; «Авто» его снимает.
+// Разметка собирается один раз; обновление меняет только строки (utils/view.js).
 import { api, toast } from '../../utils/api.js';
 import { API, TIMING } from '../../utils/constants.js';
-import { badge, button, empty, group, h, list, row } from '../../utils/dom.js';
+import { button, empty, group, h } from '../../utils/dom.js';
 import { ago, bytes, dateTime } from '../../utils/format.js';
+import { badgeView, listSection, rowView, setText } from '../../utils/view.js';
 
 const VIA = { tunnel: ['через VPN', 'accent'], direct: ['напрямую', null] };
 
+/** Строка сайта с кнопкой решения; имя сайта — в атрибуте кнопки, слушатель один на разделе. */
+function siteRow(label, via, withBadge = false) {
+  const act = button(label, { view: 'ghost', data: { via } });
+  const status = withBadge ? badgeView() : null;
+  const row = rowView(null, status ? h('span', { class: 'cluster cluster_gap_s' }, status.el, act) : act);
+  return { act, status, row };
+}
+
+function manualRow() {
+  const v = siteRow('Авто', 'auto', true);
+  return { el: v.row.el, update: ([name, via]) => { v.row.set({ title: name }); v.status.set(...VIA[via]); v.act.dataset.site = name; } };
+}
+
+function topRow() {
+  const v = siteRow('Не через VPN', 'direct');
+  return {
+    el: v.row.el,
+    update: (s) => {
+      v.row.set({ title: s.host, note: `${s.who.length} ${s.who.length === 1 ? 'источник' : 'источника'} · ${ago(s.last)}`, meta: bytes(s.bytes) });
+      v.act.dataset.site = s.host;
+    },
+  };
+}
+
+function learnedRow() {
+  const v = siteRow('Напрямую', 'direct');
+  return { el: v.row.el, update: (l) => { v.row.set({ title: l.name, note: `${l.why} · до ${dateTime(l.until)}` }); v.act.dataset.site = l.name; } };
+}
+
 export class Sites {
   #root;
-  #lists;
+  #manual;
+  #top;
+  #learned;
+  #learnedNote;
   #timer = null;
 
   constructor(root) {
@@ -17,8 +51,12 @@ export class Sites {
   }
 
   init() {
-    this.#lists = h('div', { class: 'stack stack_gap_l' });
-    this.#root.append(this.#form(), this.#lists);
+    this.#manual = listSection(([name]) => name, manualRow, empty('star', 'Своих решений нет', 'Всё решают общий список и автоматика.'));
+    this.#top = listSection((s) => s.host, topRow, empty('globe', 'Пока пусто', null));
+    this.#learned = listSection((l) => l.name, learnedRow, empty('radar', 'Ничего не выучено', 'Сайты из общего списка сюда не попадают — они через VPN сразу.'));
+    const learnedGroup = group('Выучено: через VPN', ' ', this.#learned.el);
+    this.#learnedNote = learnedGroup.querySelector('.group__note');
+    this.#root.append(this.#form(), group('Мои решения', null, this.#manual.el), group('Сайты с трафиком через VPN', 'с последнего перезапуска', this.#top.el), learnedGroup);
     this.#root.addEventListener('click', (e) => {
       const b = e.target.closest('[data-site]');
       if (b) void this.#set(b.dataset.site, b.dataset.via);
@@ -64,30 +102,15 @@ export class Sites {
   }
 
   async #load() {
+    let d;
     try {
-      this.#render(await api(API.sites));
+      d = await api(API.sites);
     } catch {
-      // следующий раз
+      return;
     }
-  }
-
-  #render(d) {
-    const manual = Object.entries(d.overrides);
-    this.#lists.replaceChildren(
-      group('Мои решения', null, manual.length === 0
-        ? empty('star', 'Своих решений нет', 'Всё решают общий список и автоматика.')
-        : list(manual.map(([name, via]) => row({ title: name, trail: h('span', { class: 'cluster cluster_gap_s' }, badge(...VIA[via]), button('Авто', { view: 'ghost', data: { site: name, via: 'auto' } })) })))),
-      group('Сайты с трафиком через VPN', 'с последнего перезапуска', d.top.length === 0
-        ? empty('globe', 'Пока пусто', null)
-        : list(d.top.slice(0, 40).map((s) => row({
-          title: s.host,
-          note: `${s.who.length} ${s.who.length === 1 ? 'источник' : 'источника'} · ${ago(s.last)}`,
-          meta: bytes(s.bytes),
-          trail: button('Не через VPN', { view: 'ghost', data: { site: s.host, via: 'direct' } }),
-        })))),
-      group('Выучено: через VPN', `напрямую не открылись · ещё в общем списке ${d.common} сайтов`, d.learnedTunnel.length === 0
-        ? empty('radar', 'Ничего не выучено', 'Сайты из общего списка сюда не попадают — они через VPN сразу.')
-        : list(d.learnedTunnel.map((l) => row({ title: l.name, note: `${l.why} · до ${dateTime(l.until)}`, trail: button('Напрямую', { view: 'ghost', data: { site: l.name, via: 'direct' } }) })))),
-    );
+    setText(this.#learnedNote, `напрямую не открылись · ещё в общем списке ${d.common} сайтов`);
+    this.#manual.render(Object.entries(d.overrides));
+    this.#top.render(d.top.slice(0, 40));
+    this.#learned.render(d.learnedTunnel);
   }
 }

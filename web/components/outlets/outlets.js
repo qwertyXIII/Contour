@@ -1,10 +1,12 @@
 // Выходы: состояние туннелей, замер скорости, перезапуск, вкл/выкл, удаление,
 // добавление. Всё, что требует root, делает помощник contour-root.
+// Карточка собирается один раз; тик меняет только значения (utils/view.js).
 import { api, toast } from '../../utils/api.js';
 import { API, EVENTS, TIMING } from '../../utils/constants.js';
-import { badge, button, empty, glyph, group, h, kv } from '../../utils/dom.js';
+import { button, empty, group, h } from '../../utils/dom.js';
 import { ago, bytes, secondsAgo, speed } from '../../utils/format.js';
-import { outletBadge } from '../overview/overview.js';
+import { badgeView, glyphView, Keyed, setHidden, setText } from '../../utils/view.js';
+import { outletStatus } from '../overview/overview.js';
 import { AddOutlet } from './add-outlet.js';
 import { confirmDialog } from './confirm.js';
 
@@ -12,10 +14,75 @@ const KIND = { netns: 'ядро, своё пространство сети', mi
 const PROTO = { amneziawg: 'AmneziaWG', wireguard: 'WireGuard', openvpn: 'OpenVPN', link: 'ссылка', subscription: 'подписка' };
 const UNIT_TONE = { active: 'ok', failed: 'danger', inactive: null, activating: 'warn' };
 
+/** Строки карточки — все сразу; ненужные этому выходу прячутся, а не пересобираются. */
+const FIELDS = [
+  ['ip', 'Внешний адрес', (o) => o.externalIp ?? '—'],
+  ['latency', 'Задержка', (o) => (o.latencyMs ? `${o.latencyMs} мс` : '—')],
+  ['now', 'Сейчас', (o) => `↓ ${speed(o.rate.down)} · ↑ ${speed(o.rate.up)}`],
+  ['today', 'Сегодня', (o) => bytes(o.today.down + o.today.up)],
+  ['tunnel', 'Туннель', (o) => (o.kind !== 'netns' ? null : o.tunnelUp ? 'поднят' : 'не поднят')],
+  ['handshake', 'Рукопожатие', (o) => (o.kind !== 'netns' || o.protocol === 'openvpn' ? null : secondsAgo(o.handshakeAgoS))],
+  ['traffic', 'Через туннель', (o) => (o.kind !== 'netns' ? null : o.tunnelRx === null ? '—' : `↓ ${bytes(o.tunnelRx)} · ↑ ${bytes(o.tunnelTx)}`)],
+  ['priority', 'Приоритет', (o) => String(o.priority ?? '—')],
+  ['speed', 'Последний замер', (o) => (o.speed ? `${o.speed.mbps} Мбит/с, ${ago(o.speed.at)}` : null)],
+  ['error', 'Ошибка', (o) => (o.lastError && o.state !== 'alive' ? o.lastError : null)],
+];
+
+function outletCard() {
+  const lead = glyphView('globe');
+  const title = h('h3', { class: 'bar__title' });
+  const subtitle = h('p', { class: 'bar__subtitle' });
+  const status = badgeView();
+  const fields = FIELDS.map(([key, label, value]) => {
+    const dt = h('dt', { class: 'kv__key', text: label });
+    const dd = h('dd', { class: 'kv__value' });
+    return { key, value, dt, dd };
+  });
+  const speedBtn = button('Замерить', { icon: 'activity', data: { act: 'speed' } });
+  const restartBtn = button('Перезапустить', { icon: 'refresh', view: 'ghost', data: { act: 'restart' } });
+  const toggleBtn = button('', { icon: 'power', view: 'ghost', data: { act: 'toggle' } });
+  const removeBtn = button('Удалить', { icon: 'trash', view: 'danger', data: { act: 'remove' } });
+  const toggleText = h('span', { class: 'button__text' });
+  toggleBtn.append(toggleText);
+  const el = h('article', { class: 'card stack stack_gap_m' },
+    h('header', { class: 'bar bar_size_s' }, lead.el, h('div', { class: 'bar__text' }, title, subtitle), h('div', { class: 'bar__end' }, status.el)),
+    h('dl', { class: 'kv' }, fields.flatMap((f) => [f.dt, f.dd])),
+    h('div', { class: 'cluster cluster_gap_s' }, speedBtn, restartBtn, toggleBtn, removeBtn));
+  return {
+    el,
+    update(o) {
+      lead.tone(o.state === 'alive' ? 'accent' : undefined);
+      setText(title, o.name);
+      setText(subtitle, [PROTO[o.protocol] ?? o.protocol, KIND[o.kind]].filter(Boolean).join(' · ') || 'данных помощника нет');
+      status.set(...outletStatus(o));
+      for (const f of fields) {
+        const v = f.value(o);
+        setHidden(f.dt, v === null);
+        setHidden(f.dd, v === null);
+        if (v !== null) setText(f.dd, v);
+      }
+      setHidden(speedBtn, !o.enabled);
+      setText(toggleText, o.enabled ? 'Выключить' : 'Включить');
+      for (const b of [speedBtn, restartBtn, toggleBtn, removeBtn]) b.dataset.name = o.name;
+    },
+  };
+}
+
+function unitBadge() {
+  const b = badgeView();
+  return { el: b.el, update: ([unit, s]) => b.set(`${unit.replace('.service', '')}: ${s}`, UNIT_TONE[s]) };
+}
+
 export class Outlets {
   #root;
   #add;
-  #busy = new Set();
+  #cards;
+  #cardsBox;
+  #empty;
+  #units;
+  #unitsCard;
+  #rootWarn;
+  #rootWarnText;
   #last = null;
 
   constructor(root) {
@@ -24,9 +91,10 @@ export class Outlets {
 
   init() {
     this.#add = new AddOutlet(document.getElementById('dlg-outlet')).init();
+    this.#build();
     document.addEventListener(EVENTS.state, (e) => {
       this.#last = e.detail;
-      if (!this.#root.hidden && this.#busy.size === 0 && !document.querySelector('dialog[open]')) this.#render(e.detail);
+      if (!this.#root.hidden) this.#update(e.detail);
     });
     this.#root.addEventListener('click', (e) => {
       const b = e.target.closest('[data-act]');
@@ -35,87 +103,70 @@ export class Outlets {
     return this;
   }
 
-  async #act(act, name, el) {
-    if (act === 'add') { this.#add.open(); return; }
-    const o = this.#last?.outlets.find((x) => x.name === name);
-    if (act === 'speed') return this.#speed(name, el);
-    if (act === 'remove' && !(await confirmDialog(`Удалить выход «${name}»?`, 'Ключ уедет в keys/removed на сервере — вернуть можно руками.', 'Удалить'))) return;
-    const req = {
-      restart: [API.outlet(name) + '/restart', {}],
-      toggle: [API.outlet(name) + '/enable', { enabled: !o?.enabled }],
-      remove: [API.outlet(name), undefined],
-    }[act];
-    if (!req) return;
-    this.#busy.add(name);
-    try {
-      await api(req[0], { method: act === 'remove' ? 'DELETE' : 'POST', body: req[1], timeout: 120_000 });
-      const restarts = act !== 'restart' || o?.kind === 'mihomo';
-      if (restarts) document.dispatchEvent(new CustomEvent(EVENTS.restart));
-      else toast(`Выход «${name}» перезапущен`, 'ok');
-    } catch (error) {
-      toast(error.message, 'danger');
-    } finally {
-      this.#busy.delete(name);
-    }
-  }
-
-  async #speed(name, el) {
-    el.classList.add('button_loading');
-    el.disabled = true;
-    this.#busy.add(name);
-    try {
-      const r = await api(API.speedtest, { method: 'POST', body: { outlet: name }, timeout: TIMING.speedtestMs });
-      toast(`«${name}»: ${r.mbps} Мбит/с (${bytes(r.bytes)} за ${(r.ms / 1000).toFixed(1)} с)`, 'ok');
-    } catch (error) {
-      toast(`Замер «${name}»: ${error.message}`, 'danger');
-    } finally {
-      this.#busy.delete(name);
-      el.classList.remove('button_loading');
-      el.disabled = false;
-    }
-  }
-
-  #card(o) {
-    const tunnel = o.kind === 'netns'
-      ? [['Туннель', o.tunnelUp ? 'поднят' : 'не поднят'], o.protocol !== 'openvpn' ? ['Рукопожатие', secondsAgo(o.handshakeAgoS)] : null, ['Через туннель', o.tunnelRx === null ? '—' : `↓ ${bytes(o.tunnelRx)} · ↑ ${bytes(o.tunnelTx)}`]]
-      : [];
-    return h('article', { class: 'card stack stack_gap_m' },
-      h('header', { class: 'bar bar_size_s' },
-        glyph('globe', o.state === 'alive' ? 'accent' : undefined),
-        h('div', { class: 'bar__text' }, h('h3', { class: 'bar__title', text: o.name }), h('p', { class: 'bar__subtitle', text: [PROTO[o.protocol] ?? o.protocol, KIND[o.kind]].filter(Boolean).join(' · ') || 'данных помощника нет' })),
-        h('div', { class: 'bar__end' }, outletBadge(o))),
-      kv([
-        ['Внешний адрес', o.externalIp ?? '—'],
-        ['Задержка', o.latencyMs ? `${o.latencyMs} мс` : '—'],
-        ['Сейчас', `↓ ${speed(o.rate.down)} · ↑ ${speed(o.rate.up)}`],
-        ['Сегодня', bytes(o.today.down + o.today.up)],
-        ...tunnel,
-        ['Приоритет', String(o.priority ?? '—')],
-        o.speed ? ['Последний замер', `${o.speed.mbps} Мбит/с, ${ago(o.speed.at)}`] : null,
-        o.lastError && o.state !== 'alive' ? ['Ошибка', o.lastError] : null,
-      ]),
-      h('div', { class: 'cluster cluster_gap_s' },
-        o.enabled ? button('Замерить', { icon: 'activity', data: { act: 'speed', name: o.name } }) : null,
-        button('Перезапустить', { icon: 'refresh', view: 'ghost', data: { act: 'restart', name: o.name } }),
-        button(o.enabled ? 'Выключить' : 'Включить', { icon: 'power', view: 'ghost', data: { act: 'toggle', name: o.name } }),
-        button('Удалить', { icon: 'trash', view: 'danger', data: { act: 'remove', name: o.name } })));
-  }
-
-  #units(state) {
-    const entries = Object.entries(state.units);
-    if (state.rootError) return h('div', { class: 'callout callout_tone_warn' }, h('div', { class: 'callout__body' }, h('p', { class: 'callout__title', text: 'Помощник от root недоступен' }), h('p', { class: 'callout__text', text: `${state.rootError}. Управлять выходами нельзя, смотреть — можно.` })));
-    return h('div', { class: 'card' }, h('div', { class: 'cluster cluster_gap_s' }, entries.map(([u, s]) => badge(`${u.replace('.service', '')}: ${s}`, UNIT_TONE[s]))));
-  }
-
-  #render(state) {
-    this.#root.replaceChildren(
+  #build() {
+    this.#cardsBox = h('div', { class: 'console__grid' });
+    this.#cards = new Keyed(this.#cardsBox, (o) => o.name, outletCard);
+    this.#empty = empty('key', 'Выходов нет', 'Добавь ключ AmneziaWG, WireGuard, OpenVPN или ссылку VLESS.');
+    const unitsBox = h('div', { class: 'cluster cluster_gap_s' });
+    this.#units = new Keyed(unitsBox, ([unit]) => unit, unitBadge);
+    this.#unitsCard = h('div', { class: 'card' }, unitsBox);
+    this.#rootWarnText = h('p', { class: 'callout__text' });
+    this.#rootWarn = h('div', { class: 'callout callout_tone_warn', hidden: true },
+      h('div', { class: 'callout__body' }, h('p', { class: 'callout__title', text: 'Помощник от root недоступен' }), this.#rootWarnText));
+    this.#root.append(
       h('div', { class: 'cluster cluster_justify_between' },
         h('p', { class: 'text text_tone_muted', text: 'Трафик идёт в живой выход с меньшим приоритетом; упал — сразу в следующий.' }),
         button('Добавить выход', { icon: 'plus', view: 'primary', size: 'm', data: { act: 'add' } })),
-      state.outlets.length === 0
-        ? empty('key', 'Выходов нет', 'Добавь ключ AmneziaWG, WireGuard, OpenVPN или ссылку VLESS.')
-        : h('div', { class: 'console__grid' }, state.outlets.map((o) => this.#card(o))),
-      group('Службы', null, this.#units(state)),
-    );
+      this.#cardsBox, this.#empty,
+      group('Службы', null, this.#unitsCard, this.#rootWarn));
+  }
+
+  #update(state) {
+    this.#cards.render(state.outlets);
+    setHidden(this.#cardsBox, state.outlets.length === 0);
+    setHidden(this.#empty, state.outlets.length > 0);
+    this.#units.render(Object.entries(state.units));
+    setHidden(this.#unitsCard, Boolean(state.rootError));
+    setHidden(this.#rootWarn, !state.rootError);
+    setText(this.#rootWarnText, state.rootError ? `${state.rootError}. Управлять выходами нельзя, смотреть — можно.` : '');
+  }
+
+  async #act(act, name, el) {
+    if (act === 'add') { this.#add.open(); return; }
+    if (act === 'speed') { await this.#speed(name, el); return; }
+    const o = this.#last?.outlets.find((x) => x.name === name);
+    if (act === 'remove' && !(await confirmDialog(`Удалить выход «${name}»?`, 'Ключ уедет в keys/removed на сервере — вернуть можно руками.', 'Удалить'))) return;
+    const req = {
+      restart: [`${API.outlet(name)}/restart`, {}],
+      toggle: [`${API.outlet(name)}/enable`, { enabled: !o?.enabled }],
+      remove: [API.outlet(name), undefined],
+    }[act];
+    if (!req) return;
+    await this.#busy(el, async () => {
+      await api(req[0], { method: act === 'remove' ? 'DELETE' : 'POST', body: req[1], timeout: 120_000 });
+      if (act !== 'restart' || o?.kind === 'mihomo') document.dispatchEvent(new CustomEvent(EVENTS.restart));
+      else toast(`Выход «${name}» перезапущен`, 'ok');
+    });
+  }
+
+  async #speed(name, el) {
+    await this.#busy(el, async () => {
+      const r = await api(API.speedtest, { method: 'POST', body: { outlet: name }, timeout: TIMING.speedtestMs });
+      toast(`«${name}»: ${r.mbps} Мбит/с (${bytes(r.bytes)} за ${(r.ms / 1000).toFixed(1)} с)`, 'ok');
+    }, `Замер «${name}»: `);
+  }
+
+  /** Кнопка крутится, пока идёт действие; ошибка — тостом. */
+  async #busy(el, job, prefix = '') {
+    el.classList.add('button_loading');
+    el.disabled = true;
+    try {
+      await job();
+    } catch (error) {
+      toast(`${prefix}${error.message}`, 'danger');
+    } finally {
+      el.classList.remove('button_loading');
+      el.disabled = false;
+    }
   }
 }
