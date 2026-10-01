@@ -14,7 +14,7 @@ outlets:
     protocol: amneziawg
     conf: /etc/contour/keys/ext.conf
 `);
-  assert.deepEqual(c.outlets, [{ name: 'ext', kind: 'mihomo', protocol: 'amneziawg', conf: '/etc/contour/keys/ext.conf', env: null, dns: [], priority: 100, enabled: true }]);
+  assert.deepEqual(c.outlets, [{ name: 'ext', kind: 'mihomo', protocol: 'amneziawg', conf: '/etc/contour/keys/ext.conf', env: null, dns: [], mtu: null, priority: 100, enabled: true }]);
   assert.throws(() => parseConfig('outlets:\n  - name: ext\n    protocol: amneziawg\n    conf: /x\n    prioriti: 1\n'), /неизвестное поле «prioriti»/);
   assert.throws(() => parseConfig('htpp: {}\n'), /неизвестное поле «htpp»/);
 });

@@ -10,7 +10,7 @@ const PRIV = 'cHJpdmF0ZS1rZXktZm9yLXRlc3RzLW9ubHktMDAwMDA=';
 const PUB = 'cHVibGljLWtleS1mb3ItdGVzdHMtb25seS0wMDAwMDA=';
 
 function outlet(name: string, protocol: 'amneziawg' | 'wireguard', port: number, conf: string): MihomoOutlet {
-  const config: OutletConfig = { name, kind: 'mihomo', protocol, conf: '/x', env: null, dns: [], priority: 10, enabled: true };
+  const config: OutletConfig = { name, kind: 'mihomo', protocol, conf: '/x', env: null, dns: [], mtu: null, priority: 10, enabled: true };
   return { outlet: newOutlet(config, port), config, profile: parseWgConf(conf) };
 }
 
@@ -54,6 +54,17 @@ test('резолверы: из профиля плюс публичные без
   const doc = parse(buildMihomoConfig({ outlets: [a, b], controller: 'c', secret: 's' })) as Record<string, any>;
   assert.deepEqual(doc.proxies[0].dns, ['10.10.8.15', '8.8.8.8', '1.1.1.1']);
   assert.deepEqual(doc.proxies[1].dns, ['9.9.9.9']);
+});
+
+test('MTU: из настроек выхода, иначе из профиля, иначе безопасные 1280', () => {
+  const fromConfig = outlet('a', 'wireguard', 1, AWG);
+  fromConfig.config.mtu = 1360;
+  const fromProfile = outlet('b', 'wireguard', 2, AWG.replace('[Peer]', 'MTU = 1376\n[Peer]'));
+  const fallback = outlet('c', 'wireguard', 3, AWG);
+  const doc = parse(buildMihomoConfig({ outlets: [fromConfig, fromProfile, fallback], controller: 'c', secret: 's' })) as Record<string, any>;
+  assert.equal(doc.proxies[0].mtu, 1360);
+  assert.equal(doc.proxies[1].mtu, 1376);
+  assert.equal(doc.proxies[2].mtu, 1280);
 });
 
 test('пароль SOCKS у каждого выхода свой и длинный', () => {

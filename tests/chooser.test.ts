@@ -7,7 +7,7 @@ import { createLogger } from '../src/vendor/logger.js';
 const quiet = createLogger({ enabled: false });
 
 function outlet(name: string, priority: number, state: Outlet['state'], latencyMs: number | null = null): Outlet {
-  const o = newOutlet({ name, kind: 'mihomo', protocol: 'wireguard', conf: '/x', env: null, dns: [], priority, enabled: true }, 1);
+  const o = newOutlet({ name, kind: 'mihomo', protocol: 'wireguard', conf: '/x', env: null, dns: [], mtu: null, priority, enabled: true }, 1);
   o.state = state;
   o.latencyMs = latencyMs;
   return o;
@@ -48,4 +48,6 @@ test('прилипание: сайт идёт первым через свой �
 test('нет выходов — соединение падает с понятной ошибкой, а не утекает', async () => {
   const chooser = new Chooser([], opts);
   await assert.rejects(chooser.connect('x.com', 443), /нет ни одного выхода/);
+  const one = new Chooser([outlet('a', 1, 'alive')], opts);
+  await assert.rejects(one.connect('x.com', 443, new Set(['a'])), /других выходов нет/);
 });

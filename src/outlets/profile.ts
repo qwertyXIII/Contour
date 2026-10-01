@@ -203,6 +203,7 @@ export function readWgProfile(confPath: string, envPath: string | null): WgProfi
 
 /** Что можно показать о профиле: без ключей. */
 export function describeProfile(p: WgProfile): string {
-  const amnezia = Object.keys(p.amnezia).length > 0 ? 'AmneziaWG' : 'WireGuard';
-  return `${amnezia}, ${p.peer.host}:${p.peer.port}, адрес ${p.addresses.join(', ')}, DNS ${p.dns.join(', ') || 'нет'}`;
+  const keys = Object.keys(p.amnezia);
+  const amnezia = keys.length > 0 ? `AmneziaWG (${keys.join(' ')})` : 'WireGuard';
+  return `${amnezia}, ${p.peer.host}:${p.peer.port}, адрес ${p.addresses.join(', ')}, DNS ${p.dns.join(', ') || 'нет'}, MTU ${p.mtu ?? 'нет'}`;
 }

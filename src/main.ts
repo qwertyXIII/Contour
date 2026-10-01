@@ -6,10 +6,12 @@ import { ConfigError, loadConfig } from './config.ts';
 import { startHttpInlet } from './inlets/http-proxy.ts';
 import { errorText, log } from './log.ts';
 import { startHealth } from './outlets/health.ts';
+import { makeDial } from './outlets/connect.ts';
 import { buildMihomoConfig } from './outlets/mihomo-config.ts';
 import { runMihomo } from './outlets/mihomo.ts';
 import { prepareOutlets } from './outlets/outlet.ts';
 import { describeProfile } from './outlets/profile.ts';
+import { Resolver } from './outlets/resolver.ts';
 import { Chooser } from './select/chooser.ts';
 
 /**
@@ -53,6 +55,7 @@ async function main(): Promise<void> {
   }
 
   const outlets = prepared.map((p) => p.outlet);
+  const dial = makeDial(new Resolver(), config.health.connectTimeoutSec * 1000);
   const health = startHealth(outlets, {
     intervalMs: config.health.intervalSec * 1000,
     connectTimeoutMs: config.health.connectTimeoutSec * 1000,
@@ -61,12 +64,14 @@ async function main(): Promise<void> {
     ipHost: config.health.ipHost,
     ipIntervalMs: config.health.ipIntervalSec * 1000,
     log,
+    dial,
   });
   const chooser = new Chooser(outlets, {
     stickyMs: config.sticky.hours * 3_600_000,
     connectTimeoutMs: config.health.connectTimeoutSec * 1000,
     onFailure: (outlet) => health.recheck(outlet),
     log,
+    dial,
   });
   const consumers = new Consumers(config.tokens, log);
   consumers.load();

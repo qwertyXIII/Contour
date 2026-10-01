@@ -34,7 +34,7 @@ async function setup(): Promise<{ proxy: string; target: http.Server; close: () 
   const consumers = new Consumers(tokens, quiet);
   consumers.load();
 
-  const fake: Outlet = newOutlet({ name: 'fake', kind: 'mihomo', protocol: 'wireguard', conf: '/x', env: null, dns: [], priority: 1, enabled: true }, 1);
+  const fake: Outlet = newOutlet({ name: 'fake', kind: 'mihomo', protocol: 'wireguard', conf: '/x', env: null, dns: [], mtu: null, priority: 1, enabled: true }, 1);
   fake.state = 'alive';
   const chooser = new Chooser([fake], { stickyMs: 0, connectTimeoutMs: 1000, onFailure: () => {}, log: quiet });
   // Любой адрес ведёт в локальную цель — ограда при этом проверяет то, что просил клиент.
@@ -131,7 +131,7 @@ test('повтор с проигрыванием: выход закрылся м
   consumers.load();
 
   const mk = (name: string): Outlet => {
-    const o = newOutlet({ name, kind: 'mihomo', protocol: 'wireguard', conf: '/x', env: null, dns: [], priority: 1, enabled: true }, 1);
+    const o = newOutlet({ name, kind: 'mihomo', protocol: 'wireguard', conf: '/x', env: null, dns: [], mtu: null, priority: 1, enabled: true }, 1);
     o.state = 'alive';
     return o;
   };

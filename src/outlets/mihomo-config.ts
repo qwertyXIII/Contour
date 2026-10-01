@@ -30,6 +30,27 @@ function dnsFor(o: MihomoOutlet): string[] {
   return [...new Set([...o.profile.dns, ...PUBLIC_DNS])];
 }
 
+/**
+ * MTU, когда ни настройки, ни профиль его не называют. У mihomo своё умолчание
+ * 1408, и с ним на живом запуске 2026-10-01 мелкие пакеты ходили, а
+ * полноразмерные терялись: 1 МБ по http — 82 КБ за 25 с, TLS-рукопожатия с
+ * большими сертификатами висли. 1280 проходит по любому пути (минимум IPv6);
+ * точнее — полем `mtu` выхода после замера `ping -M do` до VPN-сервера.
+ */
+const DEFAULT_MTU = 1280;
+
+/**
+ * Стек TCP внутри туннеля. С gVisor (умолчание `auto`) на живом запуске
+ * мелкие ответы ходили, а длинные загрузки вставали через ~200 КБ. `mips` —
+ * свой стек mihomo; для него работает выбор управления перегрузкой, BBR
+ * держит скорость при потерях лучше cubic.
+ */
+const IP_STACK = 'mips';
+
+function mtuFor(o: MihomoOutlet): number {
+  return o.config.mtu ?? o.profile.mtu ?? DEFAULT_MTU;
+}
+
 /** Числа — числами, остальное (`i1` с байтовыми шаблонами) — строкой. */
 function amneziaOption(raw: Record<string, string>): Record<string, number | string> {
   const out: Record<string, number | string> = {};
@@ -52,13 +73,14 @@ function proxyOf(o: MihomoOutlet): Record<string, unknown> {
     'public-key': p.peer.publicKey,
     'allowed-ips': p.peer.allowedIps,
     udp: true,
+    mtu: mtuFor(o),
+    'ip-stack': { mode: IP_STACK, 'congestion-controller': 'bbr' },
     'remote-dns-resolve': true,
     dns: dnsFor(o),
   };
   const v6 = bare.find(isIPv6);
   if (v6) proxy.ipv6 = v6;
   if (p.peer.presharedKey) proxy['pre-shared-key'] = p.peer.presharedKey;
-  if (p.mtu) proxy.mtu = p.mtu;
   if (p.peer.keepalive) proxy['persistent-keepalive'] = p.peer.keepalive;
   if (o.config.protocol === 'amneziawg' && Object.keys(p.amnezia).length > 0) {
     proxy['amnezia-wg-option'] = amneziaOption(p.amnezia);

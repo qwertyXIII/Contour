@@ -15,6 +15,7 @@ outlets:
     conf: /etc/contour/keys/ext.conf   # конфиг wg-quick/awg или файл со ссылкой vpn://
     env: /etc/contour/keys/ext.env     # AWG_ADDRESS / AWG_DNS, если в conf их нет (как у aiproxy)
     # dns: [1.1.1.1, 8.8.8.8]          # резолверы на дальнем конце туннеля; пусто — из профиля плюс публичные
+    # mtu: 1280                        # MTU туннеля; пусто — из профиля, без него 1280 (с 1408 большие пакеты терялись)
     priority: 10              # меньше — раньше в очереди
     enabled: true
 

@@ -266,5 +266,9 @@ ensure_sudoers
 ensure_logrotate
 verify
 echo
-echo "Готово. Дальше — переключение с контура aivpn (ключ один, два туннеля не живут):"
-echo "  sudo bash $SRC/deploy/switch-from-aivpn.sh"
+if systemctl is-active --quiet contour.service; then
+  echo "Готово. Contour уже работает; код изменился — sudo systemctl restart contour. Проверка: bash $SRC/deploy/check.sh"
+else
+  echo "Готово. Дальше — переключение с контура aivpn (ключ один, два туннеля не живут):"
+  echo "  sudo bash $SRC/deploy/switch-from-aivpn.sh"
+fi

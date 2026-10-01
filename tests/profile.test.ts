@@ -44,7 +44,7 @@ test('полный конфиг awg: адреса, DNS без доменов п�
   assert.equal(p.peer.port, 51820);
   assert.equal(p.peer.keepalive, 25);
   assert.deepEqual(p.amnezia, { jc: '4', jmin: '40', jmax: '70', s1: '15', s2: '90', h1: '1234567', h2: '2345678', h3: '3456789', h4: '4567890' });
-  assert.match(describeProfile(p), /AmneziaWG, vpn\.example\.org:51820/);
+  assert.match(describeProfile(p), /AmneziaWG \(jc jmin jmax s1 s2 h1 h2 h3 h4\), vpn\.example\.org:51820/);
   assert.doesNotMatch(describeProfile(p), new RegExp(PRIV));
 });
 

@@ -22,6 +22,8 @@ export type OutletConfig = {
   env: string | null;
   /** Резолверы на дальнем конце туннеля. Пусто — из профиля плюс публичные. */
   dns: string[];
+  /** MTU туннеля. null — из профиля, а без него безопасное умолчание (см. mihomo-config). */
+  mtu: number | null;
   /** Меньше — раньше в очереди. */
   priority: number;
   enabled: boolean;
@@ -121,7 +123,7 @@ function dnsList(value: unknown, where: string): string[] {
 function outlet(raw: unknown, index: number): OutletConfig {
   const where = `outlets[${index}]`;
   if (!isRecord(raw)) throw new ConfigError(`${where}: нужен раздел с полями name, protocol, conf`);
-  onlyKnown(raw, where, ['name', 'kind', 'protocol', 'conf', 'env', 'dns', 'priority', 'enabled']);
+  onlyKnown(raw, where, ['name', 'kind', 'protocol', 'conf', 'env', 'dns', 'mtu', 'priority', 'enabled']);
   const name = str(raw, 'name', '', where);
   if (!NAME.test(name)) {
     throw new ConfigError(`${where}.name: латиница, цифры, «-» и «_», до 32 знаков — имя идёт в логин потребителя`);
@@ -139,6 +141,7 @@ function outlet(raw: unknown, index: number): OutletConfig {
     conf: str(raw, 'conf', '', where),
     env: raw.env === undefined || raw.env === null ? null : str(raw, 'env', '', where),
     dns: dnsList(raw.dns, where),
+    mtu: raw.mtu === undefined || raw.mtu === null ? null : num(raw, 'mtu', 0, where, 576, 1500),
     priority: num(raw, 'priority', 100, where, 0, 10_000),
     enabled: bool(raw, 'enabled', true, where),
   };

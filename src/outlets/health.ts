@@ -1,6 +1,7 @@
 import { isIP, type Socket } from 'node:net';
 import { dialVia } from '../dial.ts';
 import { errorText, type Logger } from '../log.ts';
+import type { Dial } from './connect.ts';
 import type { Outlet } from './outlet.ts';
 
 /**
@@ -27,6 +28,8 @@ export type HealthOptions = {
   ipHost: string;
   ipIntervalMs: number;
   log: Logger;
+  /** Как соединяться через выход — тем же путём, что и потребители. */
+  dial?: Dial;
 };
 
 export type Health = {
@@ -63,6 +66,7 @@ export function startHealth(outlets: Outlet[], opts: HealthOptions): Health {
   const busy = new Set<string>();
   const ipAt = new Map<string, number>();
   const graphAt = new Map<string, number>();
+  const dial: Dial = opts.dial ?? ((o, h, p) => dialVia(o, h, p, opts.connectTimeoutMs));
   let stopped = false;
 
   const probe = async (outlet: Outlet): Promise<void> => {
@@ -70,7 +74,7 @@ export function startHealth(outlets: Outlet[], opts: HealthOptions): Health {
     busy.add(outlet.name);
     const started = Date.now();
     try {
-      const socket = await dialVia(outlet, opts.probeHost, 80, opts.connectTimeoutMs);
+      const socket = await dial(outlet, opts.probeHost, 80);
       const { status } = await httpOverSocket(socket, opts.probeHost, opts.probePath, RESPONSE_TIMEOUT_MS);
       if (status < 200 || status >= 400) throw new Error(`проверочный адрес ответил ${status}`);
       outlet.latencyMs = Date.now() - started;
@@ -104,7 +108,7 @@ export function startHealth(outlets: Outlet[], opts: HealthOptions): Health {
 
   const externalIp = async (outlet: Outlet): Promise<void> => {
     try {
-      const socket = await dialVia(outlet, opts.ipHost, 80, opts.connectTimeoutMs);
+      const socket = await dial(outlet, opts.ipHost, 80);
       const { status, body } = await httpOverSocket(socket, opts.ipHost, '/', RESPONSE_TIMEOUT_MS);
       const ip = body.trim();
       if (status !== 200 || isIP(ip) === 0) throw new Error(`ответ ${status}: ${ip.slice(0, 40)}`);

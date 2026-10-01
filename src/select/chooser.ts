@@ -1,5 +1,6 @@
 import type { Socket } from 'node:net';
 import { dialVia } from '../dial.ts';
+import type { Dial } from '../outlets/connect.ts';
 import { errorText, type Logger } from '../log.ts';
 import type { Outlet } from '../outlets/outlet.ts';
 
@@ -29,13 +30,15 @@ export type ChooserOptions = {
   connectTimeoutMs: number;
   onFailure: (outlet: Outlet, error: unknown) => void;
   log: Logger;
+  /** Как соединяться через выход; по умолчанию — SOCKS по имени (в тестах). */
+  dial?: Dial;
 };
 
 export class NoOutletError extends Error {
-  constructor(host: string, port: number, errors: string[]) {
-    super(errors.length === 0
-      ? 'нет ни одного выхода'
-      : `ни один выход не открыл ${host}:${port} — ${errors.join('; ')}`);
+  constructor(host: string, port: number, errors: string[], excluded: number) {
+    super(errors.length > 0
+      ? `ни один выход не открыл ${host}:${port} — ${errors.join('; ')}`
+      : excluded > 0 ? 'других выходов нет' : 'нет ни одного выхода');
   }
 }
 
@@ -75,7 +78,9 @@ export class Chooser {
     for (const outlet of this.order(host)) {
       if (exclude.has(outlet.name)) continue;
       try {
-        const socket = await dialVia(outlet, host, port, this.opts.connectTimeoutMs);
+        const socket = this.opts.dial
+          ? await this.opts.dial(outlet, host, port)
+          : await dialVia(outlet, host, port, this.opts.connectTimeoutMs);
         if (this.opts.stickyMs > 0) this.sticky.set(host, { name: outlet.name, until: Date.now() + this.opts.stickyMs });
         return { socket, outlet, failed: errors.map((e) => e.split(':')[0] as string) };
       } catch (error) {
@@ -83,7 +88,7 @@ export class Chooser {
         this.opts.onFailure(outlet, error);
       }
     }
-    throw new NoOutletError(host, port, errors);
+    throw new NoOutletError(host, port, errors, exclude.size);
   }
 
   /** Сколько сайтов сейчас прилипло — для экрана и логов. */
