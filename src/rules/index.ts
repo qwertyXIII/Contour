@@ -26,7 +26,12 @@ import { routeFor, type Router } from './need.ts';
  * ограды для края и namespace. `services` — сервис по имени (группа v2fly или
  * основной домен): ключ прилипания, самообучения и замеров.
  */
-export type Rules = { book: RuleBook; lists: RuleLists; services: Services; route: Router; allowNets(): string[]; stop(): void };
+export type Rules = {
+  book: RuleBook; lists: RuleLists; services: Services; route: Router; allowNets(): string[];
+  /** Частный адрес можно открыть через этот выход: подсеть правила «только через», и выход — из него. */
+  allowsPrivate(ip: string, outlet: string): boolean;
+  stop(): void;
+};
 
 const RESEND_MS = 60_000;
 const PRIVATE = PRIVATE_V4.map(([net, bits]) => parseCidr(`${net}/${bits}`) as Cidr);
@@ -118,6 +123,10 @@ export function startRules(config: Config, deps: { sites: Sites; outlets: Outlet
     lists,
     services,
     route: (host, asked) => routeFor(book.rules(), host, asked),
+    allowsPrivate: (ip, outlet) => {
+      const d = book.rules().decide(ip);
+      return d?.match.kind === 'cidr' && d.action.target.kind === 'only' && d.action.target.outlets.includes(outlet);
+    },
     allowNets: () => [...new Set(book.rules().onlyNets().filter((n) => isPrivateNet(n)).map((n) => formatCidr(n)))].sort(),
     stop: () => { book.stop(); lists.stop(); services.stop(); },
   };

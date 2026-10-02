@@ -118,3 +118,18 @@ test('шлюз: классы из правил — страна с прямым 
   assert.equal(routeCountry('country-ru'), 'RU');
   assert.equal(routeCountry('only-de1'), undefined);
 });
+
+test('вторая ограда: частный адрес — только через выход из правила «только через», прямой — никогда', async () => {
+  const { makeDial } = await import('../src/outlets/connect.ts');
+  const { newOutlet } = await import('../src/outlets/outlet.ts');
+  const r = new RuleSet([{ layer: 'manual', source: 'корп', entries: [net('172.16.42.0/24', act({ kind: 'only', outlets: ['corp'] }))] }]);
+  const allows = (ip: string, outlet: string): boolean => {
+    const d = r.decide(ip);
+    return d?.match.kind === 'cidr' && d.action.target.kind === 'only' && d.action.target.outlets.includes(outlet);
+  };
+  const dial = makeDial({ resolve: async (_o, h) => [h] }, 100, (ip, o) => !o.direct && allows(ip, o.name));
+  const mk = (name: string) => newOutlet({ name, kind: 'netns', bridge: 1, protocol: 'wireguard', conf: '/x', env: null, dns: [], mtu: null, priority: 1, enabled: true }, 1);
+  await assert.rejects(dial(mk('other'), '172.16.42.2', 22), /частный адрес/, 'чужой выход — ограда');
+  await assert.rejects(dial(mk('corp'), '172.16.1.1', 22), /частный адрес/, 'не та подсеть — ограда');
+  await assert.rejects(dial(mk('corp'), '172.16.42.2', 22), (e: Error) => !/частный адрес/.test(e.message), 'свой выход — ограда пропускает (дальше SOCKS, которого в проверке нет)');
+});

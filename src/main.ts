@@ -10,7 +10,7 @@ import { Hints } from './inlets/hints.ts';
 import { startLanInlet } from './inlets/lan.ts';
 import { errorText, log } from './log.ts';
 import { startHealth } from './outlets/health.ts';
-import { makeDial } from './outlets/connect.ts';
+import { makeDial, type FenceAllow } from './outlets/connect.ts';
 import { buildMihomoConfig } from './outlets/mihomo-config.ts';
 import { runMihomo, type MihomoHandle } from './outlets/mihomo.ts';
 import { prepareOutlets, reloadNetnsPassword, type Outlet } from './outlets/outlet.ts';
@@ -94,7 +94,9 @@ async function main(): Promise<void> {
   }
 
   const outlets = prepared.outlets;
-  const dial = makeDial(new Resolver(), config.health.connectTimeoutSec * 1000);
+  // Исключение ограды частных адресов — у правил («только через»); они поднимаются позже.
+  let fenceAllow: FenceAllow = () => false;
+  const dial = makeDial(new Resolver(), config.health.connectTimeoutSec * 1000, (ip, o) => fenceAllow(ip, o));
   // Соперники — до проверки живости: запасной не поднят, и проверка его не трогает.
   let recheck: ((o: Outlet) => void) | null = null;
   let shareRefresh: (() => void) | null = null;
@@ -183,6 +185,7 @@ async function main(): Promise<void> {
   const rules = startRules(config, { sites, outlets, countrySites: () => share?.store.settings().countrySites ?? {}, log });
   const route = rules.route;
   serviceOf = (host) => rules.services.serviceOf(host);
+  fenceAllow = (ip, o) => !o.direct && rules.allowsPrivate(ip, o.name);
   rulesRefresh = () => rules.book.rebuild();
   const server = await startHttpInlet({ ...config.http, chooser, consumers, log, meter, ports, route, speed });
   share = startShare(config, { consumers, outlets, countryList: (code) => rules.book.countryList(code), ruleset: () => rules.book.rules(), allowTcp: () => rules.allowNets(), log });
