@@ -83,9 +83,10 @@ export function addForm(onSubmit) {
       if (k === 'url') body.url = url.value.trim();
       if (k === 'manual') body.text = text.value;
       if (k === 'file') body.text = file.files[0] ? await file.files[0].text() : '';
+      // Чистим только введённое: вид, «куда» и формат остаются — следующий список
+      // часто такой же. form.reset() сбрасывал вид, а плашка переключателя — нет.
       if (await onSubmit(body)) {
-        form.reset();
-        show();
+        for (const input of [title, url, text, file]) input.value = '';
       }
     })();
   });
