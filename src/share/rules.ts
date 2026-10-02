@@ -1,8 +1,5 @@
-import { formatCidr, parseCidr, type Cidr } from '../cidr.ts';
 import { inSet } from '../dns/lists.ts';
-import type { OverrideMap } from '../dns/overrides.ts';
-import { serviceNets } from '../dns/subnets.ts';
-import type { Sites } from '../panel/sites.ts';
+import type { Policy, PhonePlan } from './plan.ts';
 import type { ShareStore } from './store.ts';
 
 /**
@@ -11,15 +8,16 @@ import type { ShareStore } from './store.ts';
  * клиент не умеет, поэтому решение уезжает на телефон списком, который сам
  * обновляется.
  *
- * Те же данные, что у DNS дома: свой список, общий, выученное «через VPN»,
- * ручные решения из панели (`Sites`), плюс подсети сервисов, что ходят по
- * адресам (голос Discord, Telegram), — как у шлюза. Выученное — история
- * посещений дома, поэтому правила отдаются только по токену устройства.
+ * Те же правила, что у прокси, DNS и шлюза, — из движка (`rules/`, план —
+ * `plan.ts`): свой и общий список, выученное «через VPN», ручные решения,
+ * подсети сервисов, что ходят по адресам (голос Discord, Telegram), свои списки.
+ * Выученное — история посещений дома, поэтому правила отдаются только по
+ * токену устройства.
  *
  * Формат — по справке Shadowrocket (github.com/LOWERTOP/Shadowrocket):
  * - `DOMAIN-SET` — файл без типов правил, `.example.com` — сам сайт и поддомены;
- * - правила идут сверху вниз, доменные — раньше адресных; ручное «напрямую»
- *   поэтому стоит первым и перебивает список;
+ * - правила идут сверху вниз, доменные — раньше адресных: исключения (имя не
+ *   как у родителя) поэтому стоят первыми;
  * - `IP-CIDR …,no-resolve` — только соединениям по адресу: иначе телефон
  *   спрашивал бы DNS о каждом сайте, чтобы сверить его адрес с подсетями;
  * - `update-url` — откуда конфиг обновляется сам.
@@ -33,15 +31,6 @@ import type { ShareStore } from './store.ts';
  * только по таймауту.
  */
 const REJECT_KEYWORDS = ['netseer-ipaddr-assoc'];
-
-/** Сайты через Contour и ручные «напрямую»: без поддоменов того, что уже в списке, и без того, что владелец увёл напрямую. */
-export function shareDomains(input: { own: string[]; common: string[]; learned: string[]; overrides: OverrideMap }): { tunnel: string[]; direct: string[] } {
-  const direct = Object.entries(input.overrides).filter(([, v]) => v === 'direct').map(([k]) => k).sort();
-  const directSet = new Set(direct);
-  const forced = Object.entries(input.overrides).filter(([, v]) => v === 'tunnel').map(([k]) => k);
-  const all = [...input.own, ...input.common, ...input.learned, ...forced].filter((n) => !inSet(n, directSet));
-  return { tunnel: collapse(all), direct };
-}
 
 /** Без поддоменов того, что уже в списке: `.example.com` в наборе и так берёт их. */
 export function collapse(names: Iterable<string>): string[] {
@@ -70,11 +59,18 @@ export type ConfInput = {
   /** `https://contour.example.ru/list/<токен>` — без «/» в конце. */
   base: string;
   device: string;
-  direct: string[];
-  nets: string[];
-  /** Страны, открытые телефону: своя группа на каждую; `sites` — сколько в её списке (пустой список не зовём). */
-  countries: Array<{ code: string; sites: number }>;
+  /** Правила телефона из движка (`plan.ts`). */
+  plan: PhonePlan;
+  /** Страны, открытые телефону: своя группа на каждую. */
+  countries: string[];
 };
+
+/** Имя политики в конфиге: узел Contour, DIRECT, REJECT или группа страны. */
+function policyName(p: Policy): string {
+  if (p.kind === 'contour') return SHARE_NODE;
+  if (p.kind === 'country') return countryGroup(p.code);
+  return p.kind === 'reject' ? 'REJECT' : 'DIRECT';
+}
 
 /**
  * Конфиг Shadowrocket. Узлы правила зовут по имени, а не `PROXY` («выбранный на
@@ -84,10 +80,16 @@ export type ConfInput = {
  * Страна — группа `select` с двумя путями: «напрямую» (ты в этой стране — её
  * сайты и так видят местный адрес) и «Contour-XX» (уехал — через выход в
  * стране). Так решил владелец 2026-10-02: «уехал за границу — переключил на
- * Россию и всё». В группу ведут список страны (готовый и свои сайты) и `GEOIP` —
- * адрес сайта в этой стране: банков в общих списках нет, а живут они дома.
+ * Россию и всё». В группу ведут список страны (готовый, свои сайты, правила
+ * «через страну») и `GEOIP` — адрес сайта в этой стране: банков в общих
+ * списках нет, а живут они дома. Пустой список не зовём.
+ *
+ * Порядок — как у движка (`plan.ts`): исключения отдельными строками, потом
+ * наборы, потом подсети, потом страны.
  */
 export function shadowrocketConf(input: ConfInput): string {
+  const { plan, base } = input;
+  const set = (file: string, names: string[], policy: string): string[] => (names.length > 0 ? [`DOMAIN-SET,${base}/${file},${policy}`] : []);
   return [
     `# Contour — правила для «${input.device}»: заблокированное через Contour, остальное напрямую.`,
     '# Обновляются сами (update-url ниже); правка руками здесь пропадёт при обновлении.',
@@ -98,30 +100,26 @@ export function shadowrocketConf(input: ConfInput): string {
     // QUIC через туннель хуже TCP (UDP внутри OpenVPN по TCP) — пусть приложения сразу идут по TCP.
     'block-quic = all-proxy',
     'udp-policy-not-supported-behaviour = REJECT',
-    // Не разрешилось имя «прямого» сайта — не уводить его через дом: российские
-    // сервисы за заграничным выходом не работают (Госуслуги, Альфа — живьём 2026-10-02).
+    // Не разрешилось имя «прямого» сайта — не уводить его через Contour: местные
+    // сервисы за чужим выходом не работают (Госуслуги, Альфа — живьём 2026-10-02).
     'dns-direct-fallback-proxy = false',
-    `update-url = ${input.base}/contour.conf`,
+    `update-url = ${base}/contour.conf`,
     '',
-    ...(input.countries.length > 0 ? ['[Proxy Group]', ...input.countries.map((c) => `${countryGroup(c.code)} = select,DIRECT,${countryNode(c.code)}`), ''] : []),
+    ...(input.countries.length > 0 ? ['[Proxy Group]', ...input.countries.map((c) => `${countryGroup(c)} = select,DIRECT,${countryNode(c)}`), ''] : []),
     '[Rule]',
     ...REJECT_KEYWORDS.map((k) => `DOMAIN-KEYWORD,${k},REJECT`),
-    ...input.direct.map((n) => `DOMAIN-SUFFIX,${n},DIRECT`),
-    `DOMAIN-SET,${input.base}/domains.list,${SHARE_NODE}`,
-    ...input.nets.map((c) => `IP-CIDR,${c},${SHARE_NODE},no-resolve`),
-    ...input.countries.flatMap((c) => [
-      ...(c.sites > 0 ? [`DOMAIN-SET,${input.base}/country-${c.code.toLowerCase()}.list,${countryGroup(c.code)}`] : []),
-      `GEOIP,${c.code},${countryGroup(c.code)}`,
-    ]),
+    ...plan.exceptions.map((e) => `${e.exact ? 'DOMAIN' : 'DOMAIN-SUFFIX'},${e.name},${policyName(e.policy)}`),
+    ...set('reject.list', plan.reject, 'REJECT'),
+    `DOMAIN-SET,${base}/domains.list,${SHARE_NODE}`,
+    ...set('direct.list', plan.direct, 'DIRECT'),
+    ...plan.nets.map((n) => `IP-CIDR,${n.cidr},${policyName(n.policy)},no-resolve`),
+    ...input.countries.flatMap((c) => [...set(`country-${c.toLowerCase()}.list`, plan.country[c] ?? [], countryGroup(c)), `GEOIP,${c},${countryGroup(c)}`]),
     'FINAL,DIRECT',
     '',
   ].join('\n');
 }
 
 export type RulesOptions = {
-  sites: Sites;
-  dnsDir: string;
-  skip: string[];
   /** Свои сайты стран (панель) — из хранилища раздачи. */
   store: Pick<ShareStore, 'settings'>;
   /** Готовый список страны — у книги правил (`RuleBook.countryList`): качается один раз на весь Contour. */
@@ -129,20 +127,14 @@ export type RulesOptions = {
 };
 
 /**
- * Данные правил телефона: папка DNS (`Sites`), копия списков подсетей, готовые
- * списки стран (у книги правил) и свои сайты стран из панели.
+ * Числа стран для панели: сколько в готовом списке (у книги правил) и какие
+ * свои сайты из панели. Правила телефона — из движка (`plan.ts`).
  */
 export class ShareRules {
-  private readonly sites: Sites;
-  private readonly dnsDir: string;
-  private readonly skip: Cidr[];
   private readonly store: RulesOptions['store'];
   private readonly countryList: RulesOptions['countryList'];
 
   constructor(opts: RulesOptions) {
-    this.sites = opts.sites;
-    this.dnsDir = opts.dnsDir;
-    this.skip = opts.skip.map((s) => parseCidr(s)).filter((c): c is Cidr => c !== null);
     this.store = opts.store;
     this.countryList = opts.countryList;
   }
@@ -152,15 +144,5 @@ export class ShareRules {
     const own = this.store.settings().countrySites[code] ?? [];
     const common = this.countryList(code);
     return { names: collapse([...common, ...own]), common: common.length, own };
-  }
-
-  domains(): { tunnel: string[]; direct: string[] } {
-    const learned = this.sites.learned().filter((l) => l.via === 'tunnel').map((l) => l.name);
-    return shareDomains({ own: this.sites.ownNames(), common: this.sites.commonNames(), learned, overrides: this.sites.overrides() });
-  }
-
-  /** Подсети — те же, что у шлюза: без частных, без Cloudflare. DNS ещё не скачал — пусто. */
-  nets(): string[] {
-    return serviceNets(this.dnsDir, this.skip).map(formatCidr);
   }
 }

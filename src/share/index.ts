@@ -4,7 +4,7 @@ import type { Config } from '../config.ts';
 import type { Consumers } from '../consumers.ts';
 import { errorText, type Logger } from '../log.ts';
 import { outletCountries, type Outlet } from '../outlets/outlet.ts';
-import type { Sites } from '../panel/sites.ts';
+import type { RuleSet } from '../rules/engine.ts';
 import type { UdpOutlet } from './edge-config.ts';
 import { Edge } from './edge.ts';
 import { ShareRules } from './rules.ts';
@@ -54,7 +54,7 @@ function countryUdp(config: Config, outlets: Outlet[], store: ShareStore): Array
 }
 
 /** `countryList` — готовый список страны у книги правил (`RuleBook.countryList`). */
-export function startShare(config: Config, deps: { consumers: Consumers; sites: Sites; outlets: Outlet[]; countryList: (code: string) => string[]; allowTcp?: () => string[]; log: Logger }): Share | null {
+export function startShare(config: Config, deps: { consumers: Consumers; outlets: Outlet[]; countryList: (code: string) => string[]; ruleset: () => RuleSet; allowTcp?: () => string[]; log: Logger }): Share | null {
   if (!config.share.enabled) return null;
   const log = deps.log.child({ src: 'share' });
   let store: ShareStore;
@@ -80,9 +80,9 @@ export function startShare(config: Config, deps: { consumers: Consumers; sites: 
     log,
   });
   edge.start();
-  const rules = new ShareRules({ sites: deps.sites, dnsDir: config.lan.dataDir, skip: config.lan.subnetSkip, store, countryList: deps.countryList });
+  const rules = new ShareRules({ store, countryList: deps.countryList });
   const allowed = config.share.countries;
-  const server: http.Server = startShareServer({ listen: config.share.listen, port: config.share.listPort, store, rules, allowed, log });
+  const server: http.Server = startShareServer({ listen: config.share.listen, port: config.share.listPort, store, rules: deps.ruleset, allowed, log });
   return {
     store,
     edge,

@@ -25,9 +25,8 @@ import dnsPacket from 'dns-packet';
 import { stringify } from 'yaml';
 import { PRIVATE_V4 } from '../src/inlets/fence.ts';
 import { log } from '../src/log.ts';
-import { Sites } from '../src/panel/sites.ts';
 import { Edge } from '../src/share/edge.ts';
-import { ShareRules } from '../src/share/rules.ts';
+import { RuleSet } from '../src/rules/engine.ts';
 import { startShareServer } from '../src/share/server.ts';
 import { ShareStore } from '../src/share/store.ts';
 
@@ -147,8 +146,11 @@ check((await curl(['--socks5-hostname', `127.0.0.1:${PORTS.phone}`, 'http://exam
 check(seen.length === before, 'чужой ключ до прокси не доходит');
 bad.kill();
 
-const rules = new ShareRules({ sites: new Sites({ dnsDir: dir, own: ['youtube.com'] }), dnsDir: dir, skip: [], store, countryList: () => ['gosuslugi.ru'] });
-const server = startShareServer({ listen: '127.0.0.1', port: PORTS.list, store, rules, allowed: null, log });
+const rules = new RuleSet([{ layer: 'loaded', source: 'проверка', entries: [
+  { match: { kind: 'domain', name: 'youtube.com', exact: false }, action: { target: { kind: 'tunnel' } } },
+  { match: { kind: 'domain', name: 'gosuslugi.ru', exact: false }, action: { target: { kind: 'country', country: 'RU' } } },
+] }]);
+const server = startShareServer({ listen: '127.0.0.1', port: PORTS.list, store, rules: () => rules, allowed: null, log });
 await sleep(300);
 check((await curl([`http://127.0.0.1:${PORTS.list}/list/${phone.list}/contour.conf`])) === '200', 'правила по токену');
 check((await curl([`http://127.0.0.1:${PORTS.list}/list/${phone.list}/country-ru.list`])) === '200', 'список страны по токену');

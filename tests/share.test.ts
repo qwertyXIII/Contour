@@ -7,11 +7,13 @@ import { parse } from 'yaml';
 import { parseConfig } from '../src/config.ts';
 import { Consumers } from '../src/consumers.ts';
 import { PRIVATE_V4 } from '../src/inlets/fence.ts';
-import { parseList } from '../src/dns/lists.ts';
 import { Sites } from '../src/panel/sites.ts';
 import { buildEdgeConfig } from '../src/share/edge-config.ts';
 import { shareLinks } from '../src/share/links.ts';
-import { ShareRules, shareDomains, shadowrocketConf } from '../src/share/rules.ts';
+import { RuleBook } from '../src/rules/book.ts';
+import { RuleSet } from '../src/rules/engine.ts';
+import { phonePlan } from '../src/share/plan.ts';
+import { shadowrocketConf } from '../src/share/rules.ts';
 import { answer } from '../src/share/server.ts';
 import { ShareStore, type ShareDevice } from '../src/share/store.ts';
 import { createLogger } from '../src/vendor/logger.js';
@@ -100,23 +102,36 @@ test('ограда SOCKS внутри namespace — те же сети, что �
   assert.match(script, /^    udp: true$/m);
 });
 
-test('правила: ручное «напрямую» первым и вычищено из списка, поддомены схлопнуты, подсети — no-resolve', () => {
-  const d = shareDomains({
-    own: ['youtube.com', 'googlevideo.com'],
-    common: ['instagram.com', 'www.instagram.com', 'x.com', 'cdn.x.com'],
-    learned: ['linkedin.com'],
-    overrides: { 'x.com': 'direct', 'chatgpt.com': 'tunnel', 'music.youtube.com': 'direct' },
+/** Книга правил на папке DNS — как у живого Contour, со встроенными источниками. */
+function bookOn(dns: string, opts: { own?: string[]; subnets?: string[]; countries?: string[]; countrySites?: () => Record<string, string[]>; country?: string[] } = {}): RuleBook {
+  const book = new RuleBook({
+    sites: new Sites({ dnsDir: dns, own: opts.own ?? [] }), subnets: () => opts.subnets ?? [], countries: () => opts.countries ?? [],
+    directCountry: () => 'RU', countrySites: opts.countrySites ?? (() => ({})), dir: path.join(dns, 'rules'), log: quiet,
   });
-  assert.deepEqual(d.tunnel, ['chatgpt.com', 'googlevideo.com', 'instagram.com', 'linkedin.com', 'youtube.com']);
-  assert.deepEqual(d.direct, ['music.youtube.com', 'x.com']);
-  const conf = shadowrocketConf({ base: 'https://c.example.ru/list/T', device: 'iPhone', direct: d.direct, nets: ['91.108.4.0/22'], countries: [{ code: 'RU', sites: 39 }, { code: 'DE', sites: 0 }] });
+  // Готовый список страны — подставной, без скачивания.
+  (book as unknown as { countryList: (c: string) => string[] }).countryList = (c) => (c === 'RU' ? opts.country ?? [] : []);
+  book.rebuild();
+  return book;
+}
+
+test('правила телефона из движка: исключения строками наверху, наборы по действию, подсети — no-resolve, группы стран', () => {
+  const dns = tmp('contour-dns-');
+  writeFileSync(path.join(dns, 'blocked-domains.lst'), 'instagram.com\nwww.instagram.com\nx.com\ncdn.x.com\n');
+  writeFileSync(path.join(dns, 'overrides.json'), JSON.stringify({ 'x.com': 'direct', 'chatgpt.com': 'tunnel', 'music.youtube.com': 'direct' }));
+  writeFileSync(path.join(dns, 'dns-learned.json'), JSON.stringify({ 'linkedin.com': { via: 'tunnel', why: 'x', until: Date.now() + 60_000 } }));
+  const book = bookOn(dns, { own: ['youtube.com', 'googlevideo.com'], subnets: ['91.108.4.0/22'], countries: ['RU'], country: ['gosuslugi.ru'] });
+  const plan = phonePlan(book.rules(), ['RU', 'DE']);
+  assert.deepEqual(plan.tunnel, ['chatgpt.com', 'googlevideo.com', 'instagram.com', 'linkedin.com', 'youtube.com']);
+  assert.deepEqual(plan.exceptions.map((e) => [e.name, e.policy.kind]), [['music.youtube.com', 'direct']], 'поддомен напрямую внутри «через VPN» — строкой наверх');
+  assert.deepEqual(plan.direct, ['x.com'], 'ручное «напрямую» сильнее общего списка');
+  const conf = shadowrocketConf({ base: 'https://c.example.ru/list/T', device: 'iPhone', plan, countries: ['RU', 'DE'] });
   const rules = conf.slice(conf.indexOf('[Rule]')).split('\n').filter(Boolean);
   assert.deepEqual(rules, [
     '[Rule]',
     'DOMAIN-KEYWORD,netseer-ipaddr-assoc,REJECT',
     'DOMAIN-SUFFIX,music.youtube.com,DIRECT',
-    'DOMAIN-SUFFIX,x.com,DIRECT',
     'DOMAIN-SET,https://c.example.ru/list/T/domains.list,Contour',
+    'DOMAIN-SET,https://c.example.ru/list/T/direct.list,DIRECT',
     'IP-CIDR,91.108.4.0/22,Contour,no-resolve',
     'DOMAIN-SET,https://c.example.ru/list/T/country-ru.list,Россия',
     'GEOIP,RU,Россия',
@@ -126,43 +141,59 @@ test('правила: ручное «напрямую» первым и вычи
   assert.match(conf, /^\[Proxy Group\]\nРоссия = select,DIRECT,Contour-RU\nГермания = select,DIRECT,Contour-DE$/m, 'там — напрямую, уехал — через выход в стране: группа названием страны');
   assert.match(conf, /^update-url = https:\/\/c\.example\.ru\/list\/T\/contour\.conf$/m);
   assert.match(conf, /^block-quic = all-proxy$/m);
-  assert.match(conf, /^dns-direct-fallback-proxy = false$/m, 'прямой сайт не уходит через дом, если имя не разрешилось');
+  assert.match(conf, /^dns-direct-fallback-proxy = false$/m, 'прямой сайт не уходит через Contour, если имя не разрешилось');
+  assert.deepEqual(phonePlan(book.rules(), []).country, {}, 'страна не открыта телефону — её сайты напрямую, как раньше');
+  book.stop();
+});
+
+test('план телефона: точное имя — строкой; запрет — набором; «только через выходы» и «не через» — тоже через Contour', () => {
+  const rules = new RuleSet([{ layer: 'manual', source: 'мои', entries: [
+    { match: { kind: 'domain', name: 'ads.example', exact: false }, action: { target: { kind: 'reject' } } },
+    { match: { kind: 'domain', name: 'www.example.org', exact: true }, action: { target: { kind: 'reject' } } },
+    { match: { kind: 'domain', name: 'openai.com', exact: false }, action: { target: { kind: 'avoid', countries: ['RU'] }, fastest: true } },
+    { match: { kind: 'cidr', net: (172 * 2 ** 24) + (16 << 16) + (253 << 8), bits: 24 }, action: { target: { kind: 'only', outlets: ['corp'] } } },
+  ] }]);
+  const plan = phonePlan(rules, []);
+  assert.deepEqual(plan.reject, ['ads.example']);
+  assert.deepEqual(plan.exceptions.map((e) => [e.name, e.exact]), [['www.example.org', true]]);
+  assert.deepEqual(plan.tunnel, ['openai.com']);
+  assert.deepEqual(plan.nets.map((n) => [n.cidr, n.policy.kind]), [['172.16.42.0/24', 'contour']], 'корпоративная сеть с телефона — через Contour, там правило');
+  const conf = shadowrocketConf({ base: 'B', device: 'x', plan, countries: [] });
+  assert.match(conf, /^DOMAIN,www\.example\.org,REJECT$/m);
+  assert.match(conf, /^DOMAIN-SET,B\/reject\.list,REJECT$/m);
 });
 
 test('ссылка на правила: по токену включённого устройства и только с адресом; чужое — одинаковый «нет»', () => {
   const dns = tmp('contour-dns-');
   writeFileSync(path.join(dns, 'blocked-domains.lst'), 'instagram.com\n');
-  writeFileSync(path.join(dns, 'gateway-subnets.lst'), '91.108.4.0/22\n104.16.0.0/13\n10.0.0.0/8\n');
-  const shareDir = tmp('contour-share-');
-  const store = new ShareStore(shareDir);
-  writeFileSync(path.join(shareDir, 'country-ru.lst'), 'gosuslugi.ru\nwww.gosuslugi.ru\n');
-  const country = parseList(readFileSync(path.join(shareDir, 'country-ru.lst'), 'utf8'));
-  const rules = new ShareRules({ sites: new Sites({ dnsDir: dns, own: ['youtube.com'] }), dnsDir: dns, skip: ['104.16.0.0/13'], store, countryList: (code) => (code === 'RU' ? country : []) });
-  const opts = { store, rules, allowed: null };
+  const store = new ShareStore(tmp('contour-share-'));
+  const book = bookOn(dns, { own: ['youtube.com'], subnets: ['91.108.4.0/22'], countries: ['RU'], country: ['gosuslugi.ru', 'www.gosuslugi.ru'], countrySites: () => store.settings().countrySites });
+  const opts = { store, rules: () => book.rules(), allowed: null };
   const d = store.add('iPhone');
   const conf = `/list/${d.list}/contour.conf`;
   assert.equal(answer(conf, opts), null, 'адреса нет — телефону нечего дать');
   store.setDomain('c.example.ru');
   const a = answer(`${conf}?x=1`, opts);
   assert.match(a?.body ?? '', /IP-CIDR,91\.108\.4\.0\/22,Contour,no-resolve/);
-  assert.doesNotMatch(a?.body ?? '', /104\.16|10\.0\.0/, 'без Cloudflare и частных — как у шлюза');
   assert.doesNotMatch(a?.body ?? '', /Proxy Group|GEOIP/, 'у нового телефона стран нет — и групп нет');
   assert.equal(answer(`/list/${d.list}/domains.list`, opts)?.body, '# Contour: сайты через VPN, 2\n.instagram.com\n.youtube.com\n');
   store.setCountrySite('RU', 'alfabank.ru', true);
+  book.rebuild();
   assert.equal(answer(`/list/${d.list}/country-ru.list`, opts), null, 'страна не открыта телефону — и списка нет');
   store.setCountry(d.id, 'RU', true);
-  assert.equal(answer(`/list/${d.list}/country-ru.list`, opts)?.body, '# Contour: сайты только с адресом RU, 2\n.alfabank.ru\n.gosuslugi.ru\n', 'готовый список (с копии) и свой из панели');
+  assert.equal(answer(`/list/${d.list}/country-ru.list`, opts)?.body, '# Contour: сайты только с адресом RU, 2\n.alfabank.ru\n.gosuslugi.ru\n', 'готовый список и свой из панели');
   assert.match(answer(conf, opts)?.body ?? '', /^Россия = select,DIRECT,Contour-RU$/m);
   assert.equal(answer(`/list/${d.list}/country-ru.list`, { ...opts, allowed: ['DE'] }), null, 'share.countries сужает');
   assert.equal(answer(`/list/${'A'.repeat(32)}/contour.conf`, opts), null);
   assert.equal(answer(`/list/${d.list}/other`, opts), null);
   store.setEnabled(d.id, false);
   assert.equal(answer(conf, opts), null);
+  book.stop();
 });
 
 test('подписка: серверы телефона в base64 — Contour и открытые страны; название в заголовке', () => {
   const store = new ShareStore(tmp('contour-share-'));
-  const rules = new ShareRules({ sites: new Sites({ dnsDir: tmp('contour-dns-'), own: [] }), dnsDir: tmp('contour-dns-'), skip: [], store, countryList: () => [] });
+  const rules = (): RuleSet => new RuleSet([]);
   const d = store.add('iPhone');
   store.setDomain('c.example.ru');
   const names = (): string[] => Buffer.from(answer(`/list/${d.list}/servers`, { store, rules, allowed: null })?.body ?? '', 'base64').toString().trim().split('\n').map((l) => decodeURIComponent(new URL(l).hash.slice(1)));

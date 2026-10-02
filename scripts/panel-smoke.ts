@@ -70,7 +70,7 @@ shareStore.add('iPad');
 shareStore.setCountrySite('RU', 'alfabank.ru', true);
 shareStore.setCountrySite('RU', 'sberbank.ru', true);
 setInterval(() => meter.add(`share.${iphone.id}`, 'ext', 'instagram.com', 3_000, 400_000), 200).unref();
-const shareRules = new ShareRules({ sites: new Sites({ dnsDir: dir, own: DEFAULTS.lan.domains }), dnsDir: dir, skip: [], store: shareStore, countryList: (code) => (code === 'RU' ? ['gosuslugi.ru', 'nalog.ru', 'ozon.ru', 'rzd.ru'] : []) });
+const shareRules = new ShareRules({ store: shareStore, countryList: (code) => (code === 'RU' ? ['gosuslugi.ru', 'nalog.ru', 'ozon.ru', 'rzd.ru'] : []) });
 const share = { store: shareStore, edge: { running: () => true }, rules: shareRules, outlets, ports: { edge: 18300, list: 18091 }, allowed: null, countries: () => outletCountries(outlets, null), stop: async () => {} } as unknown as Share;
 
 const config = { ...DEFAULTS, lan: { ...DEFAULTS.lan, enabled: true } };
