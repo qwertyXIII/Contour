@@ -37,14 +37,29 @@ export type EdgeOptions = {
 
 const SETTLE_MS = 500;
 const PROBE_MS = 2_000;
+const KNOCKS = 10;
+const KNOCK_GAP_MS = 200;
 
 /** Открыт ли порт: mihomo отвечает по API и тогда, когда вход открыть не смог. */
-function listening(host: string, port: number): Promise<boolean> {
+function knock(host: string, port: number): Promise<boolean> {
   return new Promise((resolve) => {
     const s = net.connect({ host, port, timeout: PROBE_MS }, () => { s.destroy(); resolve(true); });
     s.on('error', () => resolve(false));
     s.on('timeout', () => { s.destroy(); resolve(false); });
   });
+}
+
+/**
+ * Порт — с повтором: API mihomo отвечает чуть раньше, чем открыт вход (живьём
+ * 2026-10-02: проверка через 2 мс после ответа API — «не открыт», а вход
+ * открылся следом). Ошибка — только если вход так и не открылся.
+ */
+async function listening(host: string, port: number): Promise<boolean> {
+  for (let i = 0; i < KNOCKS; i += 1) {
+    if (await knock(host, port)) return true;
+    await new Promise((r) => setTimeout(r, KNOCK_GAP_MS));
+  }
+  return false;
 }
 
 export class Edge {
