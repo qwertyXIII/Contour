@@ -18,8 +18,9 @@ import type { Outlet } from './outlet.ts';
  *
  * Раз в `ipIntervalMs` — внешний адрес выхода: главный ответ на вопрос
  * «а точно через VPN?». Сменился адрес — заново и страна выхода (`countryHost`,
- * ipinfo: `/<адрес>/country` → `NL`), если её не задали руками: по ней выбор
- * ведёт соединения, которые просят страну (`chooser.ts`).
+ * ip-api: `/line/<адрес>?fields=countryCode` → `NL`), если её не задали руками:
+ * по ней выбор ведёт соединения, которые просят страну (`chooser.ts`). Не ipinfo:
+ * по http он отвечает только `curl`, остальных уводит на https (живьём 2026-10-02).
  */
 
 export type HealthOptions = {
@@ -135,7 +136,7 @@ export function startHealth(outlets: Outlet[], opts: HealthOptions): Health {
   const country = async (outlet: Outlet, ip: string): Promise<void> => {
     try {
       const socket = await dial(outlet, opts.countryHost, 80);
-      const { status, body } = await httpOverSocket(socket, opts.countryHost, `/${ip}/country`, RESPONSE_TIMEOUT_MS);
+      const { status, body } = await httpOverSocket(socket, opts.countryHost, `/line/${ip}?fields=countryCode`, RESPONSE_TIMEOUT_MS);
       const cc = body.trim().toUpperCase();
       if (status !== 200 || !/^[A-Z]{2}$/.test(cc)) throw new Error(`ответ ${status}: ${cc.slice(0, 40)}`);
       if (cc !== outlet.country) {

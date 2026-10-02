@@ -1,66 +1,36 @@
 // Раздача: телефоны, которые ходят через Contour из любой сети (Shadowrocket).
-// Решает телефон: заблокированное — через дом, остальное — напрямую. Здесь —
-// адрес снаружи и маршрут, который владелец заводит в nginx (LogViewer), телефоны
-// и окно подключения. Разметка собирается один раз; опрос меняет только значения.
+// Решает телефон: заблокированное — через дом и VPN, остальное — напрямую; уехал —
+// российское через дом с российским адресом (сервер «Contour-RU»). Здесь — что
+// работает (плитки), адрес снаружи и маршрут nginx, телефоны, сайты «только с
+// российским адресом». Разметка собирается один раз; опрос меняет только значения.
 import { api, toast } from '../../utils/api.js';
 import { API, TIMING } from '../../utils/constants.js';
 import { button, empty, group, h } from '../../utils/dom.js';
-import { ago, bytes, speed } from '../../utils/format.js';
-import { listSection, rowView, setHidden, setText } from '../../utils/view.js';
+import { bytes } from '../../utils/format.js';
+import { cardList, Keyed, setHidden, setText } from '../../utils/view.js';
 import { confirmDialog } from '../outlets/confirm.js';
 import { ConnectDialog } from './connect-dialog.js';
+import { countryCard, deviceCard, routeView, tileView } from './views.js';
 
-function deviceRow() {
-  const row = rowView('phone');
-  const open = button('Подключить', { icon: 'scan', view: 'ghost', data: { shareAct: 'open' } });
-  const toggle = button('Выключить', { view: 'ghost', data: { shareAct: 'enable' } });
-  const remove = button(null, { icon: 'trash', view: 'ghost', label: 'Удалить', data: { shareAct: 'remove' } });
-  const toggleText = toggle.querySelector('.button__text');
-  return {
-    // Кнопки — строкой под телефоном: справа на узком экране им не хватит места.
-    el: h('div', { class: 'stack stack_gap_s' }, row.el, h('div', { class: 'cluster cluster_gap_s' }, open, toggle, remove)),
-    update(x) {
-      row.set({
-        title: x.name,
-        note: [x.enabled ? null : 'выключен', x.lastSeen ? `был ${ago(x.lastSeen)}` : 'ещё не ходил'].filter(Boolean).join(' · '),
-        meta: `↓ ${speed(x.rate.down)} · сегодня ${bytes(x.today.down + x.today.up)}`,
-        tone: x.rate.down + x.rate.up > 0 ? 'accent' : undefined,
-      });
-      setText(toggleText, x.enabled ? 'Выключить' : 'Включить');
-      for (const b of [open, toggle, remove]) {
-        b.dataset.id = x.id;
-        b.dataset.name = x.name;
-        b.dataset.enabled = String(x.enabled);
-      }
-    },
-  };
-}
-
-/** Что завести в nginx (LogViewer) для домена раздачи. */
-function routeView() {
-  const values = {};
-  const pair = (key, label) => [h('dt', { class: 'kv__key', text: label }), (values[key] = h('dd', { class: 'kv__value' }))];
-  const kv = h('dl', { class: 'kv kv_layout_stack' },
-    ...pair('domain', 'Домен и сертификат'), ...pair('edge', 'Путь /'), ...pair('list', 'Путь /list/'), ...pair('flags', 'Ещё'));
-  const el = h('div', { class: 'callout callout_tone_info' }, h('div', { class: 'callout__body stack stack_gap_s' },
-    h('p', { class: 'callout__title', text: 'Маршрут в nginx — заводишь сам, в LogViewer' }), kv));
-  return {
-    el,
-    set(d) {
-      setText(values.domain, d.domain ?? 'сначала впиши адрес выше');
-      setText(values.edge, `→ http://127.0.0.1:${d.ports.edge} — край; чужие пути он отвергает сам`);
-      setText(values.list, `→ http://127.0.0.1:${d.ports.list} — правила для телефонов`);
-      setText(values.flags, 'WebSocket — включён, таймаут чтения — 3600 с');
-    },
-  };
+/** Поле с кнопкой в одну строку: адрес снаружи, новый телефон. */
+function inlineForm(input, text, icon, onSubmit) {
+  const submit = button(text, { icon, view: 'primary' });
+  submit.type = 'submit';
+  // Карточка и строка — разными узлами: обе задают раскладку и на одном элементе спорят.
+  const form = h('form', { class: 'cluster cluster_gap_s cluster_nowrap' }, h('div', { class: 'input' }, input), submit);
+  form.addEventListener('submit', (e) => { e.preventDefault(); void onSubmit(); });
+  return h('div', { class: 'card' }, form);
 }
 
 export class Share {
   #root;
   #domain;
+  #tiles = {};
   #route;
   #devices;
-  #note;
+  #devicesNote;
+  #countries;
+  #countryBox;
   #off;
   #body;
   #connect;
@@ -72,20 +42,73 @@ export class Share {
 
   init() {
     this.#connect = new ConnectDialog();
-    this.#route = routeView();
-    this.#devices = listSection((x) => x.id, deviceRow, empty('phone', 'Телефонов нет', 'Добавь телефон ниже — и подключи его в Shadowrocket.'));
-    const devicesGroup = group('Телефоны', ' ', this.#devices.el);
-    this.#note = devicesGroup.querySelector('.group__note');
     this.#off = h('div', { class: 'callout callout_tone_warn', hidden: true }, h('div', { class: 'callout__body' },
       h('p', { class: 'callout__title', text: 'Раздача выключена' }), h('p', { class: 'callout__text', text: 'В /etc/contour/contour.yaml стоит share.enabled: false.' })));
-    this.#body = h('div', { class: 'stack stack_gap_l' }, this.#domainForm(), this.#route.el, devicesGroup, this.#addForm());
+    this.#body = h('div', { class: 'stack stack_gap_l' }, this.#tilesView(), this.#devicesView(), this.#countriesView(), this.#domainView());
     this.#root.append(this.#off, this.#body);
-    this.#root.addEventListener('click', (e) => {
-      const b = e.target.closest('[data-share-act]');
-      if (b) void this.#act(b.dataset.shareAct, b.dataset);
-    });
+    this.#listen();
     new MutationObserver(() => this.#watch()).observe(this.#root, { attributes: true, attributeFilter: ['hidden'] });
     return this;
+  }
+
+  #tilesView() {
+    this.#tiles.edge = tileView('Вход', 'shield-check');
+    this.#tiles.phones = tileView('Телефоны', 'phone');
+    this.#tiles.today = tileView('Сегодня', 'activity');
+    this.#tiles.ru = tileView('Россия', 'home');
+    return h('div', { class: 'tiles' }, ...Object.values(this.#tiles).map((t) => t.el));
+  }
+
+  #devicesView() {
+    this.#devices = cardList((x) => x.id, deviceCard, empty('phone', 'Телефонов нет', 'Добавь телефон ниже — и подключи его в Shadowrocket.'));
+    const name = h('input', { class: 'input__control', name: 'name', placeholder: 'Мой iPhone', maxlength: '40', autocomplete: 'off', 'aria-label': 'Имя телефона' });
+    const add = inlineForm(name, 'Добавить', 'plus', async () => {
+      if (await this.#post(API.shareDevices, { name: name.value }, 'Телефон добавлен — нажми «Подключить»')) name.value = '';
+    });
+    const g = group('Телефоны', ' ', this.#devices.el, add);
+    this.#devicesNote = g.querySelector('.group__note');
+    return g;
+  }
+
+  #countriesView() {
+    this.#countryBox = h('div', { class: 'stack stack_gap_l' });
+    this.#countries = new Keyed(this.#countryBox, (c) => c.code, (c) => countryCard(c.code));
+    return group('Только с российским адресом', 'для поездок — сервер «Contour-RU»: Госуслуги и банки не пускают заграничные адреса', this.#countryBox);
+  }
+
+  #domainView() {
+    this.#domain = h('input', { class: 'input__control', name: 'domain', placeholder: 'contour.example.ru', autocomplete: 'off', spellcheck: 'false', 'aria-label': 'Адрес снаружи' });
+    const form = inlineForm(this.#domain, 'Сохранить', 'check', () => this.#post(API.shareSettings, { domain: this.#domain.value }, 'Адрес сохранён'));
+    this.#route = routeView();
+    return group('Адрес снаружи', 'домен, который nginx ведёт сюда; телефон подключается к нему на 443', form, this.#route.el);
+  }
+
+  #listen() {
+    this.#root.addEventListener('click', (e) => {
+      const b = e.target.closest('button[data-share-act="open"]');
+      if (b) void this.#connect.open(b.dataset.id);
+    });
+    this.#root.addEventListener('change', (e) => {
+      const t = e.target.closest('input[data-share-act="enable"]');
+      if (t) void this.#enable(t.dataset.id, t.dataset.name, t.checked);
+    });
+    this.#root.addEventListener('menu:select', (e) => {
+      const card = e.target.closest('article[data-id]');
+      if (!card) return;
+      if (e.detail.value === 'open') void this.#connect.open(card.dataset.id);
+      if (e.detail.value === 'remove') void this.#remove(card.dataset.id, card.dataset.name);
+    });
+    this.#root.addEventListener('chip:remove', (e) => {
+      const code = e.target.closest('[data-share-chips]')?.dataset.shareChips;
+      if (code) void this.#site(code, e.detail.value, false);
+    });
+    this.#root.addEventListener('submit', (e) => {
+      const form = e.target.closest('form[data-share-site]');
+      if (!form) return;
+      e.preventDefault();
+      const input = form.querySelector('input');
+      void this.#site(form.dataset.shareSite, input.value, true).then((ok) => { if (ok) input.value = ''; });
+    });
   }
 
   #watch() {
@@ -95,45 +118,23 @@ export class Share {
     this.#timer = setInterval(() => void this.#load(), TIMING.slowMs);
   }
 
-  #domainForm() {
-    this.#domain = h('input', { class: 'input__control', name: 'domain', placeholder: 'contour.example.ru', autocomplete: 'off', spellcheck: 'false', 'aria-label': 'Адрес снаружи' });
-    const form = h('form', { class: 'card cluster cluster_gap_s' },
-      h('div', { class: 'input' }, this.#domain),
-      h('button', { class: 'button button_view_primary', type: 'submit' }, h('span', { class: 'button__text', text: 'Сохранить' })));
-    form.addEventListener('submit', (e) => {
-      e.preventDefault();
-      void this.#post(API.shareSettings, { domain: this.#domain.value }, 'Адрес сохранён');
-    });
-    return group('Адрес снаружи', 'домен, который nginx ведёт сюда; телефон подключается к нему на 443', form);
+  async #enable(id, name, on) {
+    await this.#post(`${API.shareDevice(id)}/enable`, { enabled: on }, on ? `«${name}» снова ходит через дом` : `«${name}» выключен — через дом больше не ходит`);
   }
 
-  #addForm() {
-    const input = h('input', { class: 'input__control', name: 'name', placeholder: 'Мой iPhone', maxlength: '40', autocomplete: 'off', 'aria-label': 'Имя телефона' });
-    const form = h('form', { class: 'card cluster cluster_gap_s' },
-      h('div', { class: 'input' }, input),
-      h('button', { class: 'button button_view_primary', type: 'submit' }, h('span', { class: 'button__text', text: 'Добавить' })));
-    form.addEventListener('submit', (e) => {
-      e.preventDefault();
-      void this.#post(API.shareDevices, { name: input.value }, 'Телефон добавлен — нажми «Подключить»').then((ok) => { if (ok) input.value = ''; });
-    });
-    return group('Новый телефон', 'у каждого свой ключ: выключил один — остальные работают', form);
-  }
-
-  async #act(what, d) {
-    if (what === 'open') { await this.#connect.open(d.id); return; }
-    if (what === 'enable') {
-      const on = d.enabled !== 'true';
-      await this.#post(`${API.shareDevice(d.id)}/enable`, { enabled: on }, on ? `«${d.name}» включён` : `«${d.name}» выключен — через дом больше не ходит`);
-      return;
-    }
-    if (!(await confirmDialog(`Удалить «${d.name}»?`, 'Его ключ перестанет работать сразу. Вернуть нельзя — только добавить заново и подключить снова.', 'Удалить'))) return;
+  async #remove(id, name) {
+    if (!(await confirmDialog(`Удалить «${name}»?`, 'Его ключи перестанут работать сразу. Вернуть нельзя — только добавить заново и подключить снова.', 'Удалить'))) return;
     try {
-      await api(API.shareDevice(d.id), { method: 'DELETE' });
-      toast(`«${d.name}» удалён`, 'ok');
+      await api(API.shareDevice(id), { method: 'DELETE' });
+      toast(`«${name}» удалён`, 'ok');
       void this.#load();
     } catch (error) {
       toast(error.message, 'danger');
     }
+  }
+
+  #site(code, name, on) {
+    return this.#post(API.shareCountrySites(code), { name, on }, on ? `«${name}» — только с российским адресом` : `«${name}» убран из списка`);
   }
 
   async #post(path, body, done) {
@@ -144,6 +145,7 @@ export class Share {
       return true;
     } catch (error) {
       toast(error.message, 'danger');
+      void this.#load();
       return false;
     }
   }
@@ -161,7 +163,21 @@ export class Share {
     // Своё поле не трогаем, пока в нём печатают.
     if (document.activeElement !== this.#domain) this.#domain.value = d.domain ?? '';
     this.#route.set(d);
-    setText(this.#note, d.running ? 'край работает' : d.devices.some((x) => x.enabled) ? 'край поднимается…' : 'край не запущен — нет включённых телефонов');
+    this.#update(d);
+  }
+
+  #update(d) {
+    const on = d.devices.filter((x) => x.enabled);
+    const now = d.devices.filter((x) => x.enabled && x.rate.down + x.rate.up > 0);
+    const today = d.devices.reduce((s, x) => s + x.today.down + x.today.up, 0);
+    const ru = d.countries[0];
+    this.#tiles.edge.set(d.running ? 'работает' : on.length > 0 ? 'поднимается' : 'спит', d.domain ?? 'адрес не задан', d.running);
+    this.#tiles.phones.set(String(d.devices.length), now.length > 0 ? `сейчас ходят: ${now.length}` : `включено: ${on.length}`);
+    this.#tiles.today.set(bytes(today), 'через дом, TCP');
+    if (ru) this.#tiles.ru.set(ru.exit?.alive ? 'есть' : 'нет', ru.exit ? `выход ${ru.exit.name}${ru.exit.direct ? ', прямой' : ''}` : 'выхода в России нет', Boolean(ru.exit?.alive));
+    setHidden(this.#tiles.ru.el, !ru);
+    setText(this.#devicesNote, 'у каждого свои ключи: выключил один — остальные работают');
     this.#devices.render(d.devices);
+    this.#countries.render(d.countries);
   }
 }

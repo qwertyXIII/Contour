@@ -17,6 +17,7 @@ export const API = {
   shareSettings: '/api/share/settings',
   shareDevices: '/api/share/devices',
   shareDevice: (id) => `/api/share/devices/${encodeURIComponent(id)}`,
+  shareCountrySites: (code) => `/api/share/countries/${encodeURIComponent(code)}/sites`,
 };
 
 export const TIMING = {

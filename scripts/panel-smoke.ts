@@ -14,6 +14,7 @@ import { Sites } from '../src/panel/sites.ts';
 import type { SpeedResult } from '../src/panel/speedtest.ts';
 import { PanelState } from '../src/panel/state.ts';
 import type { Share } from '../src/share/index.ts';
+import { ShareRules } from '../src/share/rules.ts';
 import { ShareStore } from '../src/share/store.ts';
 import { Meter } from '../src/stats/meter.ts';
 
@@ -39,10 +40,12 @@ spare.state = 'dead'; spare.lastError = 'молчит';
 ext.ports = { filter: 'filtered', pass: new Set([80, 443, 8443]), cut: new Set([5222, 9339, 25565]), checkedAt: Date.now() - 3_600_000 };
 // Соперник ext: тот же аккаунт по OpenVPN — работает он, ext запасной.
 const ovpn = mk('corp_ext', 5);
-ovpn.state = 'alive'; ovpn.latencyMs = 957; ovpn.externalIp = '198.51.100.20'; ovpn.checkedAt = Date.now();
+ovpn.state = 'alive'; ovpn.latencyMs = 957; ovpn.externalIp = '198.51.100.20'; ovpn.country = 'DE'; ovpn.checkedAt = Date.now();
 ovpn.ports = { filter: 'all', pass: new Set(), cut: new Set(), checkedAt: Date.now() - 600_000 };
 ext.state = 'standby';
-const outlets = [ovpn, ext, spare];
+// Прямой выход — как его готовит prepareOutlets: без SOCKS, только по просьбе страны.
+const home = { ...mk('home', 1000), direct: true, onRequest: true, country: 'RU', countryFixed: false, state: 'alive' as const, latencyMs: 31, externalIp: '203.0.113.10', checkedAt: Date.now() };
+const outlets = [ovpn, ext, spare, home];
 const noDial = async (): Promise<never> => { throw new Error('в проверке выходов нет'); };
 
 const meter = new Meter({ dir, log });
@@ -59,12 +62,18 @@ setInterval(() => {
 }, 200).unref();
 
 // Раздача: два телефона, один ходит; края в проверке нет — «работает» подставлено.
-const shareStore = new ShareStore(path.join(dir, 'share'));
+const shareDir = path.join(dir, 'share');
+const shareStore = new ShareStore(shareDir, ['RU']);
 shareStore.setDomain('contour.example.ru');
 const iphone = shareStore.add('iPhone Димы');
 shareStore.add('iPad');
+shareStore.setCountrySite('RU', 'alfabank.ru', true);
+shareStore.setCountrySite('RU', 'sberbank.ru', true);
+writeFileSync(path.join(shareDir, 'country-ru.lst'), 'gosuslugi.ru\nnalog.ru\nozon.ru\nrzd.ru\n');
 setInterval(() => meter.add(`share.${iphone.id}`, 'ext', 'instagram.com', 3_000, 400_000), 200).unref();
-const share = { store: shareStore, edge: { running: () => true }, ports: { edge: 18300, list: 18091 }, stop: async () => {} } as unknown as Share;
+const shareRules = new ShareRules({ sites: new Sites({ dnsDir: dir, own: DEFAULTS.lan.domains }), dnsDir: dir, skip: [], store: shareStore, countries: ['RU'], dir: shareDir, log });
+shareRules.start();
+const share = { store: shareStore, edge: { running: () => true }, rules: shareRules, outlets, ports: { edge: 18300, list: 18091 }, stop: async () => {} } as unknown as Share;
 
 const config = { ...DEFAULTS, lan: { ...DEFAULTS.lan, enabled: true } };
 const speeds = new Map<string, SpeedResult>();

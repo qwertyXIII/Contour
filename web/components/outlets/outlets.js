@@ -11,8 +11,8 @@ import { AddOutlet } from './add-outlet.js';
 import { confirmDialog } from './confirm.js';
 import { selectField } from '../../utils/select-field.js';
 
-const KIND = { netns: 'ядро, своё пространство сети', mihomo: 'mihomo' };
-const PROTO = { amneziawg: 'AmneziaWG', wireguard: 'WireGuard', openvpn: 'OpenVPN', link: 'ссылка', subscription: 'подписка' };
+const KIND = { netns: 'ядро, своё пространство сети', mihomo: 'mihomo', direct: 'интернет самого сервера' };
+const PROTO = { amneziawg: 'AmneziaWG', wireguard: 'WireGuard', openvpn: 'OpenVPN', link: 'ссылка', subscription: 'подписка', direct: 'Прямой выход' };
 const UNIT_TONE = { active: 'ok', failed: 'danger', inactive: null, activating: 'warn' };
 
 /** Порты выхода словами: «все», «режет 9339, 5222…» или «не проверены». */
@@ -27,6 +27,7 @@ function portsText(p) {
 /** Строки карточки — все сразу; ненужные этому выходу прячутся, а не пересобираются. */
 const FIELDS = [
   ['ip', 'Внешний адрес', (o) => o.externalIp ?? '—'],
+  ['country', 'Страна', (o) => o.country ?? 'ещё не узнали'],
   ['latency', 'Задержка', (o) => (o.latencyMs ? `${o.latencyMs} мс` : '—')],
   ['now', 'Сейчас', (o) => `↓ ${speed(o.rate.down)} · ↑ ${speed(o.rate.up)}`],
   ['today', 'Сегодня', (o) => bytes(o.today.down + o.today.up)],
@@ -70,7 +71,7 @@ function outletCard() {
     update(o) {
       lead.tone(o.state === 'alive' ? 'accent' : undefined);
       setText(title, o.name);
-      setText(subtitle, [PROTO[o.protocol] ?? o.protocol, KIND[o.kind]].filter(Boolean).join(' · ') || 'данных помощника нет');
+      setText(subtitle, [PROTO[o.protocol] ?? o.protocol, KIND[o.kind], o.onRequest ? 'только когда просят его страну' : null].filter(Boolean).join(' · ') || 'данных помощника нет');
       status.set(...outletStatus(o));
       for (const f of fields) {
         const v = f.value(o);
@@ -83,7 +84,11 @@ function outletCard() {
       setHidden(activateBtn, !(standby && o.enabled));
       setHidden(speedBtn, !o.enabled || standby);
       setHidden(portsBtn, !o.enabled || standby);
-      setHidden(restartBtn, standby);
+      // Прямой выход — из настроек (`direct`), а не туннель: перезапускать, выключать и удалять тут нечего.
+      const direct = o.kind === 'direct';
+      setHidden(restartBtn, standby || direct);
+      setHidden(toggleBtn, direct);
+      setHidden(removeBtn, direct);
       setHidden(rival.el, o.kind !== 'netns' || o.candidates.length === 0);
       rival.update({ rival: o.name }, [{ value: '', text: '— ни с кем' }, ...o.candidates.map((c) => ({ value: c, text: c }))], o.rivals?.[0] ?? '');
       setText(toggleText, o.enabled ? 'Выключить' : 'Включить');

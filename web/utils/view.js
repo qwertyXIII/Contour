@@ -131,3 +131,23 @@ export function listSection(key, make, emptyCard) {
     },
   };
 }
+
+/**
+ * Список отдельных карточек (`list_view_cards`) с пустым состоянием вместо него:
+ * пункт сам — карточка (`make(item).el`), без общей карточки вокруг.
+ */
+export function cardList(key, make, emptyCard) {
+  const ul = h('ul', { class: 'list list_view_cards' });
+  const keyed = new Keyed(ul, key, (item) => {
+    const inner = make(item);
+    return { el: h('li', { class: 'list__item' }, inner.el), update: inner.update };
+  });
+  return {
+    el: h('div', {}, ul, emptyCard),
+    render(items) {
+      keyed.render(items);
+      setHidden(ul, items.length === 0);
+      setHidden(emptyCard, items.length > 0);
+    },
+  };
+}

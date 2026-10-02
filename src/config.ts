@@ -80,7 +80,7 @@ export type Config = {
     portsHost: string;
     /** Как часто перепроверять порты: провайдер может поменять фильтр. */
     portsIntervalSec: number;
-    /** Кто называет страну по адресу (`/<адрес>/country`), — когда у выхода сменился внешний адрес. */
+    /** Кто называет страну по адресу (ip-api: `/line/<адрес>?fields=countryCode`), — когда у выхода сменился внешний адрес. */
     countryHost: string;
   };
   sticky: { hours: number };
@@ -174,7 +174,7 @@ export const DEFAULTS: Config = {
     ipIntervalSec: 300,
     portsHost: 'portquiz.net',
     portsIntervalSec: 86_400,
-    countryHost: 'ipinfo.io',
+    countryHost: 'ip-api.com',
   },
   sticky: { hours: 24 },
   panel: {
