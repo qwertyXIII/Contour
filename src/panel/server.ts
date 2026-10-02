@@ -51,6 +51,8 @@ function security(app: express.Express): void {
 export function createPanel(opts: RoutesDeps & { listen: string; port: number; log: Logger }): Panel {
   const app = express();
   security(app);
+  // Списки правил приходят текстом целиком (файл до 5 МБ); остальному хватит малого.
+  app.use('/api/rules/lists', express.json({ limit: '6mb' }));
   app.use(express.json({ limit: '256kb' }));
   app.use('/api', apiRouter(opts));
   staticFiles(app);

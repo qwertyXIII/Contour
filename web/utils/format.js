@@ -41,3 +41,11 @@ export function time(ts) {
 export function dateTime(ts) {
   return new Date(ts).toLocaleString('ru-RU', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
 }
+
+/** Число со словом в нужной форме: plural(3, ['правило', 'правила', 'правил']) → «3 правила». */
+export function plural(n, [one, few, many]) {
+  const m10 = n % 10;
+  const m100 = n % 100;
+  const word = m10 === 1 && m100 !== 11 ? one : m10 >= 2 && m10 <= 4 && (m100 < 12 || m100 > 14) ? few : many;
+  return `${n} ${word}`;
+}

@@ -7,7 +7,7 @@ import { parseCidr } from '../src/cidr.ts';
 import { RuleBook } from '../src/rules/book.ts';
 import { CompiledRules } from '../src/rules/compiled.ts';
 import { ipv4ToInt, RuleSet, type RuleSource } from '../src/rules/engine.ts';
-import { domainService } from '../src/rules/index.ts';
+import { siteOf as domainService } from '../src/rules/service-index.ts';
 import { routeFor } from '../src/rules/need.ts';
 import type { Action, Entry } from '../src/rules/types.ts';
 import { Sites } from '../src/panel/sites.ts';

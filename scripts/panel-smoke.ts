@@ -14,6 +14,11 @@ import { Sites } from '../src/panel/sites.ts';
 import type { SpeedResult } from '../src/panel/speedtest.ts';
 import { PanelState } from '../src/panel/state.ts';
 import type { Share } from '../src/share/index.ts';
+import { RuleBook } from '../src/rules/book.ts';
+import { RuleLists } from '../src/rules/lists.ts';
+import { routeFor } from '../src/rules/need.ts';
+import { parseRuleList } from '../src/rules/parse.ts';
+import { Chooser, type ExitNeed } from '../src/select/chooser.ts';
 import { ShareRules } from '../src/share/rules.ts';
 import { ShareStore } from '../src/share/store.ts';
 import { Meter } from '../src/stats/meter.ts';
@@ -73,6 +78,20 @@ setInterval(() => meter.add(`share.${iphone.id}`, 'ext', 'instagram.com', 3_000,
 const shareRules = new ShareRules({ store: shareStore, countryList: (code) => (code === 'RU' ? ['gosuslugi.ru', 'nalog.ru', 'ozon.ru', 'rzd.ru'] : []) });
 const share = { store: shareStore, edge: { running: () => true }, rules: shareRules, outlets, ports: { edge: 18300, list: 18091 }, allowed: null, countries: () => outletCountries(outlets, null), stop: async () => {} } as unknown as Share;
 
+// Правила: свои списки (свой формат и запрет) поверх встроенного — как у живого Contour.
+const rulesDir = path.join(dir, 'rules');
+const ruleLists = new RuleLists({ dir: rulesDir, parse: parseRuleList, log });
+await ruleLists.add({ title: 'ИИ-сервисы', kind: 'manual', format: 'contour', action: { target: { kind: 'tunnel' } }, text: '[через: DE, самый быстрый]\nopenai.com\nchatgpt.com\n\n[только: corp_ext]\n172.16.42.0/24\n' });
+await ruleLists.add({ title: 'Реклама', kind: 'manual', format: 'plain', action: { target: { kind: 'reject' } }, text: 'ads.example.com\ndoubleclick.net\n' });
+const ruleBook = new RuleBook({
+  sites: new Sites({ dnsDir: dir, own: DEFAULTS.lan.domains }), subnets: () => ['91.108.4.0/22'], countries: () => outletCountries(outlets),
+  directCountry: () => 'RU', countrySites: () => shareStore.settings().countrySites, extra: () => ruleLists.sources(), dir: rulesDir, log,
+});
+(ruleBook as unknown as { countryList: (c: string) => string[] }).countryList = (c) => (c === 'RU' ? ['gosuslugi.ru', 'nalog.ru', 'ozon.ru', 'rzd.ru'] : []);
+ruleBook.rebuild();
+const ruleChooser = new Chooser(outlets, { stickyMs: 0, connectTimeoutMs: 1000, onFailure: () => {}, log });
+const rules = { book: ruleBook, lists: ruleLists, route: (h: string, a?: ExitNeed) => routeFor(ruleBook.rules(), h, a), order: (h: string, n: ExitNeed) => ruleChooser.order(h, undefined, Date.now(), n) };
+
 const config = { ...DEFAULTS, lan: { ...DEFAULTS.lan, enabled: true } };
 const speeds = new Map<string, SpeedResult>();
 const devices = new Devices(dir);
@@ -102,4 +121,5 @@ createPanel({
   ports: new PortProbe(outlets, { dial: noDial, host: 'portquiz.net', intervalMs: 86_400_000, needed: [9339], file: path.join(dir, 'outlet-ports.json'), log }),
   rivals: new Rivals(outlets, [], { log, activate: async () => { throw new Error('в проверке помощника нет'); }, isRunning: async () => true, onActivated: () => {} }),
   share,
+  rules,
 });

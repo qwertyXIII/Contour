@@ -18,6 +18,10 @@ export const API = {
   shareDevices: '/api/share/devices',
   shareDevice: (id) => `/api/share/devices/${encodeURIComponent(id)}`,
   shareCountrySites: (code) => `/api/share/countries/${encodeURIComponent(code)}/sites`,
+  rules: '/api/rules',
+  rulesCheck: (host) => `/api/rules/check?host=${encodeURIComponent(host)}`,
+  rulesLists: '/api/rules/lists',
+  rulesList: (id) => `/api/rules/lists/${encodeURIComponent(id)}`,
 };
 
 export const TIMING = {

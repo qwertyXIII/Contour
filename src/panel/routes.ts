@@ -14,6 +14,7 @@ import type { Devices } from './devices.ts';
 import type { Sites } from './sites.ts';
 import { speedTest, type SpeedResult } from './speedtest.ts';
 import { fail, parse } from './respond.ts';
+import { rulesRoutes, type PanelRules } from './rules-routes.ts';
 import { shareRoutes } from './share-routes.ts';
 import type { PanelState } from './state.ts';
 
@@ -35,6 +36,8 @@ export type RoutesDeps = {
   rivals: Rivals;
   /** Раздача; null — выключена в настройках. */
   share: Share | null;
+  /** Правила «что + куда»; null — без них (проверки панели). */
+  rules?: PanelRules | null;
   log: Logger;
 };
 
@@ -221,5 +224,6 @@ export function apiRouter(d: RoutesDeps): Router {
   actionRoutes(router, d);
   outletRoutes(router, d);
   shareRoutes(router, d);
+  rulesRoutes(router, d);
   return router;
 }

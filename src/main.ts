@@ -18,7 +18,7 @@ import { PortProbe } from './outlets/ports.ts';
 import { Rivals } from './outlets/rivals.ts';
 import { rootCall } from './root/protocol.ts';
 import { Resolver } from './outlets/resolver.ts';
-import { Chooser } from './select/chooser.ts';
+import { Chooser, type ExitNeed } from './select/chooser.ts';
 import { Auth } from './panel/auth.ts';
 import { GatewayAddresses } from './panel/addresses.ts';
 import { Devices } from './panel/devices.ts';
@@ -26,7 +26,9 @@ import { createPanel, type Panel } from './panel/server.ts';
 import { Sites } from './panel/sites.ts';
 import { speedTest, type SpeedResult } from './panel/speedtest.ts';
 import { PanelState } from './panel/state.ts';
-import { domainService, startRules } from './rules/index.ts';
+import type { PanelRules } from './panel/rules-routes.ts';
+import { startRules } from './rules/index.ts';
+import { siteOf } from './rules/service-index.ts';
 import { OutcomeBook } from './select/outcomes.ts';
 import { SpeedBook } from './select/speed.ts';
 import { SpeedProbe } from './select/speed-probe.ts';
@@ -97,6 +99,7 @@ async function main(): Promise<void> {
   let recheck: ((o: Outlet) => void) | null = null;
   let shareRefresh: (() => void) | null = null;
   let rulesRefresh: (() => void) | null = null;
+  let serviceOf: (host: string) => string = siteOf;
   const rivals = new Rivals(outlets, config.outlets, {
     log,
     activate: async (name) => { await rootCall({ cmd: 'outlet.activate', name }); },
@@ -151,7 +154,8 @@ async function main(): Promise<void> {
     onFailure: (outlet) => health.recheck(outlet),
     log,
     dial,
-    serviceOf: domainService,
+    // Сервис — у правил (группы v2fly или основной домен); правила поднимаются позже.
+    serviceOf: (host) => serviceOf(host),
     outcomes,
     speed,
   });
@@ -178,6 +182,7 @@ async function main(): Promise<void> {
   let share: Share | null = null;
   const rules = startRules(config, { sites, outlets, countrySites: () => share?.store.settings().countrySites ?? {}, log });
   const route = rules.route;
+  serviceOf = (host) => rules.services.serviceOf(host);
   rulesRefresh = () => rules.book.rebuild();
   const server = await startHttpInlet({ ...config.http, chooser, consumers, log, meter, ports, route, speed });
   share = startShare(config, { consumers, outlets, countryList: (code) => rules.book.countryList(code), ruleset: () => rules.book.rules(), allowTcp: () => rules.allowNets(), log });
@@ -189,7 +194,8 @@ async function main(): Promise<void> {
   });
   share?.store.onChange(() => rules.book.rebuild());
   shareRefresh = share ? () => share?.edge.refresh() : null;
-  const panel = config.panel.enabled ? startPanel(config, { outlets, meter, dial, ports, rivals, sites, share }) : null;
+  const panelRules = { book: rules.book, lists: rules.lists, route, order: (host: string, need: ExitNeed) => chooser.order(host, undefined, Date.now(), need) };
+  const panel = config.panel.enabled ? startPanel(config, { outlets, meter, dial, ports, rivals, sites, share, rules: panelRules }) : null;
   const panelHosts = new Set([config.panel.name, config.lan.address]);
   const lanServers = config.lan.enabled
     ? startLanInlet(config.lan, { chooser, consumers, log, meter, ports, route, speed }, panel ? { hosts: panelHosts, take: panel.take } : null)
@@ -226,7 +232,7 @@ async function main(): Promise<void> {
   process.on('SIGINT', () => shutdown('SIGINT'));
 }
 
-function startPanel(config: ReturnType<typeof loadConfig>, live: { outlets: Outlet[]; meter: Meter; dial: ReturnType<typeof makeDial>; ports: PortProbe; rivals: Rivals; sites: Sites; share: Share | null }): Panel {
+function startPanel(config: ReturnType<typeof loadConfig>, live: { outlets: Outlet[]; meter: Meter; dial: ReturnType<typeof makeDial>; ports: PortProbe; rivals: Rivals; sites: Sites; share: Share | null; rules: PanelRules }): Panel {
   const speeds = new Map<string, SpeedResult>();
   const devices = new Devices(config.panel.dataDir);
   const auth = new Auth(config.panel.passwordFile, config.panel.dataDir);
@@ -239,6 +245,7 @@ function startPanel(config: ReturnType<typeof loadConfig>, live: { outlets: Outl
     auth, state, devices, speeds,
     sites: live.sites,
     share: live.share,
+    rules: live.rules,
     meter: live.meter,
     outlets: live.outlets,
     dial: live.dial,
