@@ -3,10 +3,11 @@ import path from 'node:path';
 import type { OutletConfig, OutletProtocol } from '../config.ts';
 import { describeLink, parseLink } from '../outlets/links.ts';
 import { decodeVpnLink, describeProfile, parseWgConf } from '../outlets/profile.ts';
-import { addOutlet, freeBridge, readOutlets, removeOutlet, setOutletField } from './config-edit.ts';
+import { addOutlet, CONFIG_PATH, freeBridge, readOutlets, removeOutlet, setOutletField } from './config-edit.ts';
 import type { AddSource, OutletRuntime, OvpnAuth, RootStatus } from './protocol.ts';
 import { GW_TABLE } from '../gateway.ts';
 import { seenDevices } from './gateway.ts';
+import { classRuntime } from './gateway-routes.ts';
 import { activate, isRunning, setGroup, settle } from './groups.ts';
 import { groupId, netnsRuntime, run, systemctl, unitState } from './sys.ts';
 import { checkOvpn } from './ovpn-check.ts';
@@ -17,7 +18,6 @@ import { checkOvpn } from './ovpn-check.ts';
  * добавлен целиком, либо его нет.
  */
 
-export const CONFIG_PATH = '/etc/contour/contour.yaml';
 export const KEYS = '/etc/contour/keys';
 const REMOVED = path.join(KEYS, 'removed');
 const NAME = /^[a-z0-9][a-z0-9_-]{0,31}$/;
@@ -251,5 +251,5 @@ export async function statusCmd(): Promise<RootStatus> {
     }
     outlets.push(base);
   }
-  return { units, outlets, gatewaySeen: await seenDevices() };
+  return { units, outlets, gatewaySeen: await seenDevices(), gatewayClasses: classRuntime() };
 }

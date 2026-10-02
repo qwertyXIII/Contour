@@ -26,16 +26,21 @@ export function readToken(tokensFile: string, name = 'contour-dns'): string | nu
 
 export type ProxyAuth = { host: string; port: number; user: string; token: string };
 
-/** Сокет к `host:port` через HTTP-прокси Contour (CONNECT с токеном) — то же, что делает любая программа. */
-export function connectVia(proxy: ProxyAuth, host: string, port: number, timeoutMs = TIMEOUT_MS): Promise<net.Socket> {
+/**
+ * Сокет к `host:port` через HTTP-прокси Contour (CONNECT с токеном) — то же, что
+ * делает любая программа. `exit` — страна выхода (`Contour-Exit`): ответ DNS для
+ * класса «через страну» — от резолвера рядом с выходом этой страны.
+ */
+export function connectVia(proxy: ProxyAuth, host: string, port: number, timeoutMs = TIMEOUT_MS, exit?: string): Promise<net.Socket> {
   const auth = Buffer.from(`${proxy.user}:${proxy.token}`).toString('base64');
+  const country = exit && /^[A-Z]{2}$/.test(exit) ? `Contour-Exit: ${exit}\r\n` : '';
   return new Promise((resolve, reject) => {
     const raw = net.connect(proxy.port, proxy.host);
     const timer = setTimeout(() => fail(new Error('через VPN тоже молчит')), timeoutMs);
     function fail(e: Error): void { clearTimeout(timer); raw.destroy(); reject(e); }
     raw.once('error', fail);
     raw.once('connect', () => {
-      raw.write(`CONNECT ${host}:${port} HTTP/1.1\r\nHost: ${host}:${port}\r\nProxy-Authorization: Basic ${auth}\r\n\r\n`);
+      raw.write(`CONNECT ${host}:${port} HTTP/1.1\r\nHost: ${host}:${port}\r\nProxy-Authorization: Basic ${auth}\r\n${country}\r\n`);
     });
     let head = '';
     const onData = (chunk: Buffer): void => {

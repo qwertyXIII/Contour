@@ -10,7 +10,8 @@ import { resolvePacket } from '../src/dns/server.ts';
 import { parseGateway } from '../src/gateway.ts';
 import { ResolveError } from '../src/outlets/doh.ts';
 import { GatewayAddresses } from '../src/panel/addresses.ts';
-import { allowCommands, deviceCommands, gatewayRuleset } from '../src/root/gateway.ts';
+import { deviceCommands, gatewayRuleset } from '../src/root/gateway.ts';
+import { allowCommands } from '../src/root/gateway-classes.ts';
 import { createLogger } from '../src/vendor/logger.js';
 
 const quiet = createLogger({ enabled: false });
@@ -31,7 +32,10 @@ test('команды nft: наборы устройств целиком, адр
   assert.match(allow[1] as string, /^delete element/);
   assert.match(allowCommands(['1.1.1.1'], 100_000), /timeout 21600s/, 'не больше 6 часов');
   assert.throws(() => gatewayRuleset('enp1s0"; flush ruleset'), /странное/);
-  assert.match(gatewayRuleset('enp1s0'), /ether saddr @gw_all ip daddr != @local_dst ct mark set 0x2c1/);
+  const rules = gatewayRuleset('enp1s0');
+  assert.match(rules, /ether saddr @gw_all jump gw_new_all/);
+  assert.match(rules, /chain gw_new_all \{\s+jump gw_pick\s+ct mark @gw_marks return\s+ip daddr != @local_dst ct mark set 0x2c1\s+\}/, '«всё через VPN»: не выбрано классом — «как сейчас»');
+  assert.match(rules, /chain gw_new_blocked \{\s+jump gw_pick\s+ct mark @gw_marks return\s+ip daddr != @local_dst ct mark set 0x2c2\s+\}/, '«заблокированное»: не выбрано — напрямую');
 });
 
 test('DNS шлюза: устройство — по MAC; заблокированное — настоящими адресами через туннель, сначала в набор', async () => {

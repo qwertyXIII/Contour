@@ -7,7 +7,7 @@ import { Overrides } from './overrides.ts';
 import { startDns, type Decide } from './server.ts';
 import { makeTunnelProbe, readToken } from './tunnel-probe.ts';
 import { TunnelResolver } from './tunnel-resolve.ts';
-import { GatewayClients, gatewayHook } from './gateway.ts';
+import { allowRequest, GatewayClients, gatewayHook } from './gateway.ts';
 import { Subnets } from './subnets.ts';
 import { hintSender } from '../inlets/hints.ts';
 import { rootCall } from '../root/protocol.ts';
@@ -59,12 +59,13 @@ try {
   };
   // Подсказки для портов игр: устройство получило наш адрес на имя — Contour узнает, куда вести.
   const hint = hintSender(lan.hintPort);
-  // Устройства-шлюзы (src/gateway.ts): заблокированное — настоящими адресами через туннель, уже в наборе «через VPN».
+  // Устройства-шлюзы (src/gateway.ts): заблокированное — настоящими адресами через туннель, уже в наборе
+  // своего класса. Куда имени — `route` (по умолчанию defaultRoute: заблокированное — «как сейчас»).
   const tunnelResolver = proxy ? new TunnelResolver(proxy) : null;
   const gateway = tunnelResolver ? gatewayHook({
     clients: new GatewayClients(undefined, undefined, () => rootCall<string[]>({ cmd: 'gateway.seen' }, 3_000)),
     resolve: (n) => tunnelResolver.resolve(n),
-    allow: async (ips, ttl) => { await rootCall({ cmd: 'gateway.allow', ips, ttl }, 3_000); },
+    allow: async (ips, ttl, route) => { await rootCall(allowRequest(ips, ttl, route), 3_000); },
     log: dnsLog,
   }) : undefined;
   // Подсети сервисов, что ходят по адресам (голос Discord, звонки), — помощнику для шлюза.

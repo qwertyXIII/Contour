@@ -122,13 +122,15 @@ function servfail(packet: Buffer): Buffer | null {
 export type OnOwn = (client: string, name: string) => void;
 
 /**
- * Устройства-шлюзы (`dns/gateway.ts`): им на заблокированное имя — настоящие
- * адреса через туннель, уже положенные в набор «через VPN». `answer` → null —
- * не вышло, тогда как всем: наш адрес и SNI-вход.
+ * Устройства-шлюзы (`dns/gateway.ts`): им на имя, которое ведётся через туннели
+ * или класс, — настоящие адреса через туннель, уже положенные в набор класса.
+ * `answer`: пакет — ответ; `'own'` — наш адрес (не вышло: сайт поведёт SNI-вход);
+ * `'upstream'` — «напрямую», ответ обычного DNS; null — как всем.
  */
+export type GatewayAnswer = Buffer | 'own' | 'upstream' | null;
 export type GatewayHook = {
   isGateway(client: string): boolean;
-  answer(query: Packet, name: string): Promise<Buffer | null>;
+  answer(query: Packet, name: string, decision: Decision): Promise<GatewayAnswer>;
 };
 
 export type DnsDeps = { lan: Lan; decide: Decide; log: Logger; onOwn?: OnOwn; gateway?: GatewayHook };
@@ -143,11 +145,12 @@ export async function resolvePacket(packet: Buffer, deps: DnsDeps, client = ''):
   }
   const name = ownQuestion(query);
   const decision: Decision = name !== null ? await decide(name) : { tunnel: false };
-  if (decision.tunnel && name && !decision.local && gateway?.isGateway(client)) {
-    const viaGateway = await gateway.answer(query, name);
-    if (viaGateway) return viaGateway;
+  let path: GatewayAnswer = null;
+  if (name && !decision.local && gateway?.isGateway(client)) {
+    path = await gateway.answer(query, name, decision);
+    if (Buffer.isBuffer(path)) return path;
   }
-  if (decision.tunnel) {
+  if ((decision.tunnel && path !== 'upstream') || path === 'own') {
     const own = answerOwn(query, lan);
     if (own) {
       if (name && query.questions?.[0]?.type === TYPE_A) onOwn?.(client, name.toLowerCase().replace(/\.$/, ''));

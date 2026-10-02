@@ -31,6 +31,48 @@ export const GW_MARK_VPN = 0x2c1;
 export const GW_MARK_DIRECT = 0x2c2;
 export const GW_TABLE = 2701;
 
+/**
+ * Куда вести адрес устройства-шлюза (решает движок правил, `dns/gateway.ts`):
+ * - `tunnel` — как сейчас: все поднятые туннели по приоритету (`vpn_dst`,
+ *   `vpn_net`, таблица 2701);
+ * - `direct` — как сейчас «напрямую»: настоящие адреса обычного DNS, в наборы
+ *   ничего не кладётся;
+ * - иначе — имя класса, объявленного движком правил (`GatewayClass`).
+ */
+export type GatewayRoute = string;
+export const ROUTE_TUNNEL = 'tunnel';
+export const ROUTE_DIRECT = 'direct';
+
+/**
+ * Класс маршрута — упорядоченный список выходов; придумывает его движок
+ * правил, помощник только исполняет: «через страну DE» — выходы DE по
+ * приоритету, «только через corp_ext» — он один. Путь — первый поднятый
+ * выход списка; упал — следующий; ни одного — `unreachable`: не другой выход
+ * и не напрямую. Прямой выход (`direct.name`) в списке — путь через роутер,
+ * как у прокси с просьбой его страны.
+ */
+export type GatewayClass = {
+  name: string;
+  outlets: string[];
+  /**
+   * «Только через эти выходы»: прямого выхода в списке быть не может, зато
+   * можно частные подсети — единственное исключение из ограды (корпоративная
+   * сеть — только корпоративными туннелями, никогда напрямую).
+   */
+  only?: boolean;
+  /** Для показа и журнала: ради какой страны класс (`DE`). */
+  country?: string;
+  /** Постоянные подсети класса — как `vpn_net` у «как сейчас». */
+  nets?: string[];
+};
+
+/** Объявленные классы со слотами — пишет только помощник (root:contour 640). */
+export const GATEWAY_CLASSES_FILE = '/etc/contour/gateway-classes.json';
+/** Слот класса → метка `GW_CLASS_MARK + слот`, таблица и приоритет правила `GW_CLASS_TABLE + слот` — рядом с 2701. */
+export const GW_CLASS_MARK = 0x2d0;
+export const GW_CLASS_TABLE = 2702;
+export const GW_MAX_CLASSES = 32;
+
 export function parseGateway(text: string): GatewayState {
   const devices: Record<string, GatewayMode> = {};
   try {

@@ -2,7 +2,8 @@ import { chmodSync, chownSync, mkdirSync, rmSync } from 'node:fs';
 import net from 'node:net';
 import path from 'node:path';
 import { errorText, log } from '../log.ts';
-import { allowAddresses, applyGateway, seenDevices, setDeviceMode, setNets } from './gateway.ts';
+import { allowAddresses, applyGateway, seenDevices, setDeviceMode, setNets, syncGatewayRoutes } from './gateway.ts';
+import { declareClasses, routeAddresses } from './gateway-classes.ts';
 import { activateOutletCmd, addOutletCmd, enableOutletCmd, groupOutletCmd, priorityOutletCmd, removeOutletCmd, restartContourCmd, restartOutletCmd, statusCmd } from './outlets.ts';
 import { MAX_REQUEST_BYTES, ROOT_SOCKET, type RootRequest, type RootResponse } from './protocol.ts';
 import { groupId } from './sys.ts';
@@ -28,19 +29,41 @@ function serial<T>(job: () => Promise<T>): Promise<T> {
   return next;
 }
 
+/** Сверить маршруты классов шлюза; ошибка — в журнал, следующая сверка повторит. */
+async function syncRoutes(force: boolean): Promise<void> {
+  try {
+    await syncGatewayRoutes(force);
+  } catch (error) {
+    rlog.warn(`шлюз: маршруты классов не сверены — ${errorText(error)}`);
+  }
+}
+
+/** Команда над выходами — и сразу сверка маршрутов классов: мост выхода мог подняться или уйти. */
+function outletJob<T>(job: () => Promise<T>): Promise<T> {
+  return serial(async () => {
+    try {
+      return await job();
+    } finally {
+      await syncRoutes(true);
+    }
+  });
+}
+
 async function dispatch(req: RootRequest): Promise<unknown> {
   switch (req.cmd) {
     case 'status': return statusCmd();
-    case 'outlet.add': return serial(() => addOutletCmd(req));
-    case 'outlet.remove': return serial(() => removeOutletCmd(req));
-    case 'outlet.restart': return serial(() => restartOutletCmd(req));
-    case 'outlet.enable': return serial(() => enableOutletCmd(req));
-    case 'outlet.priority': return serial(() => priorityOutletCmd(req));
-    case 'outlet.activate': return serial(() => activateOutletCmd(req));
-    case 'outlet.group': return serial(() => groupOutletCmd(req));
+    case 'outlet.add': return outletJob(() => addOutletCmd(req));
+    case 'outlet.remove': return outletJob(() => removeOutletCmd(req));
+    case 'outlet.restart': return outletJob(() => restartOutletCmd(req));
+    case 'outlet.enable': return outletJob(() => enableOutletCmd(req));
+    case 'outlet.priority': return outletJob(() => priorityOutletCmd(req));
+    case 'outlet.activate': return outletJob(() => activateOutletCmd(req));
+    case 'outlet.group': return outletJob(() => groupOutletCmd(req));
     case 'gateway.set': return serial(() => setDeviceMode(req.mac, req.mode));
     // Не в общую очередь: DNS ждёт ответа перед ответом устройству, а очередь может стоять за минутным подъёмом выхода.
     case 'gateway.allow': return allowAddresses(req.ips, req.ttl);
+    case 'gateway.route': return routeAddresses(req.ips, req.ttl, req.route);
+    case 'gateway.classes': return serial(() => declareClasses(req.classes));
     case 'gateway.seen': return seenDevices();
     case 'gateway.nets': return serial(() => setNets(req.cidrs));
     case 'contour.restart': return serial(async () => restartContourCmd());
@@ -55,7 +78,8 @@ function describe(req: RootRequest): string {
     : req.cmd === 'outlet.enable' ? ` → ${req.enabled ? 'вкл' : 'выкл'}`
     : req.cmd === 'outlet.group' ? ` → ${req.with === null ? 'без соперника' : `соперник «${String(req.with)}»`}`
     : req.cmd === 'gateway.set' ? ` ${String(req.mac)} → ${req.mode ?? 'выкл'}`
-    : req.cmd === 'gateway.nets' ? ` — ${Array.isArray(req.cidrs) ? req.cidrs.length : '?'} подсетей` : '';
+    : req.cmd === 'gateway.nets' ? ` — ${Array.isArray(req.cidrs) ? req.cidrs.length : '?'} подсетей`
+    : req.cmd === 'gateway.classes' ? ` — ${Array.isArray(req.classes) ? req.classes.map((c) => String(c?.name)).join(', ') || 'без классов' : '?'}` : '';
   return `${req.cmd}${name}${extra}`;
 }
 
@@ -76,8 +100,8 @@ function handle(socket: net.Socket): void {
       socket.end(`${JSON.stringify({ ok: false, error: 'запрос не JSON' })}\n`);
       return;
     }
-    // gateway.allow — десятки в минуту от DNS: журналу помощника они не нужны.
-    const mutating = req.cmd !== 'status' && req.cmd !== 'gateway.allow' && req.cmd !== 'gateway.seen';
+    // gateway.allow и gateway.route — десятки в минуту от DNS: журналу помощника они не нужны.
+    const mutating = req.cmd !== 'status' && req.cmd !== 'gateway.allow' && req.cmd !== 'gateway.route' && req.cmd !== 'gateway.seen';
     void dispatch(req).then(
       (data) => {
         if (mutating) rlog.info(`сделано: ${describe(req)}`);
@@ -113,11 +137,13 @@ function listen(): void {
 /**
  * Шлюз — из файла, при каждом запуске помощника: так он переживает и перезагрузку
  * сервера, и перезапуск помощника. При загрузке сети может ещё не быть — повтор.
+ * Каждая попытка — в общей очереди: `gateway.classes`, пришедший сразу после
+ * запуска, иначе мог бы лечь раньше, а подъём из файла — затереть его старым набором.
  */
 async function restoreGateway(): Promise<void> {
   for (let attempt = 1; attempt <= 30; attempt++) {
     try {
-      await applyGateway();
+      await serial(() => applyGateway());
       return;
     } catch (error) {
       if (attempt === 1 || attempt === 30) rlog.warn(`шлюз не поднять (попытка ${attempt}): ${errorText(error)}`);
@@ -130,5 +156,19 @@ if (process.getuid?.() !== 0) {
   rlog.error('contour-root должен работать от root');
   process.exit(1);
 }
+/**
+ * Подъём выхода ловится сверкой: выход поднимает systemd (при загрузке, по
+ * команде, руками) — помощник об этом не узнаёт иначе. Падение отрабатывает
+ * ядро само: маршрут уходит вместе с мостом. Сверка без перемен — один `ip -j addr`.
+ */
+const ROUTES_TICK_MS = 5_000;
+let ticking = false;
+
 listen();
-void restoreGateway();
+void restoreGateway().then(() => {
+  setInterval(() => {
+    if (ticking) return;
+    ticking = true;
+    void serial(() => syncRoutes(false)).finally(() => { ticking = false; });
+  }, ROUTES_TICK_MS);
+});

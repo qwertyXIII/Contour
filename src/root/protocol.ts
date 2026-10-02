@@ -1,4 +1,5 @@
 import net from 'node:net';
+import type { GatewayClass } from '../gateway.ts';
 
 /**
  * Договор между панелью (пользователь `contour`) и помощником от root.
@@ -27,10 +28,26 @@ export type RootRequest =
   | { cmd: 'outlet.activate'; name: string }
   | { cmd: 'outlet.group'; name: string; with: string | null }
   | { cmd: 'gateway.set'; mac: string; mode: 'blocked' | 'all' | null }
+  /** Адреса — в «как сейчас» (`vpn_dst`). Старая команда: её понимает и помощник без классов. */
   | { cmd: 'gateway.allow'; ips: string[]; ttl: number }
+  /** Адреса — в класс `route` (`tunnel` — то же, что `gateway.allow`). Старый помощник ответит «неизвестная команда» — DNS отдаст наш адрес. */
+  | { cmd: 'gateway.route'; ips: string[]; ttl: number; route: string }
+  /** Весь набор классов разом (src/gateway.ts → GatewayClass); не названные — сняты. */
+  | { cmd: 'gateway.classes'; classes: GatewayClass[] }
   | { cmd: 'gateway.seen' }
   | { cmd: 'gateway.nets'; cidrs: string[] }
   | { cmd: 'contour.restart' };
+
+/** Класс маршрута шлюза, как он сейчас в ядре: `via` — выход, которым класс идёт; null — никаким (`unreachable`). */
+export type GatewayClassRuntime = {
+  name: string;
+  slot: number;
+  outlets: string[];
+  only: boolean;
+  country: string | null;
+  nets: number;
+  via: string | null;
+};
 
 export type OutletRuntime = {
   name: string;
@@ -54,6 +71,8 @@ export type RootStatus = {
   outlets: OutletRuntime[];
   /** MAC устройств-шлюзов, которые на деле шлют пакеты через сервер (root/gateway.ts → seenDevices). */
   gatewaySeen?: string[];
+  /** Классы маршрута шлюза — по последней сверке таблиц (root/gateway-routes.ts). */
+  gatewayClasses?: GatewayClassRuntime[];
 };
 
 export type RootResponse = { ok: true; data?: unknown } | { ok: false; error: string };

@@ -1,10 +1,11 @@
 import { statSync } from 'node:fs';
 import type { Packet } from 'dns-packet';
 import { arpTable } from '../arp.ts';
-import { GATEWAY_FILE, readGateway, type GatewayState } from '../gateway.ts';
+import { GATEWAY_FILE, readGateway, ROUTE_DIRECT, ROUTE_TUNNEL, type GatewayRoute, type GatewayState } from '../gateway.ts';
 import { errorText, type Logger } from '../log.ts';
 import { ResolveError, type DohResult } from '../outlets/doh.ts';
-import { respond, type GatewayHook } from './server.ts';
+import type { RootRequest } from '../root/protocol.ts';
+import { respond, type Decision, type GatewayHook } from './server.ts';
 
 /**
  * DNS для устройств-шлюзов (`src/gateway.ts`).
@@ -21,8 +22,15 @@ import { respond, type GatewayHook } from './server.ts';
  * иначе первые пакеты успели бы уйти напрямую, и соединение так бы и осталось
  * на прямом пути (путь решает первый пакет).
  *
- * Не вышло (туннель не ответил, помощник молчит) — null, и устройство получит
- * наш адрес, как все: сайты по SNI-входу всё равно откроются.
+ * Не вышло (туннель не ответил, помощник молчит или не знает класса) —
+ * устройство получит наш адрес, как все: сайты по SNI-входу всё равно откроются.
+ *
+ * Куда имени — решает внедряемая функция `route` (движок правил): класс
+ * маршрута, `tunnel` («как сейчас»), `direct` или null — «как всем». Без неё —
+ * как было: заблокированное — через туннели, остальное — как всем.
+ * Адреса класса кладутся в его набор, и ответ уходит только после этого — как
+ * с «как сейчас». «Напрямую» — настоящие адреса обычного DNS, в наборы ничего:
+ * как сейчас у незаблокированного.
  */
 
 const RECHECK_MS = 5_000;
@@ -89,16 +97,42 @@ export class GatewayClients {
   }
 }
 
+/** Куда имени для устройства-шлюза: класс, `tunnel`, `direct`; null — «как всем» (наш адрес или обычный DNS). */
+export type RouteFor = (name: string, decision: Decision) => GatewayRoute | null | Promise<GatewayRoute | null>;
+
+/**
+ * Как до движка правил: заблокированное (списки, самообучение, ручное «через
+ * VPN») — «как сейчас», остальное — как всем. Движку правил — запасным путём:
+ * своё правило не нашлось → `defaultRoute`. ⚠️ «Не совпало» — null, а не
+ * `direct`: у шлюза умолчание задаёт режим устройства (`blocked` — напрямую,
+ * `all` — через VPN), и `direct` на каждое имя лишь тратил бы запросы.
+ */
+export const defaultRoute: RouteFor = (_name, decision) => (decision.tunnel ? ROUTE_TUNNEL : null);
+
+/**
+ * Запрос помощнику: «как сейчас» — старой командой `gateway.allow` (её знает и
+ * помощник до классов), класс — `gateway.route` (старый помощник ответит
+ * «неизвестная команда» — и устройство получит наш адрес, а не чужой путь).
+ */
+export function allowRequest(ips: string[], ttl: number, route: GatewayRoute): RootRequest {
+  return route === ROUTE_TUNNEL ? { cmd: 'gateway.allow', ips, ttl } : { cmd: 'gateway.route', ips, ttl, route };
+}
+
 export type GatewayAnswerDeps = {
   clients: Pick<GatewayClients, 'isGateway'>;
-  resolve: (name: string) => Promise<DohResult>;
-  /** Положить адреса в набор «через VPN» (помощник от root). */
-  allow: (ips: string[], ttl: number) => Promise<void>;
+  /** Адреса имени через туннель; `route` — куда пойдут пакеты (чтобы спросить через выход той же страны: CDN рядом с выходом). */
+  resolve: (name: string, route: GatewayRoute) => Promise<DohResult>;
+  /** Положить адреса в набор класса `route` (помощник от root). */
+  allow: (ips: string[], ttl: number, route: GatewayRoute) => Promise<void>;
+  /** Куда имени; нет — `defaultRoute`. */
+  route?: RouteFor;
   log: Logger;
 };
 
 export function gatewayHook(deps: GatewayAnswerDeps): GatewayHook {
-  const allowedAt = new Map<string, number>();
+  const routeFor = deps.route ?? defaultRoute;
+  /** Адрес → куда положен и когда: тот же адрес туда же — не чаще ALLOW_AGAIN_MS, в другой класс — сразу. */
+  const allowedAt = new Map<string, { route: GatewayRoute; at: number }>();
   let warnedAt = 0;
   const warn = (text: string): void => {
     if (Date.now() - warnedAt < WARN_EVERY_MS) return;
@@ -107,24 +141,39 @@ export function gatewayHook(deps: GatewayAnswerDeps): GatewayHook {
   };
   return {
     isGateway: (client) => deps.clients.isGateway(client),
-    async answer(query: Packet, name: string) {
-      const q = query.questions?.[0];
-      if (q?.type !== 'A') return null; // AAAA, HTTPS — пусто, как у всех
+    async answer(query: Packet, name: string, decision: Decision) {
+      let picked: GatewayRoute | null;
       try {
-        const r = await deps.resolve(name);
+        picked = await routeFor(name, decision);
+      } catch (error) {
+        warn(`${name} — куда вести, не решено: ${errorText(error)}; ответил как всем`);
+        return null;
+      }
+      const route = picked;
+      if (route === null) return null;
+      if (route === ROUTE_DIRECT) return 'upstream';
+      const q = query.questions?.[0];
+      // AAAA, HTTPS — пусто: устройство ушло бы по IPv6 или по подсказке мимо класса.
+      if (q?.type !== 'A') return respond(query, []);
+      try {
+        const r = await deps.resolve(name, route);
         const now = Date.now();
-        const fresh = r.ips.filter((ip) => now - (allowedAt.get(ip) ?? 0) >= ALLOW_AGAIN_MS);
+        const fresh = r.ips.filter((ip) => {
+          const was = allowedAt.get(ip);
+          return was === undefined || was.route !== route || now - was.at >= ALLOW_AGAIN_MS;
+        });
         if (fresh.length > 0) {
-          await deps.allow(fresh, r.ttl);
+          await deps.allow(fresh, r.ttl, route);
           if (allowedAt.size > 20_000) allowedAt.clear();
-          for (const ip of fresh) allowedAt.set(ip, now);
+          for (const ip of fresh) allowedAt.set(ip, { route, at: now });
         }
         return respond(query, r.ips.map((ip) => ({ type: 'A' as const, name: q.name, class: 'IN' as const, ttl: Math.min(r.ttl, ANSWER_TTL_MAX_S), data: ip })));
       } catch (error) {
         // Имени нет или нет IPv4 — это ответ: пусто, а не наш адрес (по нему сайта всё равно нет).
         if (error instanceof ResolveError) return respond(query, []);
+        // Наш адрес, а не настоящие мимо класса: по SNI сайт поведёт сам Contour.
         warn(`${name} — ${errorText(error)}; ответил нашим адресом`);
-        return null;
+        return 'own';
       }
     },
   };

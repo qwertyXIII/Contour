@@ -13,6 +13,9 @@ import { parseConfig, type OutletConfig } from '../config.ts';
 
 export class ConfigEditError extends Error {}
 
+/** Настройки Contour — помощник правит в них список выходов и читает мосты (шлюз). */
+export const CONFIG_PATH = '/etc/contour/contour.yaml';
+
 function load(path: string): Document {
   const doc = parseDocument(readFileSync(path, 'utf8'));
   if (doc.errors.length > 0) throw new ConfigEditError(`contour.yaml не разбирается: ${doc.errors[0]?.message}`);

@@ -1,4 +1,4 @@
-import { chmodSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
+import { chmodSync, chownSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 
 /**
@@ -16,11 +16,15 @@ export function readJson<T>(file: string, fallback: T): T {
   }
 }
 
-/** `mode` — права файла (600 для тайн); папка создаётся, если её нет. */
-export function writeJson(file: string, data: unknown, mode = 0o644): void {
+/**
+ * `mode` — права файла (600 для тайн); папка создаётся, если её нет. `owner` —
+ * чей файл: помощник от root пишет свои `root:contour 640`, чтобы DNS и Contour читали.
+ */
+export function writeJson(file: string, data: unknown, mode = 0o644, owner?: { uid: number; gid: number }): void {
   mkdirSync(path.dirname(file), { recursive: true });
   const tmp = `${file}.tmp`;
   writeFileSync(tmp, JSON.stringify(data), { mode });
   chmodSync(tmp, mode);
+  if (owner) chownSync(tmp, owner.uid, owner.gid);
   renameSync(tmp, file);
 }
