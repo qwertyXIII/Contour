@@ -19,6 +19,14 @@ import { deviceCountries, type ShareDevice, type ShareSettings } from './store.t
  * nginx живёт только поверх HTTP/1.1; клиент, выбравший h2, до края не дойдёт.
  */
 
+/**
+ * Имя подписки в Shadowrocket — ⚠️ не имя сервера. Политикой правила бывает и
+ * подписка целиком, и Shadowrocket берёт одноимённую подписку раньше узла:
+ * живьём 2026-10-02 подписка «Contour» увела всё, что правила слали на узел
+ * «Contour», в сервер «Contour-RU» — Instagram и YouTube с домашнего адреса.
+ */
+export const SUBSCRIPTION_NAME = 'Серверы Contour';
+
 export type ShareServer = { name: string; country: string | null; server: string };
 /** `group` — группа страны в правилах (её название по-русски); у обычного сервера — null. */
 export type ShareNode = ShareServer & { group: string | null; qr: string; open: string };
@@ -41,8 +49,8 @@ export function shareLinks(d: ShareDevice, s: ShareSettings, allowed: readonly s
   const servers = shareServers(d, s, allowed);
   if (!servers) return null;
   const base = `https://${s.domain}/list/${d.list}`;
-  // `#Contour` — имя подписки в Shadowrocket (справка: «#name» или заголовок profile-title).
-  const subscription = `${base}/servers#${SHARE_NODE}`;
+  // `#…` — имя подписки в Shadowrocket (справка: «#name» или заголовок profile-title).
+  const subscription = `${base}/servers#${encodeURIComponent(SUBSCRIPTION_NAME)}`;
   const config = `${base}/contour.conf`;
   return {
     subscription: { url: subscription, qr: qrDataUri(subscription), open: `shadowrocket://add/${subscription}` },

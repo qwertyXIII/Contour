@@ -207,7 +207,7 @@ test('подписка: серверы телефона в base64 — Contour и
   store.setCountry(d.id, 'RU', true);
   assert.equal(store.devices()[0]?.exits.RU, ru, 'закрыл и открыл — ключ тот же, сервер в телефоне работает');
   const h = answer(`/list/${d.list}/servers`, { store, rules, allowed: null })?.headers ?? {};
-  assert.equal(Buffer.from((h['profile-title'] ?? '').replace(/^base64:/, ''), 'base64').toString(), 'Contour');
+  assert.equal(Buffer.from((h['profile-title'] ?? '').replace(/^base64:/, ''), 'base64').toString(), 'Серверы Contour');
   assert.throws(() => store.setCountry(d.id, 'ru1', true), /две латинские буквы/);
 });
 
@@ -217,8 +217,9 @@ test('ссылки для телефона: подписка одним QR; vles
   assert.equal(shareLinks(d, store.settings(), null), null);
   const links = shareLinks(d, store.setDomain('c.example.ru'), null);
   assert.deepEqual(links?.nodes.map((n) => [n.name, n.country]), [['Contour', null], ['Contour-RU', 'RU']]);
-  assert.equal(links?.subscription.url, `https://c.example.ru/list/${d.list}/servers#Contour`);
-  assert.equal(links?.subscription.open, `shadowrocket://add/https://c.example.ru/list/${d.list}/servers#Contour`);
+  const sub = `https://c.example.ru/list/${d.list}/servers#${encodeURIComponent('Серверы Contour')}`;
+  assert.equal(links?.subscription.url, sub, 'имя подписки — не имя сервера: одноимённую Shadowrocket берёт вместо узла');
+  assert.equal(links?.subscription.open, `shadowrocket://add/${sub}`);
   assert.deepEqual(shareLinks(d, store.settings(), ['DE'])?.nodes.map((n) => n.name), ['Contour'], 'share.countries сужает');
   assert.notEqual(new URL(links?.nodes[1]?.server ?? '').username, d.uuid, 'у сервера страны свой ключ');
   assert.equal(new URL(links?.nodes[1]?.server ?? '').hash, '#Contour-RU', 'имя сервера — то, по которому его зовут правила');

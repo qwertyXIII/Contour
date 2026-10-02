@@ -1,9 +1,9 @@
 import http from 'node:http';
 import type { Logger } from '../log.ts';
 import type { RuleSet } from '../rules/engine.ts';
-import { shareServers, subscriptionBody } from './links.ts';
+import { shareServers, SUBSCRIPTION_NAME, subscriptionBody } from './links.ts';
 import { phonePlan } from './plan.ts';
-import { domainSetText, SHARE_NODE, shadowrocketConf } from './rules.ts';
+import { domainSetText, shadowrocketConf } from './rules.ts';
 import { deviceCountries, type ShareStore } from './store.ts';
 
 /**
@@ -47,7 +47,7 @@ export function answer(url: string, opts: Pick<ShareServerOptions, 'store' | 'ru
   const countries = deviceCountries(device, opts.allowed);
   if (m[2] === 'servers') {
     const servers = shareServers(device, settings, opts.allowed) ?? [];
-    const title = `base64:${Buffer.from(SHARE_NODE).toString('base64')}`;
+    const title = `base64:${Buffer.from(SUBSCRIPTION_NAME).toString('base64')}`;
     return { body: subscriptionBody(servers), device: device.name, file: 'подписку', headers: { 'profile-title': title, 'profile-update-interval': String(SUBSCRIPTION_HOURS) } };
   }
   const plan = phonePlan(opts.rules(), countries);
