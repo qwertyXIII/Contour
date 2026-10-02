@@ -7,6 +7,7 @@ import { parse } from 'yaml';
 import { parseConfig } from '../src/config.ts';
 import { Consumers } from '../src/consumers.ts';
 import { PRIVATE_V4 } from '../src/inlets/fence.ts';
+import { parseList } from '../src/dns/lists.ts';
 import { Sites } from '../src/panel/sites.ts';
 import { buildEdgeConfig } from '../src/share/edge-config.ts';
 import { shareLinks } from '../src/share/links.ts';
@@ -135,9 +136,9 @@ test('ссылка на правила: по токену включённого
   const shareDir = tmp('contour-share-');
   const store = new ShareStore(shareDir);
   writeFileSync(path.join(shareDir, 'country-ru.lst'), 'gosuslugi.ru\nwww.gosuslugi.ru\n');
-  const rules = new ShareRules({ sites: new Sites({ dnsDir: dns, own: ['youtube.com'] }), dnsDir: dns, skip: ['104.16.0.0/13'], store, dir: shareDir, log: quiet });
+  const country = parseList(readFileSync(path.join(shareDir, 'country-ru.lst'), 'utf8'));
+  const rules = new ShareRules({ sites: new Sites({ dnsDir: dns, own: ['youtube.com'] }), dnsDir: dns, skip: ['104.16.0.0/13'], store, countryList: (code) => (code === 'RU' ? country : []) });
   const opts = { store, rules, allowed: null };
-  rules.start();
   const d = store.add('iPhone');
   const conf = `/list/${d.list}/contour.conf`;
   assert.equal(answer(conf, opts), null, 'адреса нет — телефону нечего дать');
@@ -157,12 +158,11 @@ test('ссылка на правила: по токену включённого
   assert.equal(answer(`/list/${d.list}/other`, opts), null);
   store.setEnabled(d.id, false);
   assert.equal(answer(conf, opts), null);
-  rules.stop();
 });
 
 test('подписка: серверы телефона в base64 — Contour и открытые страны; название в заголовке', () => {
   const store = new ShareStore(tmp('contour-share-'));
-  const rules = new ShareRules({ sites: new Sites({ dnsDir: tmp('contour-dns-'), own: [] }), dnsDir: tmp('contour-dns-'), skip: [], store, dir: tmp('contour-share-'), log: quiet });
+  const rules = new ShareRules({ sites: new Sites({ dnsDir: tmp('contour-dns-'), own: [] }), dnsDir: tmp('contour-dns-'), skip: [], store, countryList: () => [] });
   const d = store.add('iPhone');
   store.setDomain('c.example.ru');
   const names = (): string[] => Buffer.from(answer(`/list/${d.list}/servers`, { store, rules, allowed: null })?.body ?? '', 'base64').toString().trim().split('\n').map((l) => decodeURIComponent(new URL(l).hash.slice(1)));

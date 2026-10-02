@@ -18,6 +18,7 @@ export type Learned = { name: string; via: Via; why: string; until: number };
 export class Sites {
   private readonly dir: string;
   private readonly own: string[];
+  private readonly listeners: Array<() => void> = [];
 
   constructor(opts: { dnsDir: string; own: string[] }) {
     this.dir = opts.dnsDir;
@@ -58,9 +59,16 @@ export class Sites {
     return readOverrides(this.dir);
   }
 
+  /** Ручное решение сменилось — книга правил пересобирается сразу, не через полминуты. */
+  onChange(fn: () => void): void {
+    this.listeners.push(fn);
+  }
+
   /** `tunnel` / `direct` — ручное решение; `auto` — снять ручное, решат списки и самообучение. */
   set(name: string, via: Via | 'auto'): OverrideMap {
-    return writeOverride(this.dir, name, via === 'auto' ? null : via);
+    const all = writeOverride(this.dir, name, via === 'auto' ? null : via);
+    for (const fn of this.listeners) fn();
+    return all;
   }
 
   summary(): { own: string[]; common: number; learnedTunnel: Learned[]; overrides: OverrideMap } {

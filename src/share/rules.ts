@@ -1,13 +1,7 @@
-import { readFileSync } from 'node:fs';
-import path from 'node:path';
-import { formatCidr, parseCidr, parseCidrList, type Cidr } from '../cidr.ts';
+import { formatCidr, parseCidr, type Cidr } from '../cidr.ts';
 import { inSet } from '../dns/lists.ts';
 import type { OverrideMap } from '../dns/overrides.ts';
-import { pickSubnets, SUBNETS_FILE } from '../dns/subnets.ts';
-import { COUNTRY_LISTS } from '../config-lists.ts';
-import { parseList } from '../dns/lists.ts';
-import { RemoteList } from '../dns/remote-list.ts';
-import type { Logger } from '../log.ts';
+import { serviceNets } from '../dns/subnets.ts';
 import type { Sites } from '../panel/sites.ts';
 import type { ShareStore } from './store.ts';
 
@@ -130,79 +124,34 @@ export type RulesOptions = {
   skip: string[];
   /** Свои сайты стран (панель) — из хранилища раздачи. */
   store: Pick<ShareStore, 'settings'>;
-  /** Где держать копии списков стран (папка раздачи). */
-  dir: string;
-  log: Logger;
+  /** Готовый список страны — у книги правил (`RuleBook.countryList`): качается один раз на весь Contour. */
+  countryList: (code: string) => string[];
 };
 
 /**
- * Данные правил: папка DNS (`Sites`), копия списков подсетей, списки стран по
- * ссылкам (`COUNTRY_LISTS`: Россия — itdoginfo «Russia outside») и свои сайты
- * стран из панели. Список страны качается, когда страна впервые понадобилась
- * (панель, телефон): страны выходов меняются на ходу, а сервер в Нидерландах
- * без российского выхода российский список не качает вовсе.
+ * Данные правил телефона: папка DNS (`Sites`), копия списков подсетей, готовые
+ * списки стран (у книги правил) и свои сайты стран из панели.
  */
 export class ShareRules {
   private readonly sites: Sites;
   private readonly dnsDir: string;
   private readonly skip: Cidr[];
   private readonly store: RulesOptions['store'];
-  private readonly lists = new Map<string, { remote: RemoteList<string>; held: { names: string[] } }>();
-  private readonly dir: string;
-  private readonly log: Logger;
-  private started = false;
+  private readonly countryList: RulesOptions['countryList'];
 
   constructor(opts: RulesOptions) {
     this.sites = opts.sites;
     this.dnsDir = opts.dnsDir;
     this.skip = opts.skip.map((s) => parseCidr(s)).filter((c): c is Cidr => c !== null);
     this.store = opts.store;
-    this.dir = opts.dir;
-    this.log = opts.log;
-  }
-
-  start(): void {
-    this.started = true;
-    for (const l of this.lists.values()) l.remote.start();
-  }
-
-  stop(): void {
-    this.started = false;
-    for (const l of this.lists.values()) l.remote.stop();
+    this.countryList = opts.countryList;
   }
 
   /** Сайты «только с адресом этой страны»: готовый список и свои из панели. */
   countryNames(code: string): { names: string[]; common: number; own: string[] } {
     const own = this.store.settings().countrySites[code] ?? [];
-    const common = this.list(code)?.names ?? [];
+    const common = this.countryList(code);
     return { names: collapse([...common, ...own]), common: common.length, own };
-  }
-
-  /** Готовый список страны: первый спрос читает копию с диска и ставит скачивание. */
-  private list(code: string): { names: string[] } | null {
-    const urls = COUNTRY_LISTS[code];
-    if (!urls || urls.length === 0) return null;
-    let l = this.lists.get(code);
-    if (!l) {
-      const held = { names: [] as string[] };
-      const remote = new RemoteList<string>({
-        urls,
-        cacheFile: path.join(this.dir, `country-${code.toLowerCase()}.lst`),
-        parse: parseList,
-        key: (n) => n,
-        format: (n) => n,
-        onUpdate: (names, from) => {
-          held.names = names;
-          if (from === 'net') this.log.info(`список сайтов страны ${code}: ${names.length}`);
-        },
-        label: `список сайтов ${code}`,
-        log: this.log,
-      });
-      l = { remote, held };
-      this.lists.set(code, l);
-      if (this.started) remote.start();
-    }
-    return l.held;
   }
 
   domains(): { tunnel: string[]; direct: string[] } {
@@ -212,11 +161,6 @@ export class ShareRules {
 
   /** Подсети — те же, что у шлюза: без частных, без Cloudflare. DNS ещё не скачал — пусто. */
   nets(): string[] {
-    try {
-      const list = parseCidrList(readFileSync(path.join(this.dnsDir, SUBNETS_FILE), 'utf8'));
-      return pickSubnets(list, this.skip).nets.map(formatCidr);
-    } catch {
-      return [];
-    }
+    return serviceNets(this.dnsDir, this.skip).map(formatCidr);
   }
 }

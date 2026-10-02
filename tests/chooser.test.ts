@@ -65,3 +65,34 @@ test('страна выхода: просьба «RU» — только выхо
   assert.deepEqual(chooser.order('x.com', 443, Date.now(), { country: 'NL' }), []);
   await assert.rejects(chooser.connect('x.com', 443, new Set(), { country: 'NL' }), /нет выхода в стране NL/, 'не из другой страны: Госуслугам заграничный адрес хуже никакого');
 });
+
+test('прилипание — страна на весь сервис: упал свой выход — сначала другой той же страны; другие страны — за ней', async () => {
+  const de1 = Object.assign(outlet('de1', 10, 'alive'), { country: 'DE' });
+  const de2 = Object.assign(outlet('de2', 30, 'alive'), { country: 'DE' });
+  const nl = Object.assign(outlet('nl', 1, 'alive'), { country: 'NL' });
+  const opened: string[] = [];
+  const chooser = new Chooser([de1, de2, nl], {
+    ...opts,
+    serviceOf: (h) => h.split('.').slice(-2).join('.'),
+    dial: async (o) => { opened.push(o.name); if (o.name === 'nl') throw new Error('сброс'); return { destroy() {} } as never; },
+  });
+  // Первый раз сервис открылся через de1 (nl не смог) — сервис держится Германии.
+  await chooser.connect('chatgpt.com', 443);
+  assert.deepEqual(opened, ['nl', 'de1']);
+  assert.deepEqual(chooser.order('cdn.chatgpt.com').map((o) => o.name), ['de1', 'de2', 'nl'], 'поддомен — тот же сервис');
+  de1.state = 'dead';
+  assert.deepEqual(chooser.order('chatgpt.com').map((o) => o.name), ['de2', 'nl'], 'другой выход той же страны — раньше более приоритетной чужой');
+  assert.deepEqual(chooser.order('example.org').map((o) => o.name), ['nl', 'de2'], 'чужой сервис не прилип');
+});
+
+test('требования правил: только эти выходы (никогда прямой), не через страны, напрямую', () => {
+  const de = Object.assign(outlet('de', 10, 'alive'), { country: 'DE' });
+  const ru = Object.assign(outlet('ru', 5, 'alive'), { country: 'RU' });
+  const home = Object.assign(outlet('home', 1, 'alive'), { country: 'RU', direct: true, onRequest: true });
+  const chooser = new Chooser([de, ru, home], opts);
+  assert.deepEqual(chooser.order('x', undefined, Date.now(), { only: ['de', 'home'] }).map((o) => o.name), ['de']);
+  assert.deepEqual(chooser.order('x', undefined, Date.now(), { avoid: ['RU'] }).map((o) => o.name), ['de']);
+  assert.deepEqual(chooser.order('x', undefined, Date.now(), { direct: true }).map((o) => o.name), ['home']);
+  assert.deepEqual(chooser.order('x', undefined, Date.now(), { country: 'RU' }).map((o) => o.name), ['home', 'ru']);
+  assert.deepEqual(chooser.order('x').map((o) => o.name), ['ru', 'de'], 'без требования прямой «по просьбе» не виден');
+});

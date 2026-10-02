@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { formatCidr, overlaps, parseCidr, parseCidrList, type Cidr } from '../cidr.ts';
 import { PRIVATE_V4 } from '../inlets/fence.ts';
@@ -95,5 +96,17 @@ export class Subnets {
       this.retry = setTimeout(() => { void this.push(); }, PUSH_RETRY_MS);
       this.retry.unref();
     }
+  }
+}
+
+/**
+ * Подсети сервисов с копии DNS — без частных и без `skip` (Cloudflare): то же,
+ * что у шлюза, для правил и конфига телефона. DNS ещё не скачал — пусто.
+ */
+export function serviceNets(dnsDir: string, skip: Cidr[]): Cidr[] {
+  try {
+    return pickSubnets(parseCidrList(readFileSync(path.join(dnsDir, SUBNETS_FILE), 'utf8')), skip).nets;
+  } catch {
+    return [];
   }
 }

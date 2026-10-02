@@ -3,7 +3,7 @@ import path from 'node:path';
 import type { Config } from '../config.ts';
 import type { Consumers } from '../consumers.ts';
 import { errorText, type Logger } from '../log.ts';
-import type { Outlet } from '../outlets/outlet.ts';
+import { outletCountries, type Outlet } from '../outlets/outlet.ts';
 import type { Sites } from '../panel/sites.ts';
 import type { UdpOutlet } from './edge-config.ts';
 import { Edge } from './edge.ts';
@@ -27,11 +27,6 @@ export type Share = {
   allowed: readonly string[] | null; countries(): string[]; stop(): Promise<void>;
 };
 
-/** Страны выходов — запасные тоже: поднимется — страна та же. */
-export function outletCountries(outlets: Outlet[], allowed: readonly string[] | null): string[] {
-  const codes = new Set(outlets.map((o) => o.country).filter((c): c is string => Boolean(c) && (!allowed || allowed.includes(c as string))));
-  return [...codes].sort();
-}
 
 /**
  * Ядерные выходы для UDP — по приоритету, без запасных: namespace запасного не
@@ -58,7 +53,8 @@ function countryUdp(config: Config, outlets: Outlet[], store: ShareStore): Array
   return [...codes].sort().map((code) => ({ code, udp: all.filter((o) => o.country === code) }));
 }
 
-export function startShare(config: Config, deps: { consumers: Consumers; sites: Sites; outlets: Outlet[]; log: Logger }): Share | null {
+/** `countryList` — готовый список страны у книги правил (`RuleBook.countryList`). */
+export function startShare(config: Config, deps: { consumers: Consumers; sites: Sites; outlets: Outlet[]; countryList: (code: string) => string[]; log: Logger }): Share | null {
   if (!config.share.enabled) return null;
   const log = deps.log.child({ src: 'share' });
   let store: ShareStore;
@@ -83,8 +79,7 @@ export function startShare(config: Config, deps: { consumers: Consumers; sites: 
     log,
   });
   edge.start();
-  const rules = new ShareRules({ sites: deps.sites, dnsDir: config.lan.dataDir, skip: config.lan.subnetSkip, store, dir: config.share.dir, log });
-  rules.start();
+  const rules = new ShareRules({ sites: deps.sites, dnsDir: config.lan.dataDir, skip: config.lan.subnetSkip, store, countryList: deps.countryList });
   const allowed = config.share.countries;
   const server: http.Server = startShareServer({ listen: config.share.listen, port: config.share.listPort, store, rules, allowed, log });
   return {
@@ -97,7 +92,6 @@ export function startShare(config: Config, deps: { consumers: Consumers; sites: 
     countries: () => outletCountries(deps.outlets, allowed),
     async stop() {
       server.close();
-      rules.stop();
       await edge.stop();
     },
   };

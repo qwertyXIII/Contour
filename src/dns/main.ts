@@ -2,6 +2,7 @@ import { ConfigError, loadConfig } from '../config.ts';
 import { errorText, log } from '../log.ts';
 import { Learner } from './learn.ts';
 import { Lists } from './lists.ts';
+import { CompiledRules, rulesDir } from '../rules/compiled.ts';
 import { Overrides } from './overrides.ts';
 import { startDns, type Decide } from './server.ts';
 import { makeTunnelProbe, readToken } from './tunnel-probe.ts';
@@ -36,16 +37,22 @@ try {
   const learner = lan.learn && viaTunnel ? new Learner({ upstream: lan.upstream, dir: lan.dataDir, budgetMs: lan.probeBudgetMs, log: dnsLog, viaTunnel }) : null;
 
   const overrides = new Overrides(lan.dataDir);
+  const rules = new CompiledRules(rulesDir(config));
   const panelName = config.panel.enabled ? config.panel.name : null;
 
-  // Имя панели — наш адрес; ручное решение из панели — сильнее всего; список —
-  // сразу через VPN; остальное — самообучение (или напрямую, если выключено).
+  // Имя панели — наш адрес; дальше — правила Contour (ручное, загруженное);
+  // их набора ещё нет — как до движка: ручное решение, список. Остальное —
+  // самообучение (или напрямую, если выключено).
   const decide: Decide = async (name) => {
     const n = name.toLowerCase().replace(/\.$/, '');
     if (panelName && n === panelName) return { tunnel: true, local: true };
-    const manual = overrides.match(n);
-    if (manual) return { tunnel: manual === 'tunnel' };
-    if (lists.match(name)) return { tunnel: true };
+    const ruled = rules.dnsVia(n);
+    if (ruled) return { tunnel: ruled.tunnel };
+    if (ruled === undefined) {
+      const manual = overrides.match(n);
+      if (manual) return { tunnel: manual === 'tunnel' };
+      if (lists.match(name)) return { tunnel: true };
+    }
     if (!learner) return { tunnel: false };
     const d = await learner.decide(name);
     return { tunnel: d.via === 'tunnel', shortTtl: d.pending === true };

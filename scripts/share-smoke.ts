@@ -147,7 +147,7 @@ check((await curl(['--socks5-hostname', `127.0.0.1:${PORTS.phone}`, 'http://exam
 check(seen.length === before, 'чужой ключ до прокси не доходит');
 bad.kill();
 
-const rules = new ShareRules({ sites: new Sites({ dnsDir: dir, own: ['youtube.com'] }), dnsDir: dir, skip: [], store, dir, log });
+const rules = new ShareRules({ sites: new Sites({ dnsDir: dir, own: ['youtube.com'] }), dnsDir: dir, skip: [], store, countryList: () => ['gosuslugi.ru'] });
 const server = startShareServer({ listen: '127.0.0.1', port: PORTS.list, store, rules, allowed: null, log });
 await sleep(300);
 check((await curl([`http://127.0.0.1:${PORTS.list}/list/${phone.list}/contour.conf`])) === '200', 'правила по токену');

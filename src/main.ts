@@ -26,6 +26,7 @@ import { createPanel, type Panel } from './panel/server.ts';
 import { Sites } from './panel/sites.ts';
 import type { SpeedResult } from './panel/speedtest.ts';
 import { PanelState } from './panel/state.ts';
+import { domainService, startRules } from './rules/index.ts';
 import { startShare, type Share } from './share/index.ts';
 import { Meter } from './stats/meter.ts';
 
@@ -140,6 +141,7 @@ async function main(): Promise<void> {
     onFailure: (outlet) => health.recheck(outlet),
     log,
     dial,
+    serviceOf: domainService,
   });
   const consumers = new Consumers(config.tokens, log);
   consumers.load();
@@ -147,15 +149,20 @@ async function main(): Promise<void> {
 
   const meter = new Meter({ dir: STATE_DIR, log });
   meter.start();
-  const server = await startHttpInlet({ ...config.http, chooser, consumers, log, meter, ports });
   const sites = new Sites({ dnsDir: config.lan.dataDir, own: config.lan.domains });
-  // Раздача — после входа HTTP-прокси: край ходит в него за каждое устройство.
-  const share = startShare(config, { consumers, sites, outlets, log });
-  shareRefresh = share ? () => share.edge.refresh() : null;
+  // Правила «что + куда» — до входов: прокси, SNI и раздача ведут по ним. Свои
+  // сайты стран — у раздачи, она поднимается позже (её край ходит в прокси).
+  let share: Share | null = null;
+  const rules = startRules(config, { sites, outlets, countrySites: () => share?.store.settings().countrySites ?? {}, log });
+  const route = rules.route;
+  const server = await startHttpInlet({ ...config.http, chooser, consumers, log, meter, ports, route });
+  share = startShare(config, { consumers, sites, outlets, countryList: (code) => rules.book.countryList(code), log });
+  share?.store.onChange(() => rules.book.rebuild());
+  shareRefresh = share ? () => share?.edge.refresh() : null;
   const panel = config.panel.enabled ? startPanel(config, { outlets, meter, dial, ports, rivals, sites, share }) : null;
   const panelHosts = new Set([config.panel.name, config.lan.address]);
   const lanServers = config.lan.enabled
-    ? startLanInlet(config.lan, { chooser, consumers, log, meter, ports }, panel ? { hosts: panelHosts, take: panel.take } : null)
+    ? startLanInlet(config.lan, { chooser, consumers, log, meter, ports, route }, panel ? { hosts: panelHosts, take: panel.take } : null)
     : [];
   // Порты игр — по подсказкам DNS (inlets/hints.ts, game-ports.ts).
   const hints = new Hints();
@@ -173,6 +180,7 @@ async function main(): Promise<void> {
     ports.stop();
     consumers.stop();
     meter.stop();
+    rules.stop();
     panel?.server.close();
     server.close();
     server.closeAllConnections();

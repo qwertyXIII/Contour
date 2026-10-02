@@ -2,6 +2,7 @@ import net, { type Socket } from 'node:net';
 import { setTimeout as sleep } from 'node:timers/promises';
 import type { Config } from '../config.ts';
 import { errorText, type Logger } from '../log.ts';
+import { noRules } from '../rules/need.ts';
 import { checkDestination } from './fence.ts';
 import { inCidr } from './lan-match.ts';
 import { relay, type RelayDeps } from './relay.ts';
@@ -75,16 +76,17 @@ function serve(kind: 'tls' | 'http', port: number, client: Socket, lan: LanConfi
       panel.take(client, buf);
       return;
     }
-    // Какие сайты вести, решает DNS (списки и самообучение меняются на ходу),
-    // поэтому здесь имя не сверяется со списком. Открытым прокси это не
-    // становится: пускаем только домашнюю сеть, и ограда не пускает в частные адреса.
+    // Вести ли сайт через Contour, решил DNS; куда — правила (страна, только эти
+    // выходы, запрет). Открытым прокси это не становится: пускаем только
+    // домашнюю сеть, и ограда не пускает в частные адреса.
     const fence = checkDestination(r.name, port);
-    if (!fence.ok) {
-      log.warn(`${who}: отказ ограды — ${fence.reason}`);
+    const routed = (deps.route ?? noRules)(r.name);
+    if (!fence.ok || routed.reject) {
+      log.warn(`${who}: отказ — ${routed.reject ? `запрещено правилом «${routed.why}»` : fence.ok ? '' : fence.reason}`);
       client.destroy();
       return;
     }
-    relay(client, buf, who, { host: r.name, port }, deps, {
+    relay(client, buf, who, { host: r.name, port, need: routed.need }, deps, {
       onEstablished: () => client.resume(),
       onFail: () => client.destroy(),
     });

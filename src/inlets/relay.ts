@@ -4,6 +4,7 @@ import { errorText, type Logger } from '../log.ts';
 import type { Outlet } from '../outlets/outlet.ts';
 import type { PortLearner } from '../outlets/ports.ts';
 import type { Chooser, ExitNeed } from '../select/chooser.ts';
+import type { Router } from '../rules/need.ts';
 import type { Meter } from '../stats/meter.ts';
 
 /**
@@ -27,7 +28,8 @@ import type { Meter } from '../stats/meter.ts';
 
 /** `need` — чего соединение требует от выхода (страну), см. `chooser.ts`. */
 export type Target = { host: string; port: number; need?: ExitNeed };
-export type RelayDeps = { chooser: Chooser; consumers: Consumers; log: Logger; meter?: Meter; ports?: PortLearner };
+/** `route` — правила «что + куда» (`rules/need.ts`); нет — как до движка. */
+export type RelayDeps = { chooser: Chooser; consumers: Consumers; log: Logger; meter?: Meter; ports?: PortLearner; route?: Router };
 export type RelayHooks = {
   /** Первый выход открылся — один раз. */
   onEstablished: () => void;

@@ -205,3 +205,9 @@ export function prepareOutlets(config: Config): Prepared {
   }
   return prepared;
 }
+
+/** Страны выходов — запасные тоже (поднимется — страна та же); `allowed` сужает (null — все). */
+export function outletCountries(outlets: Outlet[], allowed: readonly string[] | null = null): string[] {
+  const codes = new Set(outlets.map((o) => o.country).filter((c): c is string => Boolean(c) && (!allowed || allowed.includes(c as string))));
+  return [...codes].sort();
+}

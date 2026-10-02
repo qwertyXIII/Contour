@@ -3,6 +3,7 @@ import type { Socket } from 'node:net';
 import type { Consumers } from '../consumers.ts';
 import { errorText, type Logger } from '../log.ts';
 import type { Outlet } from '../outlets/outlet.ts';
+import { noRules } from '../rules/need.ts';
 import type { Chooser, ExitNeed } from '../select/chooser.ts';
 import type { Meter } from '../stats/meter.ts';
 import { checkDestination } from './fence.ts';
@@ -43,6 +44,8 @@ export type HttpInletOptions = {
   log: Logger;
   meter?: Meter;
   ports?: RelayDeps['ports'];
+  /** Правила «что + куда»; нет — как до движка. */
+  route?: RelayDeps['route'];
 };
 
 type Deps = RelayDeps;
@@ -153,7 +156,8 @@ function serveForward(req: http.IncomingMessage, res: http.ServerResponse, who: 
 
 export function startHttpInlet(opts: HttpInletOptions): Promise<http.Server> {
   const { chooser, consumers, log } = opts;
-  const deps: Deps = { chooser, consumers, log, meter: opts.meter, ports: opts.ports };
+  const deps: Deps = { chooser, consumers, log, meter: opts.meter, ports: opts.ports, route: opts.route };
+  const route = opts.route ?? noRules;
   const server = http.createServer();
   // Туннели живут долго (докачка на часы) — таймаут соединения без дела не нужен.
   server.timeout = 0;
@@ -164,13 +168,19 @@ export function startHttpInlet(opts: HttpInletOptions): Promise<http.Server> {
     if (!who) { refuse(socket, 407, 'нужен токен', AUTH_HEADERS); return; }
     const target = parseAuthority(req.url);
     if (!target) { refuse(socket, 400, 'CONNECT host:port'); return; }
+    const routed = route(target.host, exitNeed(req.headers[EXIT_HEADER]));
     const fence = checkDestination(target.host, target.port);
-    if (!fence.ok) {
+    if (!fence.ok && !routed.fenceException) {
       log.warn(`${who}: отказ ограды — ${fence.reason}`);
       refuse(socket, 403, fence.reason);
       return;
     }
-    serveConnect(socket, head, who, { ...target, need: exitNeed(req.headers[EXIT_HEADER]) }, deps);
+    if (routed.reject) {
+      log.info(`${who}: ${target.host} — запрещено правилом «${routed.why}»`);
+      refuse(socket, 403, `запрещено правилом «${routed.why}»`);
+      return;
+    }
+    serveConnect(socket, head, who, { ...target, need: routed.need }, deps);
   });
 
   server.on('request', (req, res) => {
@@ -194,14 +204,17 @@ export function startHttpInlet(opts: HttpInletOptions): Promise<http.Server> {
       res.writeHead(400); res.end('плохой адрес\n'); return;
     }
     if (target.protocol !== 'http:') { res.writeHead(400); res.end('через проброс только http; для https — CONNECT\n'); return; }
-    const fence = checkDestination(target.hostname.replace(/^\[|\]$/g, ''), Number(target.port) || 80);
-    if (!fence.ok) {
-      log.warn(`${who}: отказ ограды — ${fence.reason}`);
+    const host = target.hostname.replace(/^\[|\]$/g, '');
+    const routed = route(host, exitNeed(req.headers[EXIT_HEADER]));
+    const fence = checkDestination(host, Number(target.port) || 80);
+    if ((!fence.ok && !routed.fenceException) || routed.reject) {
+      const reason = routed.reject ? `запрещено правилом «${routed.why}»` : fence.ok ? '' : fence.reason;
+      log.warn(`${who}: отказ — ${reason}`);
       res.writeHead(403, { 'Content-Type': 'text/plain; charset=utf-8' });
-      res.end(`${fence.reason}\n`);
+      res.end(`${reason}\n`);
       return;
     }
-    serveForward(req, res, who, target, deps, exitNeed(req.headers[EXIT_HEADER]));
+    serveForward(req, res, who, target, deps, routed.need);
   });
 
   server.on('clientError', (error: NodeJS.ErrnoException, socket: Socket) => {
