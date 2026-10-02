@@ -65,7 +65,7 @@ export function shareRoutes(router: Router, d: RoutesDeps): void {
     const devices = store.devices().map((x) => {
       const who = shareWho(x.id);
       return {
-        id: x.id, name: x.name, enabled: x.enabled, created: x.created, countries: deviceCountries(x, d.share!.allowed),
+        id: x.id, name: x.name, enabled: x.enabled, created: x.created, countries: deviceCountries(x, d.share!.allowed), trace: Boolean(x.trace),
         today: today[who] ?? ZERO, rate: rates[who] ?? ZERO, lastSeen: seen[who] ?? null,
       };
     });
@@ -130,6 +130,21 @@ export function shareRoutes(router: Router, d: RoutesDeps): void {
     try {
       d.share!.store.setEnabled(id.data, b.enabled);
       d.log.info(`панель: раздача — устройство ${id.data} ${b.enabled ? 'включено' : 'выключено'}`);
+      res.json({ ok: true, data: null });
+    } catch (error) {
+      fail(res, 404, 'NOT_FOUND', (error as Error).message);
+    }
+  });
+
+  // Запись сайтов телефона для разбора (share/trace.ts): 3 дня, в папке журналов.
+  router.post('/share/devices/:id/trace', (req, res) => {
+    const id = ID.safeParse(req.params.id);
+    const b = parse(schemas.country, req, res);
+    if (!b || off(res)) return;
+    if (!id.success) { fail(res, 400, 'VALIDATION', 'неверное устройство'); return; }
+    try {
+      d.share!.store.setTrace(id.data, b.on);
+      d.log.info(`панель: раздача — устройство ${id.data}: запись сайтов ${b.on ? 'включена' : 'выключена'}`);
       res.json({ ok: true, data: null });
     } catch (error) {
       fail(res, 404, 'NOT_FOUND', (error as Error).message);

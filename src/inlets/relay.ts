@@ -29,8 +29,15 @@ import type { Meter } from '../stats/meter.ts';
 
 /** `need` — чего соединение требует от выхода (страну), см. `chooser.ts`. */
 export type Target = { host: string; port: number; need?: ExitNeed };
-/** `route` — правила «что + куда» (`rules/need.ts`); нет — как до движка. `speed` — замеры для «самого быстрого». */
-export type RelayDeps = { chooser: Chooser; consumers: Consumers; log: Logger; meter?: Meter; ports?: PortLearner; route?: Router; speed?: SpeedBook };
+/**
+ * `route` — правила «что + куда» (`rules/need.ts`); нет — как до движка. `speed` —
+ * замеры для «самого быстрого». `trace` — запись сайтов телефона раздачи для
+ * разбора (`share/trace.ts`), только где её включили.
+ */
+export type RelayDeps = {
+  chooser: Chooser; consumers: Consumers; log: Logger; meter?: Meter; ports?: PortLearner; route?: Router; speed?: SpeedBook;
+  trace?: (who: string, host: string, port: number, outlet: Outlet) => void;
+};
 export type RelayHooks = {
   /** Первый выход открылся — один раз. */
   onEstablished: () => void;
@@ -78,6 +85,7 @@ export function relay(client: Socket, head: Buffer, who: string, target: Target,
     outletName = outlet.name;
     const attachedAt = Date.now();
     sentAt = buffered.length > 0 ? attachedAt : -1;
+    deps.trace?.(who, target.host, target.port, outlet);
     let answered = false;
     // Пассивная скорость выхода — рывками, по этому соединению (`select/speed-flow.ts`).
     const flow = deps.speed?.flow(outlet.name);

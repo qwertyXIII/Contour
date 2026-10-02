@@ -106,6 +106,10 @@ export class Share {
       if (!card) return;
       if (e.detail.value === 'open') void this.#connect.open(card.dataset.id);
       if (e.detail.value === 'remove') void this.#remove(card.dataset.id, card.dataset.name);
+      if (e.detail.value === 'trace') {
+        const on = !card.dataset.trace;
+        void this.#post(`${API.shareDevice(card.dataset.id)}/trace`, { on }, on ? `«${card.dataset.name}»: сайты пишутся 3 дня — для разбора` : `«${card.dataset.name}»: запись выключена`);
+      }
     });
     this.#root.addEventListener('chip:remove', (e) => {
       const code = e.target.closest('[data-share-chips]')?.dataset.shareChips;

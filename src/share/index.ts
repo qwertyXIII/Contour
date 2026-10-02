@@ -10,6 +10,11 @@ import { Edge } from './edge.ts';
 import { ShareRules } from './rules.ts';
 import { startShareServer } from './server.ts';
 import { deviceCountries, ShareStore } from './store.ts';
+import { ShareTrace } from './trace.ts';
+
+/** Запись сайтов телефона (`trace.ts`) — в папку журналов: её читает владелец без root. */
+const TRACE_DIR = '/var/log/contour';
+const TRACE_DAYS = 3;
 
 /**
  * Раздача целиком: устройства, край, правила по ссылке. Contour без неё
@@ -24,7 +29,7 @@ import { deviceCountries, ShareStore } from './store.ts';
  */
 export type Share = {
   store: ShareStore; edge: Edge; rules: ShareRules; outlets: Outlet[]; ports: { edge: number; list: number };
-  allowed: readonly string[] | null; countries(): string[]; stop(): Promise<void>;
+  allowed: readonly string[] | null; countries(): string[]; trace: ShareTrace; stop(): Promise<void>;
 };
 
 
@@ -82,6 +87,7 @@ export function startShare(config: Config, deps: { consumers: Consumers; outlets
   edge.start();
   const rules = new ShareRules({ store, countryList: deps.countryList });
   const allowed = config.share.countries;
+  const trace = new ShareTrace({ store, dir: TRACE_DIR, days: TRACE_DAYS, log });
   const server: http.Server = startShareServer({ listen: config.share.listen, port: config.share.listPort, store, rules: deps.ruleset, allowed, log });
   return {
     store,
@@ -90,6 +96,7 @@ export function startShare(config: Config, deps: { consumers: Consumers; outlets
     outlets: deps.outlets,
     ports: { edge: config.share.port, list: config.share.listPort },
     allowed,
+    trace,
     countries: () => outletCountries(deps.outlets, allowed),
     async stop() {
       server.close();

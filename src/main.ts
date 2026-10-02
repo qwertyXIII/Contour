@@ -187,7 +187,8 @@ async function main(): Promise<void> {
   serviceOf = (host) => rules.services.serviceOf(host);
   fenceAllow = (ip, o) => !o.direct && rules.allowsPrivate(ip, o.name);
   rulesRefresh = () => rules.book.rebuild();
-  const server = await startHttpInlet({ ...config.http, chooser, consumers, log, meter, ports, route, speed });
+  // Запись сайтов телефона раздачи — у раздачи, она поднимается позже: вход зовёт её по имени.
+  const server = await startHttpInlet({ ...config.http, chooser, consumers, log, meter, ports, route, speed, trace: (who, host, port, o) => share?.trace.note(who, host, port, o) });
   share = startShare(config, { consumers, outlets, countryList: (code) => rules.book.countryList(code), ruleset: () => rules.book.rules(), allowTcp: () => rules.allowNets(), log });
   // Край перезапускается, только когда сменились его исключения ограды: телефоны при этом переподключаются.
   let allowed = rules.allowNets().join(' ');

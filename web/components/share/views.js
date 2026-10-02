@@ -69,11 +69,13 @@ export function deviceCard() {
   const input = h('input', { class: 'switch__input visually-hidden', type: 'checkbox', role: 'switch', dataset: { shareAct: 'enable' } });
   const toggle = h('label', { class: 'switch' }, input, h('span', { class: 'switch__track', 'aria-hidden': 'true' }), h('span', { class: 'switch__label visually-hidden', text: 'Ходит через дом' }));
   const open = button('Подключить', { icon: 'scan', data: { shareAct: 'open' } });
-  const menu = moreMenu([['open', 'Подключить', 'scan'], ['remove', 'Удалить', 'trash', true]]);
+  const menu = moreMenu([['open', 'Подключить', 'scan'], ['trace', 'Записывать сайты', 'eye'], ['remove', 'Удалить', 'trash', true]]);
+  const traceText = menu.querySelector('[data-value="trace"] .menu__item-text');
   const state = badgeView();
+  const tracing = h('span', { class: 'badge badge_tone_warn', hidden: true }, svgIcon('eye', 'badge__icon'), 'пишет сайты · 3 дня');
   const row = rowView('phone', h('span', { class: 'cluster cluster_gap_s cluster_nowrap' }, toggle, menu));
   const chips = countryChips();
-  const el = h('article', { class: 'card stack stack_gap_m' }, row.el, chips.el, h('div', { class: 'cluster cluster_gap_s' }, open, state.el));
+  const el = h('article', { class: 'card stack stack_gap_m' }, row.el, chips.el, h('div', { class: 'cluster cluster_gap_s' }, open, state.el, tracing));
   return {
     el,
     update(x) {
@@ -85,6 +87,9 @@ export function deviceCard() {
       });
       state.set(x.enabled ? (active ? `ходит · ↓ ${speed(x.rate.down)}` : 'включён') : 'выключен', x.enabled ? (active ? 'ok' : null) : 'warn');
       chips.set(x);
+      setHidden(tracing, !x.trace);
+      setText(traceText, x.trace ? 'Не записывать сайты' : 'Записывать сайты (3 дня)');
+      el.dataset.trace = x.trace ? '1' : '';
       if (input.checked !== x.enabled) input.checked = x.enabled;
       for (const node of [el, input, open]) {
         node.dataset.id = x.id;

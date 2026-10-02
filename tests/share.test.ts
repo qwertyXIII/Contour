@@ -282,3 +282,26 @@ test('край: подсеть правила «только через эти �
   assert.ok(doc.rules.includes('IP-CIDR,10.0.0.0/8,REJECT,no-resolve'));
   assert.ok(!doc.rules.includes('IP-CIDR,172.16.0.0/12,REJECT,no-resolve'));
 });
+
+test('запись сайтов: только у телефона, где включена; файл на день, старше 3 дней удаляется', async () => {
+  const { ShareTrace } = await import('../src/share/trace.ts');
+  const { readdirSync } = await import('node:fs');
+  const dir = tmp('contour-trace-');
+  writeFileSync(path.join(dir, 'share-trace-2020-01-01.log'), 'старое\n');
+  const store = new ShareStore(tmp('contour-share-'));
+  const a = store.add('iPhone');
+  const b = store.add('Друг');
+  const trace = new ShareTrace({ store, dir, days: 3, log: quiet });
+  assert.ok(!readdirSync(dir).includes('share-trace-2020-01-01.log'), 'старше срока — удалён');
+  const outlet = { name: 'corp_ext', country: 'DE' } as never;
+  trace.note(`share.${a.id}`, 'x.com', 443, outlet);
+  store.setTrace(a.id, true);
+  trace.note(`share.${a.id}`, 'youtube.com', 443, outlet);
+  trace.note(`share.${b.id}`, 'friend.example', 443, outlet);
+  trace.note('alter', 'alter.example', 443, outlet);
+  await new Promise((r) => setTimeout(r, 50));
+  const files = readdirSync(dir).filter((f) => f.startsWith('share-trace-'));
+  assert.equal(files.length, 1);
+  const lines = readFileSync(path.join(dir, files[0] as string), 'utf8').trim().split('\n').map((l) => JSON.parse(l) as { device: string; host: string; outlet: string });
+  assert.deepEqual(lines.map((l) => [l.device, l.host, l.outlet]), [['iPhone', 'youtube.com', 'corp_ext']], 'до включения, друг и не раздача — не пишутся');
+});

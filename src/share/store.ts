@@ -28,7 +28,8 @@ import { normalizeSite } from '../dns/overrides.ts';
  * этой страны» (банки и прочее, чего нет в общем списке).
  */
 
-export type ShareDevice = { id: string; name: string; uuid: string; countries: string[]; exits: Record<string, string>; list: string; enabled: boolean; created: number };
+/** `trace` — записывать сайты этого телефона для разбора (`trace.ts`); по умолчанию — нет. */
+export type ShareDevice = { id: string; name: string; uuid: string; countries: string[]; exits: Record<string, string>; list: string; enabled: boolean; created: number; trace?: boolean };
 export type ShareSettings = { domain: string | null; path: string; countrySites: Record<string, string[]> };
 
 type File = { settings: ShareSettings; devices: ShareDevice[] };
@@ -127,6 +128,11 @@ export class ShareStore {
 
   setEnabled(id: string, enabled: boolean): void {
     this.find(id).enabled = enabled;
+    this.commit();
+  }
+
+  setTrace(id: string, on: boolean): void {
+    this.find(id).trace = on;
     this.commit();
   }
 
