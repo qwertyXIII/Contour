@@ -68,7 +68,7 @@ export function shadowrocketConf(input: ConfInput): string {
     'dns-server = system',
     'fallback-dns-server = system',
     'ipv6 = false',
-    // QUIC (UDP) через край пока не ходит — пусть приложения сразу идут по TCP.
+    // QUIC через туннель хуже TCP (UDP внутри OpenVPN по TCP) — пусть приложения сразу идут по TCP.
     'block-quic = all-proxy',
     'udp-policy-not-supported-behaviour = REJECT',
     // Не разрешилось имя «прямого» сайта — не уводить его через дом: российские
