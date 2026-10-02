@@ -1,0 +1,34 @@
+/*
+ * scene-ui__switch: переключатель в строке макета; включён — у строки __row_on.
+ * Цвет включённого — переменная облика --ui-switch-on (у iOS — зелёный).
+ */
+.scene-ui__switch {
+  position: relative;
+  flex: 0 0 auto;
+  width: 42px;
+  height: 26px;
+  border-radius: var(--radius-full);
+  background: var(--color-fill-3);
+  transition: background-color var(--duration-fast) ease;
+}
+
+.scene-ui__switch::after {
+  content: "";
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--color-knob);
+  box-shadow: var(--shadow-knob);
+  transition: transform var(--duration-normal) var(--ease-out);
+}
+
+.scene-ui__row_on .scene-ui__switch {
+  background: var(--ui-switch-on, var(--color-accent));
+}
+
+.scene-ui__row_on .scene-ui__switch::after {
+  transform: translateX(16px);
+}

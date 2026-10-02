@@ -1,0 +1,164 @@
+/*
+ * Облик макета — scene-ui_look_{ios|mac|win|web|tv|term|cam} — и строка окна
+ * __chrome_kind_{mac|win|browser|term}. Облик меняет переменные блока и немного
+ * формы (боковое меню Mac на подложке, строки телевизора плашками), словарь узлов
+ * остаётся один.
+ */
+
+/* ——— Телефон: группы на фоне, место под строку состояния, зелёные переключатели. */
+.scene-ui_look_ios {
+  --ui-safe: 30px;
+  --ui-row: 40px;
+  --ui-switch-on: var(--color-ok);
+  --ui-radius: 12px;
+
+  background: var(--color-bg);
+}
+
+.scene-ui_look_ios .scene-ui__sheet {
+  place-items: end stretch;
+  padding: 0;
+}
+
+.scene-ui_look_ios .scene-ui__dialog {
+  border-radius: var(--radius-xl) var(--radius-xl) 0 0;
+  padding-bottom: var(--space-8);
+}
+
+.scene-ui_look_ios .scene-ui__sheet_off .scene-ui__dialog {
+  transform: translateY(100%);
+}
+
+.scene-ui_look_cam {
+  --ui-safe: 30px;
+
+  background: var(--color-media-bg);
+  color: var(--color-on-media);
+}
+
+.scene-ui_look_cam .scene-ui__text {
+  text-align: center;
+}
+
+/* ——— Окна ноутбука: рамка, тень, поле ввода в рамке, значение слева. */
+.scene-ui_look_mac,
+.scene-ui_look_win,
+.scene-ui_look_web,
+.scene-ui_look_term {
+  --ui-text: 13px;
+  --ui-small: 11.5px;
+  --ui-m: 14px;
+  --ui-l: 19px;
+  --ui-row: 34px;
+  --ui-pad: var(--space-4);
+  --ui-box-bg: var(--color-well);
+  --ui-box-border: 1px solid var(--color-border-strong);
+  --ui-box-justify: flex-start;
+  --ui-box-pad: 0 var(--space-2);
+  --ui-box-focus: 0 0 0 3px var(--color-accent-soft);
+  --ui-label-w: 112px;
+  --ui-button-radius: var(--radius-xs);
+  --ui-dialog-w: 420px;
+
+  overflow: hidden;
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-m);
+  background: var(--color-bg-elevated);
+  box-shadow: var(--shadow-l);
+}
+
+.scene-ui_look_mac {
+  --ui-side: 148px;
+}
+
+/* Боковое меню окна — на своей подложке во всю высоту (__split_flush — главный раздел окна). */
+.scene-ui__split_flush {
+  margin: calc(var(--ui-pad) * -1) 0 calc(var(--ui-pad) * -1) calc(var(--ui-pad) * -1);
+}
+
+.scene-ui__split_flush .scene-ui__side {
+  padding: var(--ui-pad) var(--space-2);
+  border-right: 1px solid var(--color-border);
+  background: var(--color-fill-1);
+}
+
+.scene-ui__split_flush .scene-ui__pane {
+  padding-block: var(--ui-pad);
+}
+
+.scene-ui_look_win {
+  --ui-side: 172px;
+  --ui-radius: var(--radius-s);
+  --ui-group-bg: var(--color-fill-1);
+}
+
+.scene-ui_look_win .scene-ui__item_on {
+  background: var(--color-fill-2);
+  color: var(--color-text);
+  box-shadow: inset 3px 0 var(--color-accent);
+}
+
+.scene-ui_look_web {
+  --ui-side: 160px;
+  --ui-radius: var(--radius-s);
+}
+
+/* Терминал — окно поменьше, не во весь экран: строки переносятся в ширину кадра даже на телефоне. */
+.scene-ui_look_term {
+  --ui-pad: var(--space-3);
+
+  align-self: center;
+  width: min(100%, 440px);
+}
+
+/* Строк больше, чем влезает, — старые уходят вверх, как в настоящем терминале. */
+.scene-ui_look_term .scene-ui__content {
+  height: 100%;
+  box-sizing: border-box;
+}
+
+.scene-ui_look_term .scene-ui__term {
+  justify-content: flex-end;
+  max-height: 100%;
+  overflow: hidden;
+}
+
+/* Окно «Подробнее» на Mac — шире, с боковыми вкладками. */
+.scene-ui_look_mac .scene-ui__dialog {
+  --ui-side: 92px;
+  --ui-dialog-w: 470px;
+}
+
+/* ——— Телевизор: крупно, строки — плашками, подсказка слева. */
+.scene-ui_look_tv {
+  --ui-text: 16px;
+  --ui-small: 13px;
+  --ui-m: 17px;
+  --ui-l: 26px;
+  --ui-row: 37px;
+  --ui-pad: 22px;
+  --ui-gap: var(--space-4);
+  --ui-side: 210px;
+  --ui-group-bg: transparent;
+  --ui-box-justify: flex-end;
+  --ui-box-focus: 0 0 0 3px var(--color-accent-soft);
+
+  background: linear-gradient(160deg, var(--color-fill-2), transparent 45%), var(--color-bg);
+}
+
+.scene-ui_look_tv .scene-ui__group {
+  gap: 6px;
+  overflow: visible;
+}
+
+.scene-ui_look_tv .scene-ui__row,
+.scene-ui_look_tv .scene-ui__field {
+  border-radius: var(--radius-s);
+  background: var(--color-fill-1);
+  box-shadow: none;
+}
+
+.scene-ui_look_tv .scene-ui__icon {
+  background: transparent;
+  color: var(--color-text-muted);
+}

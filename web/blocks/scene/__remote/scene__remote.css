@@ -1,0 +1,73 @@
+/*
+ * scene__remote: пульт телевизора на сцене — какие кнопки жмут. Стоит рядом с
+ * телевизором: справа или снизу (__remote_place_bottom — крестовина и кнопки в
+ * ряд), где телевизор выйдет крупнее; решает JS. Нажатая кнопка — __remote-key_lit.
+ */
+/* Пульт: стеклянный, в углу сцены — какие кнопки жмут. */
+.scene__remote {
+  position: absolute;
+  top: 50%;
+  right: var(--space-3);
+  display: grid;
+  gap: var(--space-2);
+  justify-items: center;
+  padding: var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-l);
+  background: var(--color-glass-strong, var(--color-bg-elevated));
+  -webkit-backdrop-filter: blur(var(--blur-glass));
+  backdrop-filter: blur(var(--blur-glass));
+  box-shadow: var(--shadow-m);
+  opacity: 0;
+  transform: translateY(-50%);
+  pointer-events: none;
+  --icon-size: 14px;
+}
+
+/* Узкая сцена: пульт под телевизором, кнопки — в ряд с крестовиной. */
+.scene__remote_place_bottom {
+  top: auto;
+  right: auto;
+  bottom: var(--space-3);
+  left: 50%;
+  grid-auto-flow: column;
+  align-items: center;
+  transform: translateX(-50%);
+}
+
+.scene__remote-pad {
+  display: grid;
+  grid-template: repeat(3, 26px) / repeat(3, 26px);
+  grid-template-areas: ". up ." "left ok right" ". down .";
+  gap: 2px;
+}
+
+.scene__remote-row {
+  display: flex;
+  gap: var(--space-2);
+}
+
+.scene__remote-key {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: var(--color-fill-2);
+  color: var(--color-text-muted);
+  font-size: 9px;
+  font-weight: var(--weight-bold);
+  transition: background-color var(--duration-fast) ease, color var(--duration-fast) ease, transform var(--duration-fast) var(--ease-out);
+}
+
+.scene__remote-key_up { grid-area: up; }
+.scene__remote-key_down { grid-area: down; }
+.scene__remote-key_left { grid-area: left; }
+.scene__remote-key_right { grid-area: right; }
+.scene__remote-key_ok { grid-area: ok; }
+
+.scene__remote-key_lit {
+  background: var(--color-accent);
+  color: var(--color-on-accent);
+  transform: scale(.9);
+}

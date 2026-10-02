@@ -1,0 +1,35 @@
+/*
+ * Блок scene-ui: макет чужого экрана внутри сцены ролика — словарь узлов
+ * (components/guide/mock.js): шапка, группа строк, строка, поле, кнопка,
+ * сегменты, боковое меню, вкладки, плитки, лист поверх, список, терминал,
+ * видоискатель, видео, путь сайта. Не копия чужих интерфейсов: узнаваемая
+ * структура на токенах системы, без логотипов.
+ *
+ * Макет живёт в своих пикселях (его масштабирует сцена), поэтому кегли и высоты —
+ * переменные блока, а не токены плотности: телефон в ролике один и тот же и на
+ * десктопе, и на телефоне. Облик (iOS, Mac, Windows, веб, ТВ, терминал) —
+ * модификатор scene-ui_look_*: он меняет переменные и немного формы.
+ *
+ *   <div class="scene-ui scene-ui_look_ios">
+ *     [__chrome — строка окна]  <div class="scene-ui__view"> <div class="scene-ui__content">…</div> [__sheet · __toast · __dock] </div>
+ *   </div>
+ *
+ * Состояния узлов ставит JS модификаторами: <узел>_on (включён, выбран),
+ * <узел>_off (слой поверх спрятан), <узел>_typing (каретка); строки нет — hidden.
+ */
+@import url('./__view/scene-ui__view.css');
+@import url('./__bar/scene-ui__bar.css');
+@import url('./__row/scene-ui__row.css');
+@import url('./__switch/scene-ui__switch.css');
+@import url('./__edit/scene-ui__edit.css');
+@import url('./__field/scene-ui__field.css');
+@import url('./__controls/scene-ui__controls.css');
+@import url('./__chips/scene-ui__chips.css');
+@import url('./__select/scene-ui__select.css');
+@import url('./__over/scene-ui__over.css');
+@import url('./__media/scene-ui__media.css');
+@import url('./__route/scene-ui__route.css');
+@import url('./__term/scene-ui__term.css');
+@import url('./__chrome/scene-ui__chrome.css');
+/* Облик — последним: его переменные перекрывают умолчания корня при равной специфичности. */
+@import url('./_look/scene-ui_look.css');

@@ -1,0 +1,137 @@
+/*
+ * Корень scene-ui (переменные по умолчанию — облик их перекрывает, поэтому
+ * этот файл импортируется первым), __view — окно экрана, __content — то, что
+ * прокручивается (transform от JS), и раскладка: __head, __group,
+ * __split › __pane (_flush — в _look), __stack, __cluster, __card, __text, __space.
+ */
+.scene-ui {
+  --ui-text: 14px;
+  --ui-small: 12px;
+  --ui-m: 15px;
+  --ui-l: 20px;
+  --ui-title: 28px;
+  --ui-row: 40px;
+  --ui-pad: var(--space-3);
+  --ui-gap: var(--space-3);
+  --ui-safe: 0px;
+  --ui-radius: var(--radius-m);
+  --ui-side: 150px;
+  --ui-group-bg: var(--color-surface);
+  --ui-accent: var(--color-accent-text);
+
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-height: 0;
+  color: var(--color-text);
+  font-size: var(--ui-text);
+  line-height: 1.25;
+}
+
+.scene-ui__view {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.scene-ui__content {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ui-gap);
+  padding: calc(var(--ui-pad) + var(--ui-safe)) var(--ui-pad) var(--ui-pad);
+  will-change: transform;
+}
+
+.scene-ui__head {
+  margin: var(--space-1) 0 calc(var(--ui-gap) * -0.6);
+  padding-inline: var(--space-3);
+  color: var(--color-text-muted);
+  font-size: var(--ui-small);
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
+.scene-ui__group {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border-radius: var(--ui-radius);
+  background: var(--ui-group-bg);
+}
+
+.scene-ui__split {
+  display: grid;
+  grid-template-columns: var(--ui-side) minmax(0, 1fr);
+  gap: var(--space-4);
+  min-height: 0;
+}
+
+.scene-ui__pane,
+.scene-ui__stack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.scene-ui__pane {
+  gap: var(--ui-gap);
+}
+
+.scene-ui__cluster {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.scene-ui__card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--ui-radius);
+  background: var(--ui-group-bg);
+}
+
+.scene-ui__text {
+  margin: 0;
+}
+
+.scene-ui__text_tone_muted {
+  color: var(--color-text-muted);
+  font-size: var(--ui-small);
+  line-height: 1.35;
+}
+
+.scene-ui__text_size_m {
+  font-size: var(--ui-m);
+  font-weight: var(--weight-semibold);
+}
+
+.scene-ui__text_size_l {
+  font-size: var(--ui-l);
+  font-weight: var(--weight-bold);
+  letter-spacing: -0.01em;
+  line-height: 1.15;
+}
+
+.scene-ui__space {
+  flex: 1 1 auto;
+}
+
+/* Узел появился (строка пришла, показали карточку) — проявляется, а не выскакивает. */
+@keyframes scene-ui-in {
+  from { opacity: 0; transform: translateY(6px); }
+}
+
+.scene-ui__row,
+.scene-ui__field,
+.scene-ui__card,
+.scene-ui__group,
+.scene-ui__chips,
+.scene-ui__stack {
+  animation: scene-ui-in var(--duration-normal) var(--ease-out);
+}

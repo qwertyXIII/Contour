@@ -1,0 +1,57 @@
+/*
+ * scene-ui__bar: шапка экрана макета — __back («‹ куда», __back-text ужимается
+ * многоточием), __heading (заголовок по центру), __act (действие справа);
+ * __title — крупный заголовок под шапкой, как в настройках iPhone.
+ */
+/* Шапка экрана: «‹ назад» слева, заголовок по центру, действие справа. */
+.scene-ui__bar {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, auto) minmax(min-content, 1fr);
+  align-items: center;
+  min-height: 30px;
+  font-size: var(--ui-m);
+}
+
+.scene-ui__back {
+  display: inline-flex;
+  align-items: center;
+  justify-self: start;
+  max-width: 100%;
+  min-width: 0;
+  color: var(--ui-accent);
+  --icon-size: 18px;
+}
+
+.scene-ui__back-text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.scene-ui__heading {
+  min-width: 0;
+  overflow: hidden;
+  padding-inline: var(--space-1);
+  text-overflow: ellipsis;
+  font-size: var(--ui-text);
+  font-weight: var(--weight-semibold);
+  text-align: center;
+  white-space: nowrap;
+}
+
+.scene-ui__act {
+  justify-self: end;
+  color: var(--ui-accent);
+  font-size: var(--ui-text);
+  font-weight: var(--weight-semibold);
+  white-space: nowrap;
+}
+
+.scene-ui__title {
+  margin-top: calc(var(--ui-gap) * -0.5);
+  font-size: var(--ui-title);
+  font-weight: var(--weight-bold);
+  letter-spacing: -0.02em;
+  line-height: 1.1;
+}

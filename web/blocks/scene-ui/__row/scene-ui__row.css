@@ -1,0 +1,109 @@
+/*
+ * scene-ui__row: строка настроек макета —
+ * [__minus] [__tick] [__icon] __label __value [__button] [__chevron | __info | __check | __switch | __plus] [__del].
+ * Высота и отступы — общие с полем (scene-ui__field).
+ *
+ *   __row_on — переключатель включён, галочка видна, выделенная строка (__row_hl) подсвечена
+ *   __row_tone_{accent|danger|muted} · __minus_off · __del_off — спрятаны (правка списка)
+ */
+.scene-ui__row,
+.scene-ui__field {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: var(--ui-row);
+  padding: var(--space-1) var(--space-3);
+  overflow: hidden;
+  box-shadow: inset 0 -1px var(--color-border);
+}
+
+.scene-ui__row:last-child,
+.scene-ui__field:last-child {
+  box-shadow: none;
+}
+
+/* Подпись важнее значения: она целиком (длинная — переносится после ~⅔ строки), значение ужимается многоточием. */
+.scene-ui__label {
+  flex: 0 0 auto;
+  min-width: 0;
+  max-width: 64%;
+  line-height: 1.2;
+}
+
+/* Значения нет — подписи вся строка. */
+.scene-ui__label:has(+ .scene-ui__value:empty) {
+  max-width: none;
+}
+
+.scene-ui__value {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--color-text-muted);
+  text-overflow: ellipsis;
+  white-space: pre;
+}
+
+.scene-ui__icon {
+  display: grid;
+  flex: 0 0 auto;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 7px;
+  background: var(--color-accent);
+  color: var(--color-on-accent);
+  --icon-size: 16px;
+}
+
+.scene-ui__chevron {
+  flex: 0 0 auto;
+  color: var(--color-text-faint);
+  --icon-size: 14px;
+}
+
+.scene-ui__tick,
+.scene-ui__check,
+.scene-ui__plus {
+  flex: 0 0 auto;
+  color: var(--ui-accent);
+  --icon-size: 16px;
+}
+
+.scene-ui__info {
+  display: grid;
+  flex: 0 0 auto;
+  place-items: center;
+  color: var(--ui-accent);
+  --icon-size: 20px;
+}
+
+.scene-ui__check {
+  opacity: 0;
+  transform: scale(.6);
+  transition: opacity var(--duration-fast) ease, transform var(--duration-normal) var(--ease-out);
+}
+
+.scene-ui__row_on .scene-ui__check {
+  opacity: 1;
+  transform: none;
+}
+
+.scene-ui__row_tone_accent .scene-ui__label { color: var(--ui-accent); }
+.scene-ui__row_tone_danger .scene-ui__label { color: var(--color-danger); }
+.scene-ui__row_tone_muted .scene-ui__label { color: var(--color-text-faint); }
+
+.scene-ui__row_hl {
+  transition: background-color var(--duration-fast) ease;
+}
+
+.scene-ui__row_hl.scene-ui__row_on {
+  background: var(--color-accent);
+  color: var(--color-on-accent);
+}
+
+/* Значение строки — к правому краю, сколько бы ни заняла подпись. */
+.scene-ui__row .scene-ui__value {
+  margin-left: auto;
+}

@@ -1,0 +1,101 @@
+/*
+ * scene__pad: экранная клавиатура, на которой «нажимаются» буквы, пока текст
+ * впечатывается в поле. На телефоне — снизу (цифры — как у поля адреса, буквы —
+ * обычные ряды), на телевизоре — панелью справа. Выезжает transform'ом от JS;
+ * нажатая клавиша — __key_lit, гаснет переходом.
+ */
+.scene__pad {
+  position: absolute;
+  z-index: 3;
+  display: grid;
+  gap: 6px;
+  padding: 8px 6px 18px;
+  background: var(--color-fill-1);
+  -webkit-backdrop-filter: blur(var(--blur-glass));
+  backdrop-filter: blur(var(--blur-glass));
+  transform: translateY(110%);
+  will-change: transform;
+}
+
+.scene__pad_device_phone {
+  right: 0;
+  bottom: 0;
+  left: 0;
+  border-top: 1px solid var(--color-border);
+  background: var(--color-bg-elevated);
+}
+
+/* На телевизоре — панелью слева, поверх подсказки: список с полем остаётся виден. */
+.scene__pad_device_tv {
+  top: 16px;
+  bottom: 16px;
+  left: 16px;
+  width: 200px;
+  align-content: start;
+  padding: 14px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-l);
+  background: var(--color-bg-elevated);
+  box-shadow: var(--shadow-l);
+  transform: translateX(-110%);
+}
+
+.scene__pad-preview {
+  display: block;
+  min-height: 34px;
+  margin-bottom: 6px;
+  padding: 7px 10px;
+  border: 2px solid var(--color-accent);
+  border-radius: var(--radius-xs);
+  background: var(--color-well);
+  color: var(--color-text);
+  font-size: 15px;
+  font-variant-numeric: tabular-nums;
+}
+
+.scene__pad-row {
+  display: flex;
+  gap: 5px;
+  justify-content: center;
+}
+
+.scene__key {
+  display: grid;
+  flex: 1 1 0;
+  place-items: center;
+  min-width: 0;
+  height: 32px;
+  border-radius: var(--radius-xs);
+  background: var(--color-fill-2);
+  color: var(--color-text);
+  font-size: 15px;
+  font-weight: var(--weight-medium);
+  transition: background-color var(--duration-normal) ease, color var(--duration-normal) ease, transform var(--duration-normal) var(--ease-out);
+}
+
+.scene__pad_kind_num .scene__key {
+  height: 34px;
+  font-size: 18px;
+}
+
+.scene__pad_kind_abc .scene__key {
+  height: 30px;
+  font-size: 12px;
+}
+
+.scene__key_wide {
+  flex-grow: 4;
+  font-size: 11px;
+}
+
+.scene__pad_device_tv .scene__key {
+  height: 40px;
+  font-size: 18px;
+}
+
+.scene__key_lit {
+  background: var(--color-accent);
+  color: var(--color-on-accent);
+  transform: scale(.94);
+  transition-duration: 40ms;
+}

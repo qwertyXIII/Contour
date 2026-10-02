@@ -1,0 +1,99 @@
+/*
+ * Блок scene: ролик «как подключить» — макет устройства, на котором курсор,
+ * палец или рамка пульта проходят шаги. Устройство нарисовано в своих пикселях
+ * (размеры — переменными от JS, components/guide/stage.js) и вписано в сцену
+ * масштабом: transform на устройстве пишет JS на кадре, как и transform и
+ * прозрачность указателей. Всё, что движется на кадре, — только transform и opacity.
+ *
+ *   <figure class="scene" role="img" aria-label="…">
+ *     <div class="scene__viewport">
+ *       <div class="scene__device scene__device_kind_phone" style="--device-w…">
+ *         <div class="scene__body"></div>
+ *         <div class="scene__screen"> __layers › __layer (+ scene-ui) · __status · __pad · __mark · __ring · __ripple · __pointer </div>
+ *       </div>
+ *       <div class="scene__remote">…</div>   ← пульт телевизора
+ *       <div class="scene__done">…</div>     ← «готово» в конце шага
+ *     </div>
+ *     <p class="scene__caption">Нажми «Wi-Fi»</p>
+ *   </figure>
+ *
+ *   __device_kind_{phone|laptop|tv} · __device_idle (не на сцене — раскладка остаётся для замеров)
+ *   __layer_idle (экран не показан) · __layer_top (поверх соседа в переходе) · __layer_window (окно на рабочем столе)
+ *   __pointer_kind_{finger|cursor} · __pad_kind_{num|abc} · __pad_device_{phone|tv} · __key_lit · __remote-key_lit
+ */
+@import url('./__device/scene__device.css');
+@import url('./__pad/scene__pad.css');
+@import url('./__remote/scene__remote.css');
+@import url('./__pointer/scene__pointer.css');
+
+.scene {
+  --scene-ratio: 4 / 5;
+
+  display: grid;
+  gap: var(--space-2);
+  min-width: 0;
+  margin: 0;
+  container-type: inline-size;
+}
+
+@container (min-width: 480px) {
+  .scene__viewport { --scene-ratio: 5 / 4; }
+}
+
+.scene__viewport {
+  position: relative;
+  overflow: hidden;
+  aspect-ratio: var(--scene-ratio);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-xl);
+  background:
+    radial-gradient(120% 80% at 50% -10%, var(--color-accent-soft), transparent 62%),
+    var(--color-surface);
+  isolation: isolate;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+/* Субтитры: что сейчас делается — крупно, одной-двумя строками, место держится. */
+.scene__caption {
+  min-height: calc(2em * var(--leading-snug));
+  margin: 0;
+  padding-inline: var(--space-2);
+  color: var(--color-text);
+  font-size: var(--text-lead);
+  font-weight: var(--weight-semibold);
+  line-height: var(--leading-snug);
+  text-align: center;
+  text-wrap: balance;
+}
+
+/* «Готово» — сверху сцены, поверх устройства. */
+.scene__done {
+  position: absolute;
+  top: var(--space-4);
+  left: 50%;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  max-width: calc(100% - var(--space-8));
+  padding: var(--space-2) var(--space-4) var(--space-2) var(--space-2);
+  border-radius: var(--radius-full);
+  background: var(--color-bg-elevated);
+  color: var(--color-text);
+  box-shadow: var(--shadow-m);
+  font-size: var(--text-body);
+  font-weight: var(--weight-semibold);
+  white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
+  --icon-size: var(--icon-s);
+}
+
+.scene__done-icon {
+  flex: 0 0 auto;
+  padding: var(--space-1);
+  box-sizing: content-box;
+  border-radius: 50%;
+  background: var(--color-ok);
+  color: var(--color-bg);
+}

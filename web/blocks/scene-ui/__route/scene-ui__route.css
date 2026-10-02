@@ -1,0 +1,56 @@
+/*
+ * scene-ui__route: путь сайта «сайт → правило → выход», как в «Правилах» панели:
+ * __stop (последний — __stop_end) › __stop-dot · __stop-place · __stop-note.
+ */
+.scene-ui__route {
+  display: flex;
+  flex-direction: column;
+}
+
+.scene-ui__stop {
+  position: relative;
+  display: grid;
+  grid-template-columns: 12px minmax(0, 1fr);
+  column-gap: var(--space-2);
+  padding-bottom: var(--space-2);
+}
+
+.scene-ui__stop::before {
+  content: "";
+  position: absolute;
+  top: 12px;
+  bottom: -2px;
+  left: 5px;
+  width: 2px;
+  background: var(--color-accent-line);
+}
+
+.scene-ui__stop_end::before {
+  display: none;
+}
+
+.scene-ui__stop-dot {
+  grid-row: span 2;
+  position: relative;
+  z-index: 1;
+  width: 12px;
+  height: 12px;
+  margin-top: 2px;
+  box-sizing: border-box;
+  border: 2px solid var(--color-accent);
+  border-radius: 50%;
+  background: var(--color-bg-elevated);
+}
+
+.scene-ui__stop_end .scene-ui__stop-dot {
+  background: var(--color-accent);
+}
+
+.scene-ui__stop-place {
+  font-weight: var(--weight-semibold);
+}
+
+.scene-ui__stop-note {
+  color: var(--color-text-muted);
+  font-size: var(--ui-small);
+}

@@ -1,0 +1,47 @@
+/*
+ * Блок guide: раздел «Как подключить» — ролик и шаги. На широком месте рядом:
+ * ролик слева и прилипает при прокрутке, пока читаешь шаги; на узком — ролик
+ * сверху, шаги под ним. Решает ширина места, а не экрана.
+ *
+ *   <div class="guide"><div class="guide__grid">
+ *     <div class="guide__aside"> сцена · плеер </div>
+ *     <div class="guide__steps"> шаги · оговорки </div>
+ *   </div></div>
+ *
+ * Корень — контейнер запроса, сетка — его элемент: запрос смотрит на предка.
+ */
+.guide {
+  --guide-top: calc(var(--space-16) + var(--space-4));
+
+  min-width: 0;
+  container-type: inline-size;
+}
+
+.guide__grid {
+  display: grid;
+  gap: var(--space-5);
+}
+
+.guide__aside {
+  display: grid;
+  align-content: start;
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+.guide__steps {
+  min-width: 0;
+}
+
+@container (min-width: 860px) {
+  .guide__grid {
+    grid-template-columns: minmax(0, 1.12fr) minmax(0, 1fr);
+    align-items: start;
+    gap: var(--space-6);
+  }
+
+  .guide__aside {
+    position: sticky;
+    top: var(--guide-top);
+  }
+}

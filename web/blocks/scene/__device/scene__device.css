@@ -1,0 +1,175 @@
+/*
+ * scene__device: корпус устройства и экран в нём. Размеры — данными от JS
+ * (--device-w/-h, --screen-x/-y/-w/-h): одна таблица в stage.js, без второго
+ * источника чисел здесь. Корпус рисует __body псевдоэлементами.
+ */
+.scene__device {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: var(--device-w);
+  height: var(--device-h);
+  transform-origin: 0 0;
+  will-change: transform, opacity;
+}
+
+/* Не на сцене: невидим, но раскладка остаётся — по ней меряется, куда ехать указателю. */
+.scene__device_idle {
+  visibility: hidden;
+}
+
+.scene__body {
+  position: absolute;
+  inset: 0;
+}
+
+.scene__screen {
+  position: absolute;
+  top: var(--screen-y);
+  left: var(--screen-x);
+  width: var(--screen-w);
+  height: var(--screen-h);
+  overflow: hidden;
+  background: var(--color-bg);
+  isolation: isolate;
+}
+
+.scene__layers {
+  position: absolute;
+  inset: 0;
+  isolation: isolate;
+}
+
+.scene__layer {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--color-bg);
+  will-change: transform, opacity;
+}
+
+.scene__layer_idle {
+  visibility: hidden;
+}
+
+.scene__layer_top {
+  z-index: 1;
+}
+
+/* Окно на рабочем столе: обои видны по краям, окно — само по себе. */
+.scene__layer_window {
+  padding: var(--space-3);
+  background: transparent;
+}
+
+/* ——— Телефон: скруглённый корпус, «островок», строка состояния. */
+
+.scene__device_kind_phone .scene__body {
+  border: 1px solid var(--color-border-strong);
+  border-radius: 40px;
+  background: var(--color-surface-solid);
+  box-shadow: var(--shadow-l);
+}
+
+.scene__device_kind_phone .scene__screen {
+  border-radius: 33px;
+}
+
+.scene__status {
+  position: absolute;
+  top: 0;
+  right: 0;
+  left: 0;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 34px;
+  padding: 2px 22px 0 26px;
+  background: var(--color-bg);
+  color: var(--color-text);
+  font-size: 12px;
+  font-weight: var(--weight-semibold);
+  font-variant-numeric: tabular-nums;
+  pointer-events: none;
+  --icon-size: 12px;
+}
+
+.scene__island {
+  width: 72px;
+  height: 20px;
+  border-radius: var(--radius-full);
+  background: var(--color-media-bg);
+}
+
+.scene__status-icons {
+  display: inline-flex;
+  gap: 3px;
+}
+
+/* ——— Ноутбук: тёмная рамка экрана, обои, корпус клавиатуры снизу. */
+
+.scene__device_kind_laptop .scene__body::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: calc(var(--screen-x) - 12px);
+  width: calc(var(--screen-w) + 24px);
+  height: calc(var(--screen-h) + var(--screen-y) + 12px);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-l) var(--radius-l) var(--radius-xs) var(--radius-xs);
+  background: var(--color-media-bg);
+  box-shadow: var(--shadow-l);
+}
+
+.scene__device_kind_laptop .scene__body::after {
+  content: "";
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  height: calc(var(--device-h) - var(--screen-h) - var(--screen-y) - 12px);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-xs) var(--radius-xs) var(--radius-xl) var(--radius-xl);
+  background: linear-gradient(var(--color-fill-3), var(--color-fill-2));
+}
+
+.scene__device_kind_laptop .scene__screen {
+  border-radius: var(--radius-xs);
+  background:
+    radial-gradient(90% 120% at 15% 0%, var(--color-accent-soft), transparent 60%),
+    radial-gradient(80% 90% at 100% 100%, var(--color-info-soft), transparent 60%),
+    var(--color-bg);
+}
+
+/* ——— Телевизор: тонкая рамка и подставка. */
+
+.scene__device_kind_tv .scene__body::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: var(--device-w);
+  height: calc(var(--screen-h) + var(--screen-y) * 2);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-s);
+  background: var(--color-media-bg);
+  box-shadow: var(--shadow-l);
+}
+
+.scene__device_kind_tv .scene__body::after {
+  content: "";
+  position: absolute;
+  bottom: 0;
+  left: calc(50% - 90px);
+  width: 180px;
+  height: calc(var(--device-h) - var(--screen-h) - var(--screen-y) * 2);
+  border-radius: 0 0 var(--radius-s) var(--radius-s);
+  background: linear-gradient(var(--color-fill-3), var(--color-fill-1));
+  clip-path: polygon(30% 0, 70% 0, 100% 100%, 0 100%);
+}
+
+.scene__device_kind_tv .scene__screen {
+  border-radius: 3px;
+}

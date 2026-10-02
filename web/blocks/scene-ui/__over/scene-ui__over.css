@@ -1,0 +1,65 @@
+/*
+ * Слои поверх экрана макета: __sheet › __dialog (окно «Подробнее», диалог,
+ * «Добавить конфиг»), __toast («Сохранено»). Спрятаны модификатором _off;
+ * появляются переходом прозрачности и сдвига — CSS, одной кривой системы.
+ */
+.scene-ui__sheet {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  display: grid;
+  place-items: center;
+  padding: var(--space-4);
+  background: var(--color-overlay);
+  transition: opacity var(--duration-normal) var(--ease-out);
+}
+
+.scene-ui__sheet_off {
+  opacity: 0;
+}
+
+.scene-ui__dialog {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  width: min(100%, var(--ui-dialog-w, 460px));
+  max-height: 100%;
+  padding: var(--space-4);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-l);
+  background: var(--color-bg-elevated);
+  box-shadow: var(--shadow-l);
+  transition: transform var(--duration-normal) var(--ease-out);
+}
+
+.scene-ui__sheet_off .scene-ui__dialog {
+  transform: translateY(16px) scale(.97);
+}
+
+.scene-ui__toast {
+  position: absolute;
+  bottom: var(--space-4);
+  left: 50%;
+  z-index: 3;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-4);
+  border-radius: var(--radius-full);
+  background: var(--color-bg-elevated);
+  box-shadow: var(--shadow-m);
+  font-weight: var(--weight-semibold);
+  white-space: nowrap;
+  transform: translateX(-50%);
+  transition: opacity var(--duration-normal) ease, transform var(--duration-normal) var(--ease-out);
+  --icon-size: 16px;
+}
+
+.scene-ui__toast_off {
+  opacity: 0;
+  transform: translate(-50%, 12px);
+}
+
+.scene-ui__toast-icon {
+  color: var(--color-ok);
+}

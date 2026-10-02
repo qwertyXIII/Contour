@@ -1,0 +1,41 @@
+/*
+ * Правка списка в строке макета: __minus (красный «−» слева; спрятан — __minus_off)
+ * и __del («Удалить», выезжает справа; спрятан — __del_off).
+ */
+/* «−» правки списка: место держит всегда — строка не прыгает, когда он появляется. */
+.scene-ui__minus {
+  display: grid;
+  flex: 0 0 auto;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--color-danger);
+  color: var(--color-bg);
+  transition: opacity var(--duration-fast) ease, transform var(--duration-normal) var(--ease-out);
+  --icon-size: 14px;
+}
+
+.scene-ui__minus_off {
+  opacity: 0;
+  transform: scale(.3);
+}
+
+.scene-ui__del {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  display: grid;
+  place-items: center;
+  padding: 0 var(--space-4);
+  background: var(--color-danger);
+  color: var(--color-bg);
+  font-weight: var(--weight-semibold);
+  transition: transform var(--duration-normal) var(--ease-out), opacity var(--duration-fast) ease;
+}
+
+.scene-ui__del_off {
+  opacity: 0;
+  transform: translateX(100%);
+}

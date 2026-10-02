@@ -1,0 +1,158 @@
+/*
+ * Содержимое макета: __badge (_tone_{ok|warn|accent|muted}), __tiles › __tile
+ * (главный экран телевизора), __video (абстрактная плитка видео, полоса — доля
+ * от JS), __qr (узор «как QR»), __cam (видоискатель сканера, линия — доля от JS),
+ * __route (путь сайта: сайт → правило → выход), __term (терминал: __lines, __line_{cmd|out|input}, __prompt).
+ */
+.scene-ui__badge {
+  display: inline-flex;
+  align-items: center;
+  align-self: flex-start;
+  gap: 6px;
+  padding: 3px var(--space-2);
+  border-radius: var(--radius-full);
+  background: var(--color-fill-2);
+  color: var(--color-text-muted);
+  font-size: var(--ui-small);
+  font-weight: var(--weight-semibold);
+  white-space: nowrap;
+}
+
+.scene-ui__badge_tone_ok { background: var(--color-ok-soft); color: var(--color-ok); }
+.scene-ui__badge_tone_warn { background: var(--color-warn-soft); color: var(--color-warn); }
+.scene-ui__badge_tone_accent { background: var(--color-accent-soft); color: var(--color-accent-text); }
+
+.scene-ui__dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.scene-ui__tiles {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: var(--space-3);
+}
+
+.scene-ui__tile {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.scene-ui__tile-art {
+  display: grid;
+  place-items: center;
+  aspect-ratio: 4 / 3;
+  border-radius: var(--radius-m);
+  background: var(--color-fill-2);
+  color: var(--color-text-muted);
+  --icon-size: 28px;
+}
+
+.scene-ui__tile-text {
+  color: var(--color-text-muted);
+  font-size: var(--ui-small);
+  text-align: center;
+}
+
+.scene-ui__video {
+  position: relative;
+  display: grid;
+  flex: 1 1 auto;
+  place-items: center;
+  min-height: 0;
+  overflow: hidden;
+  border-radius: var(--ui-radius);
+  background:
+    radial-gradient(70% 90% at 25% 25%, var(--color-accent-soft), transparent 65%),
+    radial-gradient(60% 80% at 85% 80%, var(--color-info-soft), transparent 60%),
+    var(--color-fill-1);
+}
+
+.scene-ui__play {
+  display: grid;
+  place-items: center;
+  width: 58px;
+  height: 58px;
+  border-radius: 50%;
+  background: var(--color-media-shade);
+  color: var(--color-on-media);
+  --icon-size: 26px;
+}
+
+.scene-ui__video-text {
+  position: absolute;
+  top: var(--space-3);
+  left: var(--space-4);
+  font-weight: var(--weight-semibold);
+}
+
+.scene-ui__progress {
+  position: absolute;
+  right: var(--space-4);
+  bottom: var(--space-3);
+  left: var(--space-4);
+  height: 4px;
+  overflow: hidden;
+  border-radius: var(--radius-full);
+  background: var(--color-fill-3);
+}
+
+.scene-ui__progress-bar {
+  display: block;
+  height: 100%;
+  background: var(--color-accent);
+  transform: scaleX(0);
+  transform-origin: left;
+}
+
+/* Узор для сканирования — тёмный на белом в любой теме, как у блока qr панели. */
+.scene-ui__qr {
+  display: grid;
+  flex: 0 0 auto;
+  place-items: center;
+  padding: 6px;
+  border-radius: var(--radius-s);
+  background: var(--color-on-media);
+}
+
+.scene-ui__qr-code {
+  display: block;
+  width: 116px;
+  height: 116px;
+  fill: var(--color-media-bg);
+  shape-rendering: crispEdges;
+}
+
+.scene-ui__cam {
+  display: grid;
+  flex: 1 1 auto;
+  place-items: center;
+  min-height: 300px;
+}
+
+.scene-ui__frame {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 176px;
+  height: 176px;
+  border: 3px solid var(--color-on-media);
+  border-radius: var(--radius-l);
+  container-type: size;
+}
+
+.scene-ui__scanline {
+  position: absolute;
+  top: 0;
+  right: 6%;
+  left: 6%;
+  height: 2px;
+  border-radius: 1px;
+  background: var(--color-accent);
+  box-shadow: 0 0 12px var(--color-accent);
+  will-change: transform;
+}

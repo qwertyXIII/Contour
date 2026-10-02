@@ -1,0 +1,101 @@
+/*
+ * scene-ui__field: поле ввода макета — __label · __box › __value __caret __hint.
+ * Облик поля (рамка, выравнивание, подсветка фокуса) — переменные облика
+ * --ui-box-*, --ui-label-w: у iOS значение справа без рамки, у окон — поле в рамке.
+ *
+ *   __field_typing — каретка и фокус · __field_stacked — подпись над полем ·
+ *   __field_bare — без подписи · __box_multi — многострочное
+ */
+/* Подписи полей одной ширины в окнах — поля встают ровной колонкой, как в форме. */
+.scene-ui__field .scene-ui__label {
+  flex: 0 0 var(--ui-label-w, auto);
+  max-width: 55%;
+}
+
+.scene-ui__box {
+  position: relative;
+  display: flex;
+  flex: 1 1 auto;
+  align-items: center;
+  justify-content: var(--ui-box-justify, flex-end);
+  min-width: 0;
+  min-height: 26px;
+  padding: var(--ui-box-pad, 0);
+  border: var(--ui-box-border, 0 solid transparent);
+  border-radius: var(--radius-xs);
+  background: var(--ui-box-bg, transparent);
+  font-variant-numeric: tabular-nums;
+  transition: border-color var(--duration-fast) ease, box-shadow var(--duration-fast) ease;
+}
+
+.scene-ui__box .scene-ui__value {
+  color: var(--color-text);
+}
+
+.scene-ui__hint {
+  overflow: hidden;
+  color: var(--color-text-faint);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.scene-ui__value:not(:empty) ~ .scene-ui__hint {
+  display: none;
+}
+
+.scene-ui__caret {
+  flex: 0 0 auto;
+  width: 2px;
+  height: 1.15em;
+  margin-inline: 1px;
+  border-radius: 1px;
+  background: var(--color-accent);
+  opacity: 0;
+}
+
+.scene-ui__field_typing .scene-ui__caret {
+  opacity: 1;
+}
+
+.scene-ui__field_typing .scene-ui__box {
+  border-color: var(--color-accent);
+  box-shadow: var(--ui-box-focus, none);
+}
+
+/* Поле без подписи (новый адрес в списке) — значение с начала строки. */
+.scene-ui__field_bare .scene-ui__box {
+  justify-content: flex-start;
+}
+
+.scene-ui__field_stacked {
+  flex-direction: column;
+  align-items: stretch;
+  gap: var(--space-1);
+  padding-block: var(--space-2);
+}
+
+.scene-ui__field_stacked .scene-ui__label {
+  flex: none;
+  max-width: none;
+  color: var(--color-text-muted);
+  font-size: var(--ui-small);
+}
+
+/* Многострочное (правило со своим разделом): текст и каретка — строкой, как в поле. */
+.scene-ui__box_multi {
+  display: block;
+  min-height: 64px;
+  padding-block: var(--space-2);
+  font-family: var(--font-mono);
+  font-size: var(--ui-small);
+  line-height: 1.5;
+}
+
+.scene-ui__box_multi .scene-ui__value {
+  white-space: pre-wrap;
+}
+
+.scene-ui__box_multi .scene-ui__caret {
+  display: inline-block;
+  vertical-align: text-bottom;
+}

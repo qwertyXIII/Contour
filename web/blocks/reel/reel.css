@@ -1,0 +1,118 @@
+/*
+ * Блок reel: плеер ролика и шаги, которые он ведёт. Полоса шагов — по отрезку
+ * на шаг (доля идущего — transform от JS, components/guide/player.js), кнопки —
+ * блоки button системы. Шаг в списке — микс с card: идёт — подсвечен.
+ *
+ *   <div class="reel" role="group">
+ *     <p class="reel__now"> <span class="reel__count">Шаг 1 из 3</span> <span class="reel__title">…</span> </p>
+ *     <div class="reel__track"> <button class="reel__seg"><span class="reel__fill"></span></button> … </div>
+ *     <div class="reel__bar"> «сначала» · «назад» · «смотреть / пауза» · «вперёд» </div>
+ *   </div>
+ *   <article class="card reel__step [reel__step_current]"> <button class="reel__goto">…</button> … </article>
+ */
+.reel {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.reel__track {
+  display: flex;
+  gap: var(--space-1);
+}
+
+/* Отрезок шага: тонкая полоса, а нажимать — по всей высоте строки. */
+.reel__seg {
+  position: relative;
+  flex: 1 1 0;
+  height: 20px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-xs);
+  background: none;
+  cursor: pointer;
+}
+
+.reel__seg::before,
+.reel__fill {
+  content: "";
+  position: absolute;
+  top: calc(50% - 2px);
+  right: 0;
+  left: 0;
+  height: 4px;
+  border-radius: var(--radius-full);
+}
+
+.reel__seg::before {
+  background: var(--color-fill-2);
+}
+
+.reel__fill {
+  background: var(--color-accent);
+  transform: scaleX(0);
+  transform-origin: left;
+}
+
+.reel__seg:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 2px;
+}
+
+.reel__bar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+}
+
+/* «Шаг 2 из 4 · Впиши DNS» — одной строкой над полосой, длинное — многоточием. */
+.reel__now {
+  display: flex;
+  gap: var(--space-2);
+  min-width: 0;
+  margin: 0;
+  font-size: var(--text-small);
+  white-space: nowrap;
+}
+
+.reel__count {
+  flex: 0 0 auto;
+  color: var(--color-text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.reel__title {
+  min-width: 0;
+  overflow: hidden;
+  font-weight: var(--weight-semibold);
+  text-overflow: ellipsis;
+}
+
+.reel__step {
+  cursor: pointer;
+  transition: border-color var(--duration-fast) ease, background-color var(--duration-fast) ease;
+}
+
+.reel__step_current {
+  --card-border: var(--color-accent-line);
+  --card-bg: var(--color-accent-soft);
+  --card-bg-hover: var(--color-accent-soft);
+}
+
+.reel__goto {
+  display: block;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-s);
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: start;
+  cursor: pointer;
+}
+
+.reel__goto:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 4px;
+}

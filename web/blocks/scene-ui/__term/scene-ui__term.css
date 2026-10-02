@@ -1,0 +1,51 @@
+/*
+ * scene-ui__term: терминал — __lines (история: __line_cmd, __line_out) и строка
+ * ввода __line_input › __prompt · __value · __caret (брусок, стоит всегда).
+ */
+.scene-ui__term {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-family: var(--font-mono);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.scene-ui__line_cmd {
+  color: var(--color-text);
+}
+
+.scene-ui__lines {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.scene-ui__line {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.scene-ui__line_out {
+  color: var(--color-text-muted);
+}
+
+.scene-ui__line_input .scene-ui__value {
+  color: var(--color-text);
+  white-space: pre-wrap;
+}
+
+.scene-ui__prompt {
+  margin-right: 0.6em;
+  color: var(--color-ok);
+}
+
+/* Курсор терминала — брусок, стоит всегда: так терминал и выглядит. */
+.scene-ui__term .scene-ui__caret {
+  display: inline-block;
+  width: 0.6em;
+  height: 1.15em;
+  vertical-align: text-bottom;
+  border-radius: 0;
+  opacity: .8;
+}
