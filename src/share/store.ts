@@ -12,10 +12,13 @@ import { normalizeSite } from '../dns/overrides.ts';
  * - `uuid` — его ключ VLESS (вход края, `edge.ts`) и пароль, с которым край
  *   ходит за него в HTTP-прокси Contour (`share.<id>`): одна тайна на одно
  *   устройство, обе стороны — на этой машине;
- * - `exits` — ещё по ключу на каждую страну выхода (`share.countries`): второй
- *   сервер в Shadowrocket, «Contour-RU». Всё, что телефон шлёт на него, Contour
- *   выпускает в этой стране — так решил владелец (2026-10-02): уехал за границу —
- *   переключил «Россию» на этот сервер, и Госуслуги видят российский адрес;
+ * - `countries` — страны выходов, открытые этому телефону (панель; у нового —
+ *   никаких: другу не уходит домашний адрес без спроса, владелец 2026-10-02);
+ *   на каждую — свой сервер в Shadowrocket («Contour-RU», «Contour-DE»): всё,
+ *   что телефон шлёт на него, Contour выпускает в этой стране;
+ * - `exits` — ключи этих серверов, по стране. Появляется при первом включении
+ *   страны и не пропадает при выключении: включил снова — сервер в телефоне
+ *   тот же;
  * - `list` — отдельный токен ссылки на правила: адрес ссылки попадает в журнал
  *   nginx и в настройки Shadowrocket, а ключ VLESS туда попадать не должен;
  * - `id` — имя устройства для края и счётчиков, без тайны.
@@ -25,7 +28,7 @@ import { normalizeSite } from '../dns/overrides.ts';
  * этой страны» (банки и прочее, чего нет в общем списке).
  */
 
-export type ShareDevice = { id: string; name: string; uuid: string; exits: Record<string, string>; list: string; enabled: boolean; created: number };
+export type ShareDevice = { id: string; name: string; uuid: string; countries: string[]; exits: Record<string, string>; list: string; enabled: boolean; created: number };
 export type ShareSettings = { domain: string | null; path: string; countrySites: Record<string, string[]> };
 
 type File = { settings: ShareSettings; devices: ShareDevice[] };
@@ -35,23 +38,31 @@ export const SHARE_PREFIX = 'share.';
 export const shareWho = (id: string): string => `${SHARE_PREFIX}${id}`;
 
 const MAX_DEVICES = 50;
+const COUNTRY = /^[A-Z]{2}$/;
 const MAX_SITES = 500;
 
 function fresh(): File {
   return { settings: { domain: null, path: `/s-${randomBytes(12).toString('hex')}`, countrySites: {} }, devices: [] };
 }
 
-const copy = (d: ShareDevice): ShareDevice => ({ ...d, exits: { ...d.exits } });
+const copy = (d: ShareDevice): ShareDevice => ({ ...d, countries: [...d.countries], exits: { ...d.exits } });
+
+function checkCountry(code: string): void {
+  if (!COUNTRY.test(code)) throw new Error('страна — две латинские буквы, например NL');
+}
+
+/** Страны устройства, которые сервер раздаёт (`share.countries` сужает; null — все). */
+export function deviceCountries(d: ShareDevice, allowed: readonly string[] | null): string[] {
+  return d.countries.filter((c) => d.exits[c] && (!allowed || allowed.includes(c)));
+}
 
 export class ShareStore {
   private readonly file: string;
-  private readonly countries: string[];
   private data: File;
   private readonly listeners: Array<() => void> = [];
 
-  constructor(dir: string, countries: string[] = []) {
+  constructor(dir: string) {
     this.file = path.join(dir, 'share.json');
-    this.countries = countries;
     let loaded: File | null = null;
     try {
       loaded = JSON.parse(readFileSync(this.file, 'utf8')) as File;
@@ -85,7 +96,7 @@ export class ShareStore {
 
   /** Свой сайт «только с адресом страны»: добавить (`on`) или убрать. */
   setCountrySite(country: string, name: string, on: boolean): string[] {
-    if (!this.countries.includes(country)) throw new Error(`страны ${country} нет в share.countries`);
+    checkCountry(country);
     const site = normalizeSite(name);
     const list = new Set(this.data.settings.countrySites[country] ?? []);
     if (on && list.size >= MAX_SITES) throw new Error(`сайтов уже ${MAX_SITES}`);
@@ -101,8 +112,7 @@ export class ShareStore {
     if (this.data.devices.length >= MAX_DEVICES) throw new Error(`устройств уже ${MAX_DEVICES}`);
     let id = randomBytes(4).toString('hex');
     while (this.data.devices.some((d) => d.id === id)) id = randomBytes(4).toString('hex');
-    const exits = Object.fromEntries(this.countries.map((c) => [c, randomUUID()]));
-    const device: ShareDevice = { id, name: clean, uuid: randomUUID(), exits, list: randomBytes(24).toString('base64url'), enabled: true, created: Date.now() };
+    const device: ShareDevice = { id, name: clean, uuid: randomUUID(), countries: [], exits: {}, list: randomBytes(24).toString('base64url'), enabled: true, created: Date.now() };
     this.data.devices.push(device);
     this.commit();
     return copy(device);
@@ -116,10 +126,18 @@ export class ShareStore {
   }
 
   setEnabled(id: string, enabled: boolean): void {
-    const d = this.data.devices.find((x) => x.id === id);
-    if (!d) throw new Error('такого устройства нет');
-    d.enabled = enabled;
+    this.find(id).enabled = enabled;
     this.commit();
+  }
+
+  /** Открыть телефону страну выхода (`on`) или закрыть; ключ её сервера — при первом открытии. */
+  setCountry(id: string, code: string, on: boolean): ShareDevice {
+    checkCountry(code);
+    const d = this.find(id);
+    if (on && !d.exits[code]) d.exits[code] = randomUUID();
+    d.countries = on ? [...new Set([...d.countries, code])].sort() : d.countries.filter((c) => c !== code);
+    this.commit();
+    return copy(d);
   }
 
   /** Включённое устройство по токену ссылки на правила, сравнение — без утечки по времени. */
@@ -137,15 +155,23 @@ export class ShareStore {
     return new Map(this.data.devices.filter((d) => d.enabled).map((d) => [shareWho(d.id), Buffer.from(d.uuid)]));
   }
 
-  /** Недостающее у прежнего файла: свои сайты стран, ключи стран у устройств. */
+  private find(id: string): ShareDevice {
+    const d = this.data.devices.find((x) => x.id === id);
+    if (!d) throw new Error('такого устройства нет');
+    return d;
+  }
+
+  /**
+   * Недостающее у прежнего файла: свои сайты стран, ключи стран. Открытые
+   * страны прежнего файла — те, ключи которых уже выданы: телефон, которому
+   * выдали «Contour-RU», его не теряет.
+   */
   private upgrade(): boolean {
     let changed = false;
     if (!this.data.settings.countrySites) { this.data.settings.countrySites = {}; changed = true; }
     for (const d of this.data.devices) {
       if (!d.exits) { d.exits = {}; changed = true; }
-      for (const c of this.countries) {
-        if (!d.exits[c]) { d.exits[c] = randomUUID(); changed = true; }
-      }
+      if (!d.countries) { d.countries = Object.keys(d.exits).sort(); changed = true; }
     }
     return changed;
   }

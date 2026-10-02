@@ -182,12 +182,13 @@ function prepareMihomo(oc: OutletConfig, port: number, prepared: Prepared): void
   prepared.lines.push(`выход «${oc.name}» (mihomo): ${what} → SOCKS :${port}`);
 }
 
+/**
+ * Прямой выход «по просьбе» — только когда есть туннели. Нет ни одного (сервер
+ * друга в Нидерландах, где ничего не заблокировано), — он сам основной: иначе
+ * без просьбы страны соединению некуда идти (владелец, 2026-10-02).
+ */
 export function prepareOutlets(config: Config): Prepared {
   const prepared: Prepared = { outlets: [], mihomo: [], lines: [] };
-  if (config.direct.enabled) {
-    prepared.outlets.push(directOutlet(config.direct));
-    prepared.lines.push(`выход «${config.direct.name}» — прямой, интернет сервера${config.direct.onRequest ? ', только когда просят его страну' : ''}`);
-  }
   for (const oc of config.outlets) {
     if (!oc.enabled) continue;
     try {
@@ -196,6 +197,11 @@ export function prepareOutlets(config: Config): Prepared {
     } catch (error) {
       throw new Error(`выход «${oc.name}»: ${(error as Error).message}`);
     }
+  }
+  if (config.direct.enabled) {
+    const onRequest = config.direct.onRequest && prepared.outlets.length > 0;
+    prepared.outlets.unshift(directOutlet({ ...config.direct, onRequest }));
+    prepared.lines.unshift(`выход «${config.direct.name}» — прямой, интернет сервера${onRequest ? ', только когда просят его страну' : config.direct.onRequest ? ', основной: туннелей нет' : ''}`);
   }
   return prepared;
 }

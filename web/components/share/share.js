@@ -1,11 +1,12 @@
 // Раздача: телефоны, которые ходят через Contour из любой сети (Shadowrocket).
-// Решает телефон: заблокированное — через дом и VPN, остальное — напрямую; уехал —
-// российское через дом с российским адресом (сервер «Contour-RU»). Здесь — что
-// работает (плитки), адрес снаружи и маршрут nginx, телефоны, сайты «только с
-// российским адресом». Разметка собирается один раз; опрос меняет только значения.
+// Решает телефон: заблокированное — через Contour и его выходы, остальное —
+// напрямую; уехал — сайты страны через выход в этой стране (сервер «Contour-XX»,
+// стране его открывают в карточке телефона). Здесь — что работает (плитки),
+// телефоны, страны выходов, адрес снаружи и маршрут nginx. Разметка собирается
+// один раз; опрос меняет только значения.
 import { api, toast } from '../../utils/api.js';
 import { API, TIMING } from '../../utils/constants.js';
-import { button, empty, group, h } from '../../utils/dom.js';
+import { button, empty, group, h, svgIcon } from '../../utils/dom.js';
 import { bytes } from '../../utils/format.js';
 import { cardList, Keyed, setHidden, setText } from '../../utils/view.js';
 import { confirmDialog } from '../outlets/confirm.js';
@@ -31,6 +32,7 @@ export class Share {
   #devicesNote;
   #countries;
   #countryBox;
+  #countryGroup;
   #off;
   #body;
   #connect;
@@ -55,7 +57,7 @@ export class Share {
     this.#tiles.edge = tileView('Вход', 'shield-check');
     this.#tiles.phones = tileView('Телефоны', 'phone');
     this.#tiles.today = tileView('Сегодня', 'activity');
-    this.#tiles.ru = tileView('Россия', 'home');
+    this.#tiles.countries = tileView('Страны', 'globe');
     return h('div', { class: 'tiles' }, ...Object.values(this.#tiles).map((t) => t.el));
   }
 
@@ -73,7 +75,12 @@ export class Share {
   #countriesView() {
     this.#countryBox = h('div', { class: 'stack stack_gap_l' });
     this.#countries = new Keyed(this.#countryBox, (c) => c.code, (c) => countryCard(c.code));
-    return group('Только с российским адресом', 'для поездок — сервер «Contour-RU»: Госуслуги и банки не пускают заграничные адреса', this.#countryBox);
+    // Памятка для поездок — одна на раздел: в каждой стране она одинаковая.
+    const tip = h('div', { class: 'callout callout_tone_info' }, svgIcon('plane', 'callout__icon'), h('div', { class: 'callout__body' },
+      h('p', { class: 'callout__title', text: 'Уехал из страны' }),
+      h('p', { class: 'callout__text', text: 'В Shadowrocket на главной, в группе страны, выбери её сервер (Contour-RU, Contour-DE) — её сайты пойдут с её адресом. Вернулся — DIRECT. Заблокированное в обоих случаях идёт через Contour.' })));
+    this.#countryGroup = group('Выход в другой стране', 'страны выходов Contour: у каждой свой сервер в телефоне — местные банки и госсервисы не пускают чужие адреса', this.#countryBox, tip);
+    return this.#countryGroup;
   }
 
   #domainView() {
@@ -91,6 +98,8 @@ export class Share {
     this.#root.addEventListener('change', (e) => {
       const t = e.target.closest('input[data-share-act="enable"]');
       if (t) void this.#enable(t.dataset.id, t.dataset.name, t.checked);
+      const c = e.target.closest('input[data-share-act="country"]');
+      if (c) void this.#country(c.dataset, c.checked);
     });
     this.#root.addEventListener('menu:select', (e) => {
       const card = e.target.closest('article[data-id]');
@@ -122,6 +131,11 @@ export class Share {
     await this.#post(`${API.shareDevice(id)}/enable`, { enabled: on }, on ? `«${name}» снова ходит через дом` : `«${name}» выключен — через дом больше не ходит`);
   }
 
+  #country({ id, name, code, title }, on) {
+    const done = on ? `«${name}»: ${title} открыта — обнови подписку в Shadowrocket` : `«${name}»: ${title} закрыта`;
+    return this.#post(`${API.shareDevice(id)}/countries/${encodeURIComponent(code)}`, { on }, done);
+  }
+
   async #remove(id, name) {
     if (!(await confirmDialog(`Удалить «${name}»?`, 'Его ключи перестанут работать сразу. Вернуть нельзя — только добавить заново и подключить снова.', 'Удалить'))) return;
     try {
@@ -134,7 +148,7 @@ export class Share {
   }
 
   #site(code, name, on) {
-    return this.#post(API.shareCountrySites(code), { name, on }, on ? `«${name}» — только с российским адресом` : `«${name}» убран из списка`);
+    return this.#post(API.shareCountrySites(code), { name, on }, on ? `«${name}» — в группе страны ${code}` : `«${name}» убран из списка`);
   }
 
   async #post(path, body, done) {
@@ -170,14 +184,14 @@ export class Share {
     const on = d.devices.filter((x) => x.enabled);
     const now = d.devices.filter((x) => x.enabled && x.rate.down + x.rate.up > 0);
     const today = d.devices.reduce((s, x) => s + x.today.down + x.today.up, 0);
-    const ru = d.countries[0];
+    const alive = d.countries.filter((c) => c.exit?.alive);
     this.#tiles.edge.set(d.running ? 'работает' : on.length > 0 ? 'поднимается' : 'спит', d.domain ?? 'адрес не задан', d.running);
     this.#tiles.phones.set(String(d.devices.length), now.length > 0 ? `сейчас ходят: ${now.length}` : `включено: ${on.length}`);
-    this.#tiles.today.set(bytes(today), 'через дом, TCP');
-    if (ru) this.#tiles.ru.set(ru.exit?.alive ? 'есть' : 'нет', ru.exit ? `выход ${ru.exit.name}${ru.exit.direct ? ', прямой' : ''}` : 'выхода в России нет', Boolean(ru.exit?.alive));
-    setHidden(this.#tiles.ru.el, !ru);
-    setText(this.#devicesNote, 'у каждого свои ключи: выключил один — остальные работают');
-    this.#devices.render(d.devices);
+    this.#tiles.today.set(bytes(today), 'через Contour, TCP');
+    this.#tiles.countries.set(String(alive.length), d.countries.length > 0 ? d.countries.map((c) => c.title).join(', ') : 'страна выходов ещё не известна', alive.length > 0);
+    setText(this.#devicesNote, 'у каждого свои ключи и свои страны: выключил один — остальные работают');
+    this.#devices.render(d.devices.map((x) => ({ ...x, all: d.countries })));
     this.#countries.render(d.countries);
+    setHidden(this.#countryGroup, d.countries.length === 0);
   }
 }

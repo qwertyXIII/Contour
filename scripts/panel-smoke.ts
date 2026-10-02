@@ -13,7 +13,7 @@ import { createPanel } from '../src/panel/server.ts';
 import { Sites } from '../src/panel/sites.ts';
 import type { SpeedResult } from '../src/panel/speedtest.ts';
 import { PanelState } from '../src/panel/state.ts';
-import type { Share } from '../src/share/index.ts';
+import { outletCountries, type Share } from '../src/share/index.ts';
 import { ShareRules } from '../src/share/rules.ts';
 import { ShareStore } from '../src/share/store.ts';
 import { Meter } from '../src/stats/meter.ts';
@@ -63,17 +63,17 @@ setInterval(() => {
 
 // Раздача: два телефона, один ходит; края в проверке нет — «работает» подставлено.
 const shareDir = path.join(dir, 'share');
-const shareStore = new ShareStore(shareDir, ['RU']);
+const shareStore = new ShareStore(shareDir);
 shareStore.setDomain('contour.example.ru');
-const iphone = shareStore.add('iPhone Димы');
+const iphone = shareStore.setCountry(shareStore.add('iPhone Димы').id, 'RU', true);
 shareStore.add('iPad');
 shareStore.setCountrySite('RU', 'alfabank.ru', true);
 shareStore.setCountrySite('RU', 'sberbank.ru', true);
 writeFileSync(path.join(shareDir, 'country-ru.lst'), 'gosuslugi.ru\nnalog.ru\nozon.ru\nrzd.ru\n');
 setInterval(() => meter.add(`share.${iphone.id}`, 'ext', 'instagram.com', 3_000, 400_000), 200).unref();
-const shareRules = new ShareRules({ sites: new Sites({ dnsDir: dir, own: DEFAULTS.lan.domains }), dnsDir: dir, skip: [], store: shareStore, countries: ['RU'], dir: shareDir, log });
+const shareRules = new ShareRules({ sites: new Sites({ dnsDir: dir, own: DEFAULTS.lan.domains }), dnsDir: dir, skip: [], store: shareStore, dir: shareDir, log });
 shareRules.start();
-const share = { store: shareStore, edge: { running: () => true }, rules: shareRules, outlets, ports: { edge: 18300, list: 18091 }, stop: async () => {} } as unknown as Share;
+const share = { store: shareStore, edge: { running: () => true }, rules: shareRules, outlets, ports: { edge: 18300, list: 18091 }, allowed: null, countries: () => outletCountries(outlets, null), stop: async () => {} } as unknown as Share;
 
 const config = { ...DEFAULTS, lan: { ...DEFAULTS.lan, enabled: true } };
 const speeds = new Map<string, SpeedResult>();

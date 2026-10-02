@@ -1,8 +1,9 @@
 import type { Router } from 'express';
 import { z } from 'zod';
 import { shareLinks } from '../share/links.ts';
-import { countryGroup, countryNode } from '../share/rules.ts';
-import { shareWho } from '../share/store.ts';
+import type { Share } from '../share/index.ts';
+import { countryGroup, countryNode, countryTitle } from '../share/rules.ts';
+import { deviceCountries, shareWho } from '../share/store.ts';
 import { fail, parse } from './respond.ts';
 import type { RoutesDeps } from './routes.ts';
 
@@ -21,10 +22,32 @@ const schemas = {
   settings: z.object({ domain: z.string().max(253) }),
   device: z.object({ name: z.string().min(1, 'нужно имя').max(40) }),
   enable: z.object({ enabled: z.boolean() }),
+  country: z.object({ on: z.boolean() }),
   site: z.object({ name: z.string().min(3).max(253), on: z.boolean() }),
 };
 
 const ZERO = { up: 0, down: 0 };
+
+/**
+ * Страны для панели: где есть выход, и те, что уже открыты телефонам (выход
+ * пропал — страну всё равно видно, и её можно закрыть). У каждой — чем
+ * выпускать (живой выход этой страны: прямой или туннель) и сколько сайтов в
+ * её списке.
+ */
+function countriesView(share: Share): unknown[] {
+  const devices = share.store.devices().map((x) => ({ name: x.name, countries: deviceCountries(x, share.allowed) }));
+  const codes = [...new Set([...share.countries(), ...devices.flatMap((x) => x.countries)])].sort();
+  return codes.map((code) => {
+    const exit = share.outlets.filter((o) => o.country === code && o.state !== 'standby')
+      .sort((a, b) => Number(b.state === 'alive') - Number(a.state === 'alive') || a.priority - b.priority)[0];
+    const list = share.rules.countryNames(code);
+    return {
+      code, title: countryTitle(code), group: countryGroup(code), node: countryNode(code),
+      exit: exit ? { name: exit.name, direct: exit.direct, alive: exit.state === 'alive', ip: exit.externalIp } : null,
+      phones: devices.filter((x) => x.countries.includes(code)).map((x) => x.name), common: list.common, own: list.own,
+    };
+  });
+}
 
 export function shareRoutes(router: Router, d: RoutesDeps): void {
   const off = (res: Parameters<typeof fail>[0]): boolean => {
@@ -41,15 +64,12 @@ export function shareRoutes(router: Router, d: RoutesDeps): void {
     const seen = d.meter.lastSeen();
     const devices = store.devices().map((x) => {
       const who = shareWho(x.id);
-      return { id: x.id, name: x.name, enabled: x.enabled, created: x.created, today: today[who] ?? ZERO, rate: rates[who] ?? ZERO, lastSeen: seen[who] ?? null };
+      return {
+        id: x.id, name: x.name, enabled: x.enabled, created: x.created, countries: deviceCountries(x, d.share!.allowed),
+        today: today[who] ?? ZERO, rate: rates[who] ?? ZERO, lastSeen: seen[who] ?? null,
+      };
     });
-    // Страны: чем выпускать (живой выход этой страны — прямой дома или туннель) и сколько сайтов в списке.
-    const countries = d.share.rules.countries.map((code) => {
-      const exit = d.share!.outlets.filter((o) => o.country === code && o.state !== 'standby').sort((a, b) => Number(b.state === 'alive') - Number(a.state === 'alive') || a.priority - b.priority)[0];
-      const list = d.share!.rules.countryNames(code);
-      return { code, group: countryGroup(code), node: countryNode(code), exit: exit ? { name: exit.name, direct: exit.direct, alive: exit.state === 'alive', ip: exit.externalIp } : null, common: list.common, own: list.own };
-    });
-    res.json({ ok: true, data: { enabled: true, running: edge.running(), domain: store.settings().domain, ports, devices, countries } });
+    res.json({ ok: true, data: { enabled: true, running: edge.running(), domain: store.settings().domain, ports, devices, countries: countriesView(d.share) } });
   });
 
   router.post('/share/countries/:code/sites', (req, res) => {
@@ -97,7 +117,7 @@ export function shareRoutes(router: Router, d: RoutesDeps): void {
     const { store } = d.share!;
     const x = store.devices().find((v) => v.id === id.data);
     if (!x) { fail(res, 404, 'NOT_FOUND', 'такого устройства нет'); return; }
-    const links = shareLinks(x, store.settings());
+    const links = shareLinks(x, store.settings(), d.share!.allowed);
     if (!links) { fail(res, 409, 'NO_DOMAIN', 'сначала задай адрес снаружи — без него телефону некуда подключаться'); return; }
     res.json({ ok: true, data: { name: x.name, ...links } });
   });
@@ -111,6 +131,23 @@ export function shareRoutes(router: Router, d: RoutesDeps): void {
       d.share!.store.setEnabled(id.data, b.enabled);
       d.log.info(`панель: раздача — устройство ${id.data} ${b.enabled ? 'включено' : 'выключено'}`);
       res.json({ ok: true, data: null });
+    } catch (error) {
+      fail(res, 404, 'NOT_FOUND', (error as Error).message);
+    }
+  });
+
+  // Открыть телефону страну можно, только где есть выход; закрыть — любую.
+  router.post('/share/devices/:id/countries/:code', (req, res) => {
+    const id = ID.safeParse(req.params.id);
+    const code = CODE.safeParse(String(req.params.code).toUpperCase());
+    const b = parse(schemas.country, req, res);
+    if (!b || off(res)) return;
+    if (!id.success || !code.success) { fail(res, 400, 'VALIDATION', 'неверное устройство или страна'); return; }
+    if (b.on && !d.share!.countries().includes(code.data)) { fail(res, 409, 'NO_EXIT', `выхода в стране ${countryTitle(code.data)} нет — открыть её некуда`); return; }
+    try {
+      const x = d.share!.store.setCountry(id.data, code.data, b.on);
+      d.log.info(`панель: раздача — «${x.name}» ${b.on ? 'открыта' : 'закрыта'} страна ${code.data}`);
+      res.json({ ok: true, data: { countries: deviceCountries(x, d.share!.allowed) } });
     } catch (error) {
       fail(res, 404, 'NOT_FOUND', (error as Error).message);
     }

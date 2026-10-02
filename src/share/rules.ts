@@ -65,8 +65,12 @@ export function domainSetText(names: string[], what = 'сайты через VPN
 /** Узел Shadowrocket для обычного выхода — имя из ссылки сервера (`links.ts`); правила зовут его по имени. */
 export const SHARE_NODE = 'Contour';
 export const countryNode = (code: string): string => `${SHARE_NODE}-${code}`;
-/** Группа на главной Shadowrocket: «дома — напрямую, уехал — через выход в стране». */
-export const countryGroup = (code: string): string => (code === 'RU' ? 'Россия' : code);
+
+const REGIONS = new Intl.DisplayNames(['ru'], { type: 'region' });
+/** Страна по-русски: «Россия», «Германия»; запятая и «=» — разделители конфига, их нет в имени. */
+export const countryTitle = (code: string): string => (REGIONS.of(code) ?? code).replace(/[,=]/g, ' ');
+/** Группа на главной Shadowrocket — названием страны: «там — напрямую, уехал — через выход в стране». */
+export const countryGroup = countryTitle;
 
 export type ConfInput = {
   /** `https://contour.example.ru/list/<токен>` — без «/» в конце. */
@@ -74,8 +78,8 @@ export type ConfInput = {
   device: string;
   direct: string[];
   nets: string[];
-  /** Страны выхода (`share.countries`): своя группа и свой список на каждую. */
-  countries: string[];
+  /** Страны, открытые телефону: своя группа на каждую; `sites` — сколько в её списке (пустой список не зовём). */
+  countries: Array<{ code: string; sites: number }>;
 };
 
 /**
@@ -83,11 +87,11 @@ export type ConfInput = {
  * главной»): выбери на главной «Contour-RU» — заблокированное всё равно пойдёт
  * через «Contour», а не через Россию.
  *
- * Страна — группа `select` с двумя путями: «напрямую» (дома: российское и так
- * российское) и «Contour-RU» (уехал: российское — через выход в России). Так
- * решил владелец 2026-10-02: «уехал за границу — переключил на Россию и всё».
- * В группу ведут список страны и `GEOIP` — адрес сайта в этой стране (банков в
- * общем списке нет, а живут они в России).
+ * Страна — группа `select` с двумя путями: «напрямую» (ты в этой стране — её
+ * сайты и так видят местный адрес) и «Contour-XX» (уехал — через выход в
+ * стране). Так решил владелец 2026-10-02: «уехал за границу — переключил на
+ * Россию и всё». В группу ведут список страны (готовый и свои сайты) и `GEOIP` —
+ * адрес сайта в этой стране: банков в общих списках нет, а живут они дома.
  */
 export function shadowrocketConf(input: ConfInput): string {
   return [
@@ -105,13 +109,16 @@ export function shadowrocketConf(input: ConfInput): string {
     'dns-direct-fallback-proxy = false',
     `update-url = ${input.base}/contour.conf`,
     '',
-    ...(input.countries.length > 0 ? ['[Proxy Group]', ...input.countries.map((c) => `${countryGroup(c)} = select,DIRECT,${countryNode(c)}`), ''] : []),
+    ...(input.countries.length > 0 ? ['[Proxy Group]', ...input.countries.map((c) => `${countryGroup(c.code)} = select,DIRECT,${countryNode(c.code)}`), ''] : []),
     '[Rule]',
     ...REJECT_KEYWORDS.map((k) => `DOMAIN-KEYWORD,${k},REJECT`),
     ...input.direct.map((n) => `DOMAIN-SUFFIX,${n},DIRECT`),
     `DOMAIN-SET,${input.base}/domains.list,${SHARE_NODE}`,
     ...input.nets.map((c) => `IP-CIDR,${c},${SHARE_NODE},no-resolve`),
-    ...input.countries.flatMap((c) => [`DOMAIN-SET,${input.base}/country-${c.toLowerCase()}.list,${countryGroup(c)}`, `GEOIP,${c},${countryGroup(c)}`]),
+    ...input.countries.flatMap((c) => [
+      ...(c.sites > 0 ? [`DOMAIN-SET,${input.base}/country-${c.code.toLowerCase()}.list,${countryGroup(c.code)}`] : []),
+      `GEOIP,${c.code},${countryGroup(c.code)}`,
+    ]),
     'FINAL,DIRECT',
     '',
   ].join('\n');
@@ -123,7 +130,6 @@ export type RulesOptions = {
   skip: string[];
   /** Свои сайты стран (панель) — из хранилища раздачи. */
   store: Pick<ShareStore, 'settings'>;
-  countries: string[];
   /** Где держать копии списков стран (папка раздачи). */
   dir: string;
   log: Logger;
@@ -132,7 +138,9 @@ export type RulesOptions = {
 /**
  * Данные правил: папка DNS (`Sites`), копия списков подсетей, списки стран по
  * ссылкам (`COUNTRY_LISTS`: Россия — itdoginfo «Russia outside») и свои сайты
- * стран из панели.
+ * стран из панели. Список страны качается, когда страна впервые понадобилась
+ * (панель, телефон): страны выходов меняются на ходу, а сервер в Нидерландах
+ * без российского выхода российский список не качает вовсе.
  */
 export class ShareRules {
   private readonly sites: Sites;
@@ -140,46 +148,61 @@ export class ShareRules {
   private readonly skip: Cidr[];
   private readonly store: RulesOptions['store'];
   private readonly lists = new Map<string, { remote: RemoteList<string>; held: { names: string[] } }>();
-  readonly countries: string[];
+  private readonly dir: string;
+  private readonly log: Logger;
+  private started = false;
 
   constructor(opts: RulesOptions) {
     this.sites = opts.sites;
     this.dnsDir = opts.dnsDir;
     this.skip = opts.skip.map((s) => parseCidr(s)).filter((c): c is Cidr => c !== null);
     this.store = opts.store;
-    this.countries = opts.countries;
-    for (const code of opts.countries) {
+    this.dir = opts.dir;
+    this.log = opts.log;
+  }
+
+  start(): void {
+    this.started = true;
+    for (const l of this.lists.values()) l.remote.start();
+  }
+
+  stop(): void {
+    this.started = false;
+    for (const l of this.lists.values()) l.remote.stop();
+  }
+
+  /** Сайты «только с адресом этой страны»: готовый список и свои из панели. */
+  countryNames(code: string): { names: string[]; common: number; own: string[] } {
+    const own = this.store.settings().countrySites[code] ?? [];
+    const common = this.list(code)?.names ?? [];
+    return { names: collapse([...common, ...own]), common: common.length, own };
+  }
+
+  /** Готовый список страны: первый спрос читает копию с диска и ставит скачивание. */
+  private list(code: string): { names: string[] } | null {
+    const urls = COUNTRY_LISTS[code];
+    if (!urls || urls.length === 0) return null;
+    let l = this.lists.get(code);
+    if (!l) {
       const held = { names: [] as string[] };
       const remote = new RemoteList<string>({
-        urls: COUNTRY_LISTS[code] ?? [],
-        cacheFile: path.join(opts.dir, `country-${code.toLowerCase()}.lst`),
+        urls,
+        cacheFile: path.join(this.dir, `country-${code.toLowerCase()}.lst`),
         parse: parseList,
         key: (n) => n,
         format: (n) => n,
         onUpdate: (names, from) => {
           held.names = names;
-          if (from === 'net') opts.log.info(`список сайтов «только с адресом ${code}»: ${names.length}`);
+          if (from === 'net') this.log.info(`список сайтов страны ${code}: ${names.length}`);
         },
         label: `список сайтов ${code}`,
-        log: opts.log,
+        log: this.log,
       });
-      this.lists.set(code, { remote, held });
+      l = { remote, held };
+      this.lists.set(code, l);
+      if (this.started) remote.start();
     }
-  }
-
-  start(): void {
-    for (const l of this.lists.values()) l.remote.start();
-  }
-
-  stop(): void {
-    for (const l of this.lists.values()) l.remote.stop();
-  }
-
-  /** Сайты «только с адресом этой страны»: общий список и свои из панели. */
-  countryNames(code: string): { names: string[]; common: number; own: string[] } {
-    const own = this.store.settings().countrySites[code] ?? [];
-    const common = this.lists.get(code)?.held.names ?? [];
-    return { names: collapse([...common, ...own]), common: common.length, own };
+    return l.held;
   }
 
   domains(): { tunnel: string[]; direct: string[] } {

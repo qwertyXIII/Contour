@@ -12,7 +12,7 @@ import { buildEdgeConfig } from '../src/share/edge-config.ts';
 import { shareLinks } from '../src/share/links.ts';
 import { ShareRules, shareDomains, shadowrocketConf } from '../src/share/rules.ts';
 import { answer } from '../src/share/server.ts';
-import { ShareStore } from '../src/share/store.ts';
+import { ShareStore, type ShareDevice } from '../src/share/store.ts';
 import { createLogger } from '../src/vendor/logger.js';
 
 const quiet = createLogger({ enabled: false });
@@ -108,7 +108,7 @@ test('правила: ручное «напрямую» первым и вычи
   });
   assert.deepEqual(d.tunnel, ['chatgpt.com', 'googlevideo.com', 'instagram.com', 'linkedin.com', 'youtube.com']);
   assert.deepEqual(d.direct, ['music.youtube.com', 'x.com']);
-  const conf = shadowrocketConf({ base: 'https://c.example.ru/list/T', device: 'iPhone', direct: d.direct, nets: ['91.108.4.0/22'], countries: ['RU'] });
+  const conf = shadowrocketConf({ base: 'https://c.example.ru/list/T', device: 'iPhone', direct: d.direct, nets: ['91.108.4.0/22'], countries: [{ code: 'RU', sites: 39 }, { code: 'DE', sites: 0 }] });
   const rules = conf.slice(conf.indexOf('[Rule]')).split('\n').filter(Boolean);
   assert.deepEqual(rules, [
     '[Rule]',
@@ -119,9 +119,10 @@ test('правила: ручное «напрямую» первым и вычи
     'IP-CIDR,91.108.4.0/22,Contour,no-resolve',
     'DOMAIN-SET,https://c.example.ru/list/T/country-ru.list,Россия',
     'GEOIP,RU,Россия',
+    'GEOIP,DE,Германия',
     'FINAL,DIRECT',
-  ], 'узлы — по имени, а не «выбранный на главной»: выбрал Contour-RU — заблокированное всё равно через Contour');
-  assert.match(conf, /^\[Proxy Group\]\nРоссия = select,DIRECT,Contour-RU$/m, 'дома — напрямую, уехал — через выход в России: один переключатель');
+  ], 'узлы — по имени, а не «выбранный на главной»; пустой список страны не зовём');
+  assert.match(conf, /^\[Proxy Group\]\nРоссия = select,DIRECT,Contour-RU\nГермания = select,DIRECT,Contour-DE$/m, 'там — напрямую, уехал — через выход в стране: группа названием страны');
   assert.match(conf, /^update-url = https:\/\/c\.example\.ru\/list\/T\/contour\.conf$/m);
   assert.match(conf, /^block-quic = all-proxy$/m);
   assert.match(conf, /^dns-direct-fallback-proxy = false$/m, 'прямой сайт не уходит через дом, если имя не разрешилось');
@@ -132,34 +133,62 @@ test('ссылка на правила: по токену включённого
   writeFileSync(path.join(dns, 'blocked-domains.lst'), 'instagram.com\n');
   writeFileSync(path.join(dns, 'gateway-subnets.lst'), '91.108.4.0/22\n104.16.0.0/13\n10.0.0.0/8\n');
   const shareDir = tmp('contour-share-');
-  const store = new ShareStore(shareDir, ['RU']);
+  const store = new ShareStore(shareDir);
   writeFileSync(path.join(shareDir, 'country-ru.lst'), 'gosuslugi.ru\nwww.gosuslugi.ru\n');
-  const rules = new ShareRules({ sites: new Sites({ dnsDir: dns, own: ['youtube.com'] }), dnsDir: dns, skip: ['104.16.0.0/13'], store, countries: ['RU'], dir: shareDir, log: quiet });
+  const rules = new ShareRules({ sites: new Sites({ dnsDir: dns, own: ['youtube.com'] }), dnsDir: dns, skip: ['104.16.0.0/13'], store, dir: shareDir, log: quiet });
+  const opts = { store, rules, allowed: null };
   rules.start();
-  rules.stop();
   const d = store.add('iPhone');
   const conf = `/list/${d.list}/contour.conf`;
-  assert.equal(answer(conf, { store, rules }), null, 'адреса нет — телефону нечего дать');
+  assert.equal(answer(conf, opts), null, 'адреса нет — телефону нечего дать');
   store.setDomain('c.example.ru');
-  const a = answer(`${conf}?x=1`, { store, rules });
+  const a = answer(`${conf}?x=1`, opts);
   assert.match(a?.body ?? '', /IP-CIDR,91\.108\.4\.0\/22,Contour,no-resolve/);
   assert.doesNotMatch(a?.body ?? '', /104\.16|10\.0\.0/, 'без Cloudflare и частных — как у шлюза');
-  assert.equal(answer(`/list/${d.list}/domains.list`, { store, rules })?.body, '# Contour: сайты через VPN, 2\n.instagram.com\n.youtube.com\n');
+  assert.doesNotMatch(a?.body ?? '', /Proxy Group|GEOIP/, 'у нового телефона стран нет — и групп нет');
+  assert.equal(answer(`/list/${d.list}/domains.list`, opts)?.body, '# Contour: сайты через VPN, 2\n.instagram.com\n.youtube.com\n');
   store.setCountrySite('RU', 'alfabank.ru', true);
-  assert.equal(answer(`/list/${d.list}/country-ru.list`, { store, rules })?.body, '# Contour: сайты только с адресом RU, 2\n.alfabank.ru\n.gosuslugi.ru\n', 'общий список (с копии) и свой из панели');
-  assert.equal(answer(`/list/${d.list}/country-nl.list`, { store, rules }), null, 'страны нет в share.countries');
-  assert.equal(answer(`/list/${'A'.repeat(32)}/contour.conf`, { store, rules }), null);
-  assert.equal(answer(`/list/${d.list}/other`, { store, rules }), null);
+  assert.equal(answer(`/list/${d.list}/country-ru.list`, opts), null, 'страна не открыта телефону — и списка нет');
+  store.setCountry(d.id, 'RU', true);
+  assert.equal(answer(`/list/${d.list}/country-ru.list`, opts)?.body, '# Contour: сайты только с адресом RU, 2\n.alfabank.ru\n.gosuslugi.ru\n', 'готовый список (с копии) и свой из панели');
+  assert.match(answer(conf, opts)?.body ?? '', /^Россия = select,DIRECT,Contour-RU$/m);
+  assert.equal(answer(`/list/${d.list}/country-ru.list`, { ...opts, allowed: ['DE'] }), null, 'share.countries сужает');
+  assert.equal(answer(`/list/${'A'.repeat(32)}/contour.conf`, opts), null);
+  assert.equal(answer(`/list/${d.list}/other`, opts), null);
   store.setEnabled(d.id, false);
-  assert.equal(answer(conf, { store, rules }), null);
+  assert.equal(answer(conf, opts), null);
+  rules.stop();
 });
 
-test('ссылки для телефона: vless через WebSocket и TLS на 443, HTTP/1.1; второй сервер на страну; QR — картинкой с белой подложкой', () => {
-  const store = new ShareStore(tmp('contour-share-'), ['RU']);
+test('подписка: серверы телефона в base64 — Contour и открытые страны; название в заголовке', () => {
+  const store = new ShareStore(tmp('contour-share-'));
+  const rules = new ShareRules({ sites: new Sites({ dnsDir: tmp('contour-dns-'), own: [] }), dnsDir: tmp('contour-dns-'), skip: [], store, dir: tmp('contour-share-'), log: quiet });
   const d = store.add('iPhone');
-  assert.equal(shareLinks(d, store.settings()), null);
-  const links = shareLinks(d, store.setDomain('c.example.ru'));
+  store.setDomain('c.example.ru');
+  const names = (): string[] => Buffer.from(answer(`/list/${d.list}/servers`, { store, rules, allowed: null })?.body ?? '', 'base64').toString().trim().split('\n').map((l) => decodeURIComponent(new URL(l).hash.slice(1)));
+  assert.deepEqual(names(), ['Contour']);
+  store.setCountry(d.id, 'RU', true);
+  store.setCountry(d.id, 'DE', true);
+  assert.deepEqual(names(), ['Contour', 'Contour-DE', 'Contour-RU']);
+  const ru = store.devices()[0]?.exits.RU;
+  store.setCountry(d.id, 'RU', false);
+  assert.deepEqual(names(), ['Contour', 'Contour-DE']);
+  store.setCountry(d.id, 'RU', true);
+  assert.equal(store.devices()[0]?.exits.RU, ru, 'закрыл и открыл — ключ тот же, сервер в телефоне работает');
+  const h = answer(`/list/${d.list}/servers`, { store, rules, allowed: null })?.headers ?? {};
+  assert.equal(Buffer.from((h['profile-title'] ?? '').replace(/^base64:/, ''), 'base64').toString(), 'Contour');
+  assert.throws(() => store.setCountry(d.id, 'ru1', true), /две латинские буквы/);
+});
+
+test('ссылки для телефона: подписка одним QR; vless через WebSocket и TLS на 443, HTTP/1.1; сервер на страну; QR — картинкой с белой подложкой', () => {
+  const store = new ShareStore(tmp('contour-share-'));
+  const d = store.setCountry(store.add('iPhone').id, 'RU', true);
+  assert.equal(shareLinks(d, store.settings(), null), null);
+  const links = shareLinks(d, store.setDomain('c.example.ru'), null);
   assert.deepEqual(links?.nodes.map((n) => [n.name, n.country]), [['Contour', null], ['Contour-RU', 'RU']]);
+  assert.equal(links?.subscription.url, `https://c.example.ru/list/${d.list}/servers#Contour`);
+  assert.equal(links?.subscription.open, `shadowrocket://add/https://c.example.ru/list/${d.list}/servers#Contour`);
+  assert.deepEqual(shareLinks(d, store.settings(), ['DE'])?.nodes.map((n) => n.name), ['Contour'], 'share.countries сужает');
   assert.notEqual(new URL(links?.nodes[1]?.server ?? '').username, d.uuid, 'у сервера страны свой ключ');
   assert.equal(new URL(links?.nodes[1]?.server ?? '').hash, '#Contour-RU', 'имя сервера — то, по которому его зовут правила');
   const u = new URL(links?.nodes[0]?.server ?? '');
@@ -173,20 +202,26 @@ test('ссылки для телефона: vless через WebSocket и TLS н
 });
 
 test('настройки: раздел share — умолчания и неизвестное поле', () => {
-  assert.deepEqual(parseConfig('outlets: []').share, { enabled: true, listen: '127.0.0.1', port: 18300, listPort: 18091, controller: '127.0.0.1:19091', dir: '/var/lib/contour/share', countries: ['RU'] });
+  assert.deepEqual(parseConfig('outlets: []').share, { enabled: true, listen: '127.0.0.1', port: 18300, listPort: 18091, controller: '127.0.0.1:19091', dir: '/var/lib/contour/share', countries: null });
   assert.equal(parseConfig('share: {enabled: false}').share.enabled, false);
   assert.throws(() => parseConfig('share: {domain: x}'), /share: неизвестное поле «domain»/);
 });
 
-test('страны: прежний файл получает ключи стран; край ведёт сервер страны в прокси с заголовком, UDP — в выходы страны', () => {
+test('страны: прежний файл сохраняет выданные страны; край ведёт сервер страны в прокси с заголовком, UDP — в выходы страны', () => {
   const dir = tmp('contour-share-');
-  const old = new ShareStore(dir);
-  const a = old.add('iPhone');
-  assert.deepEqual(a.exits, {}, 'без стран — без вторых серверов');
-  const store = new ShareStore(dir, ['RU']);
-  const ru = store.devices()[0]?.exits.RU as string;
-  assert.match(ru, /^[0-9a-f-]{36}$/);
-  assert.equal(new ShareStore(dir, ['RU']).devices()[0]?.exits.RU, ru, 'ключ страны не меняется между запусками');
+  const fresh = new ShareStore(dir).add('iPad');
+  assert.deepEqual([fresh.countries, fresh.exits], [[], {}], 'у нового — никаких стран: домашний адрес без спроса не уходит');
+  // Файл прежней версии: ключ «Contour-RU» выдан, списка открытых стран ещё нет.
+  const ru = '11111111-2222-4333-8444-555555555555';
+  const file = path.join(dir, 'share.json');
+  const raw = JSON.parse(readFileSync(file, 'utf8')) as { devices: Array<Record<string, unknown>> };
+  raw.devices = [{ id: 'aaaaaaaa', name: 'iPhone', uuid: '99999999-2222-4333-8444-555555555555', exits: { RU: ru }, list: 'L'.repeat(32), enabled: true, created: 1 }];
+  writeFileSync(file, JSON.stringify(raw));
+  const store = new ShareStore(dir);
+  const a = store.devices()[0] as ShareDevice;
+  assert.deepEqual(a.countries, ['RU'], 'выданный сервер страны не пропадает');
+  assert.equal(new ShareStore(dir).devices()[0]?.exits.RU, ru, 'ключ страны не меняется между запусками');
+  const other = store.add('Друг');
 
   const home = { name: 'home', direct: true, socks: { host: '', port: 0, user: '', pass: '' } };
   const de = { name: 'corp_ext', socks: { host: '10.201.2.2', port: 1080, user: 'corp_ext', pass: 'p' } };
@@ -196,7 +231,8 @@ test('страны: прежний файл получает ключи стра
     'proxy-groups': Array<{ name: string; proxies: string[] }>;
     rules: string[];
   };
-  assert.deepEqual(doc.listeners[0]?.users, [{ username: a.id, uuid: a.uuid }, { username: `${a.id}.ru`, uuid: ru }]);
+  assert.deepEqual(doc.listeners[0]?.users, [{ username: a.id, uuid: a.uuid }, { username: `${a.id}.ru`, uuid: ru }, { username: other.id, uuid: other.uuid }], 'другу Россия не открыта — и сервера страны у него нет');
+  assert.ok(!doc.rules.some((x) => x.includes(`${other.id}.ru`)));
   assert.deepEqual(doc.proxies.find((p) => p.name === `via-${a.id}-ru`)?.headers, { 'contour-exit': 'RU' });
   assert.deepEqual(doc['proxy-groups'].map((g) => [g.name, g.proxies]), [['udp', ['udp-corp_ext']], ['udp-RU', ['DIRECT']]], 'прямой выход для UDP — DIRECT с края');
   const r = doc.rules;

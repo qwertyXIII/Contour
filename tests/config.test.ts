@@ -1,6 +1,10 @@
 import assert from 'node:assert/strict';
+import { mkdtempSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
 import test from 'node:test';
 import { DEFAULTS, parseConfig } from '../src/config.ts';
+import { prepareOutlets } from '../src/outlets/outlet.ts';
 
 test('пустой файл — умолчания', () => {
   const c = parseConfig('');
@@ -41,4 +45,13 @@ test('прямой выход: по умолчанию есть и только 
   assert.throws(() => parseConfig('direct: {country: Russia}'), /две латинские буквы/);
   assert.throws(() => parseConfig('outlets:\n  - {name: home, protocol: wireguard, bridge: 3, conf: /x}\n'), /уже имя выхода/);
   assert.deepEqual(parseConfig('share: {countries: [ru, RU, nl]}').share.countries, ['RU', 'NL']);
+});
+
+test('прямой выход: туннелей нет — он основной; есть — только по просьбе страны', () => {
+  const alone = prepareOutlets(parseConfig('direct: {country: nl}'));
+  assert.deepEqual(alone.outlets.map((o) => [o.name, o.direct, o.onRequest]), [['home', true, false]], 'сервер друга без VPN-выходов: иначе соединению некуда идти');
+  const link = path.join(mkdtempSync(path.join(tmpdir(), 'contour-cfg-')), 'link');
+  writeFileSync(link, 'vless://11111111-2222-4333-8444-555555555555@nl.example.org:443?security=tls&type=ws&path=%2Fs#nl\n');
+  const both = prepareOutlets(parseConfig(`outlets:\n  - {name: nl, kind: mihomo, protocol: link, conf: ${link}}\n`));
+  assert.deepEqual(both.outlets.map((o) => [o.name, o.onRequest]), [['home', true], ['nl', false]], 'прямой — первым, как раньше');
 });

@@ -58,8 +58,9 @@ export type OutletConfig = {
 /**
  * «Прямой выход» — интернет самого сервера, без туннеля. Ограда частных адресов
  * та же. `onRequest` — только когда просят его страну (телефон за границей
- * просит Россию: Госуслуги и банки не пускают заграничные адреса); выключить —
- * обычный выход по приоритету (сервер там, где ничего не заблокировано).
+ * просит страну, где стоит сервер: местные банки не пускают заграничные
+ * адреса); выключить — обычный выход по приоритету. Туннелей нет вовсе — он
+ * основной и так (`prepareOutlets`).
  */
 export type DirectConfig = { enabled: boolean; name: string; priority: number; onRequest: boolean; country: string | null };
 
@@ -147,8 +148,12 @@ export type Config = {
    */
   share: {
     enabled: boolean; listen: string; port: number; listPort: number; controller: string; dir: string;
-    /** Страны, в которые телефон может попросить выход, — второй сервер в Shadowrocket на каждую («Contour-RU»). */
-    countries: string[];
+    /**
+     * Страны выходов, которые можно открыть телефонам; null — все, где есть
+     * выход (страна выхода — `outlets[].country` или по его адресу). Список
+     * только сужает: страны без выхода он не создаёт.
+     */
+    countries: string[] | null;
   };
 };
 
@@ -202,7 +207,7 @@ export const DEFAULTS: Config = {
     ports: GAME_PORTS,
     hintPort: 18053,
   },
-  share: { enabled: true, listen: '127.0.0.1', port: 18300, listPort: 18091, controller: '127.0.0.1:19091', dir: '/var/lib/contour/share', countries: ['RU'] },
+  share: { enabled: true, listen: '127.0.0.1', port: 18300, listPort: 18091, controller: '127.0.0.1:19091', dir: '/var/lib/contour/share', countries: null },
 };
 
 export class ConfigError extends Error {}
@@ -259,7 +264,7 @@ function country(raw: Raw, key: string, where: string): string | null {
   return c;
 }
 
-function countryList(value: unknown, fallback: string[]): string[] {
+function countryList(value: unknown, fallback: string[] | null): string[] | null {
   if (value === undefined || value === null) return fallback;
   if (!Array.isArray(value) || !value.every((v) => typeof v === 'string' && COUNTRY.test(v.toUpperCase()))) {
     throw new ConfigError('share.countries: список стран, например [RU]');

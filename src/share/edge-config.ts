@@ -1,7 +1,7 @@
 import { stringify } from 'yaml';
 import { EXIT_HEADER } from '../inlets/http-proxy.ts';
 import { PRIVATE_V4 } from '../inlets/fence.ts';
-import { shareWho, type ShareDevice } from './store.ts';
+import { deviceCountries, shareWho, type ShareDevice } from './store.ts';
 
 /**
  * Конфиг края — второго mihomo, к которому телефоны приходят по VLESS через
@@ -13,10 +13,10 @@ import { shareWho, type ShareDevice } from './store.ts';
  * ограда частных адресов, карта портов, счётчики. `DIRECT` в правилах TCP нет
  * нарочно: напрямую телефон ходит сам, из той сети, где он.
  *
- * Страны: у устройства есть второй пользователь на каждую (`<id>.ru`, второй
- * сервер в Shadowrocket — «Contour-RU»). Его TCP идёт в тот же прокси с
- * заголовком `Contour-Exit: RU` — Contour выпустит его в России (прямой выход
- * дома или выход-туннель в Россию), не в другой стране.
+ * Страны: у устройства есть ещё пользователь на каждую открытую ему страну
+ * (`<id>.ru`, сервер «Contour-RU» в Shadowrocket). Его TCP идёт в тот же прокси
+ * с заголовком `Contour-Exit: RU` — Contour выпустит его в этой стране (прямой
+ * выход сервера или туннель туда), не в другой.
  *
  * UDP (голос Discord, звонки, игры) HTTP-прокси не несёт, поэтому он идёт прямо
  * в выходы — группой `fallback`, «первый живой»: обычный — в SOCKS ядерных
@@ -40,7 +40,7 @@ export type EdgeInput = {
   proxy: { host: string; port: number };
   /** Ядерные выходы для обычного UDP — по приоритету; пусто — UDP отвергается. */
   udp: UdpOutlet[];
-  /** Страны (`share.countries`) и их выходы для UDP — по приоритету. */
+  /** Страны, открытые хоть одному устройству, и их выходы для UDP — по приоритету. */
   countries: Array<{ code: string; udp: UdpOutlet[] }>;
   /** Проверка живости выходов в группах UDP (`health.probeHost` + `probePath`). */
   probeUrl: string;
@@ -51,11 +51,13 @@ export type EdgeInput = {
 const UDP_GROUP = 'udp';
 const lower = (c: string): string => c.toLowerCase();
 const member = (o: UdpOutlet): string => (o.direct ? 'DIRECT' : `udp-${o.name}`);
+/** Страны устройства из тех, что край знает. */
+const own = (d: ShareDevice, codes: string[]): string[] => deviceCountries(d, codes);
 
 function users(devices: ShareDevice[], codes: string[]): Array<{ username: string; uuid: string }> {
   return devices.flatMap((d) => [
     { username: d.id, uuid: d.uuid },
-    ...codes.filter((c) => d.exits[c]).map((c) => ({ username: `${d.id}.${lower(c)}`, uuid: d.exits[c] as string })),
+    ...own(d, codes).map((c) => ({ username: `${d.id}.${lower(c)}`, uuid: d.exits[c] as string })),
   ]);
 }
 
@@ -66,7 +68,7 @@ function proxies(input: EdgeInput, devices: ShareDevice[], codes: string[]): Rec
   const socks = new Map<string, UdpOutlet>();
   for (const o of [...input.udp, ...input.countries.flatMap((c) => c.udp)]) if (!o.direct) socks.set(o.name, o);
   return [
-    ...devices.flatMap((d) => [http(`via-${d.id}`, d), ...codes.map((c) => http(`via-${d.id}-${lower(c)}`, d, { [EXIT_HEADER]: c }))]),
+    ...devices.flatMap((d) => [http(`via-${d.id}`, d), ...own(d, codes).map((c) => http(`via-${d.id}-${lower(c)}`, d, { [EXIT_HEADER]: c }))]),
     ...[...socks.values()].map((o) => ({ name: `udp-${o.name}`, type: 'socks5', server: o.socks.host, port: o.socks.port, username: o.socks.user, password: o.socks.pass, udp: true })),
   ];
 }
@@ -80,15 +82,15 @@ function groups(input: EdgeInput): Record<string, unknown>[] {
 }
 
 function rules(input: EdgeInput, devices: ShareDevice[], codes: string[]): string[] {
-  const countryUdp = input.countries.filter((c) => codes.includes(c.code)).map((c) => {
-    const who = devices.map((d) => `${d.id}.${lower(c.code)}`).join('/');
-    return `AND,((NETWORK,udp),(IN-USER,${who})),${c.udp.length > 0 ? `udp-${c.code}` : 'REJECT'}`;
+  const countryUdp = input.countries.flatMap((c) => {
+    const who = devices.filter((d) => own(d, codes).includes(c.code)).map((d) => `${d.id}.${lower(c.code)}`);
+    return who.length > 0 ? [`AND,((NETWORK,udp),(IN-USER,${who.join('/')})),${c.udp.length > 0 ? `udp-${c.code}` : 'REJECT'}`] : [];
   });
   return [
     ...PRIVATE_V4.map(([net, bits]) => `IP-CIDR,${net}/${bits},REJECT,no-resolve`),
-    ...(devices.length > 0 ? countryUdp : []),
+    ...countryUdp,
     `NETWORK,udp,${input.udp.length > 0 ? UDP_GROUP : 'REJECT'}`,
-    ...devices.flatMap((d) => [...codes.map((c) => `IN-USER,${d.id}.${lower(c)},via-${d.id}-${lower(c)}`), `IN-USER,${d.id},via-${d.id}`]),
+    ...devices.flatMap((d) => [...own(d, codes).map((c) => `IN-USER,${d.id}.${lower(c)},via-${d.id}-${lower(c)}`), `IN-USER,${d.id},via-${d.id}`]),
     'MATCH,REJECT',
   ];
 }
