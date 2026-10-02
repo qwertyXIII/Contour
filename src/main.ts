@@ -93,6 +93,7 @@ async function main(): Promise<void> {
   // Соперники — до проверки живости: запасной не поднят, и проверка его не трогает.
   let recheck: ((o: Outlet) => void) | null = null;
   let shareRefresh: (() => void) | null = null;
+  let rulesRefresh: (() => void) | null = null;
   const rivals = new Rivals(outlets, config.outlets, {
     log,
     activate: async (name) => { await rootCall({ cmd: 'outlet.activate', name }); },
@@ -119,8 +120,9 @@ async function main(): Promise<void> {
     ipHost: config.health.ipHost,
     ipIntervalMs: config.health.ipIntervalSec * 1000,
     countryHost: config.health.countryHost,
-    // Край раздачи ведёт UDP «страны» прямо в выходы этой страны — узнали страну, пересобрать.
-    onCountry: () => shareRefresh?.(),
+    // Край раздачи ведёт UDP «страны» прямо в выходы этой страны, а правила «через
+    // страну» есть только там, где есть выход, — узнали страну, пересобрать то и другое.
+    onCountry: () => { shareRefresh?.(); rulesRefresh?.(); },
     log,
     dial,
   });
@@ -155,6 +157,7 @@ async function main(): Promise<void> {
   let share: Share | null = null;
   const rules = startRules(config, { sites, outlets, countrySites: () => share?.store.settings().countrySites ?? {}, log });
   const route = rules.route;
+  rulesRefresh = () => rules.book.rebuild();
   const server = await startHttpInlet({ ...config.http, chooser, consumers, log, meter, ports, route });
   share = startShare(config, { consumers, sites, outlets, countryList: (code) => rules.book.countryList(code), log });
   share?.store.onChange(() => rules.book.rebuild());
