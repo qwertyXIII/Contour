@@ -46,6 +46,7 @@ export type HttpInletOptions = {
   ports?: RelayDeps['ports'];
   /** Правила «что + куда»; нет — как до движка. */
   route?: RelayDeps['route'];
+  speed?: RelayDeps['speed'];
 };
 
 type Deps = RelayDeps;
@@ -156,7 +157,7 @@ function serveForward(req: http.IncomingMessage, res: http.ServerResponse, who: 
 
 export function startHttpInlet(opts: HttpInletOptions): Promise<http.Server> {
   const { chooser, consumers, log } = opts;
-  const deps: Deps = { chooser, consumers, log, meter: opts.meter, ports: opts.ports, route: opts.route };
+  const deps: Deps = { chooser, consumers, log, meter: opts.meter, ports: opts.ports, route: opts.route, speed: opts.speed };
   const route = opts.route ?? noRules;
   const server = http.createServer();
   // Туннели живут долго (докачка на часы) — таймаут соединения без дела не нужен.

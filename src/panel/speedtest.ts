@@ -9,18 +9,25 @@ import type { Outlet } from '../outlets/outlet.ts';
  * Через выход идёт ровно так же, как трафик потребителей (DoH-имя, ограда,
  * SOCKS выхода), — значит, замер честный, а не «до VPN-сервера».
  * Проверено 2026-10-01: через ядерный AWG — 13 МБ/с за 25 МБ.
+ *
+ * Им же — редкая проба режима «самый быстрый» (`select/speed-probe.ts`), с
+ * маленьким `bytes`: ей скорость нужна по `bodyMs` (только тело) — на
+ * нескольких мегабайтах рукопожатие и запрос заметно занижали бы итог.
  */
 
 const HOST = 'speed.cloudflare.com';
 const BYTES = 25_000_000;
 const MAX_MS = 10_000;
 
-export type SpeedResult = { outlet: string; bytes: number; ms: number; mbps: number; firstByteMs: number; at: number };
+/** `firstByteMs` — первый байт ответа HTTP (рукопожатие TLS и запрос внутри), `bodyMs` — сколько шло тело. */
+export type SpeedResult = { outlet: string; bytes: number; ms: number; mbps: number; firstByteMs: number; bodyMs: number; at: number };
 
-export function speedTest(outlet: Outlet, dial: Dial): Promise<SpeedResult> {
+export function speedTest(outlet: Outlet, dial: Dial, opts: { bytes?: number; maxMs?: number } = {}): Promise<SpeedResult> {
+  const want = opts.bytes ?? BYTES;
   return dial(outlet, HOST, 443).then((raw) => new Promise<SpeedResult>((resolve, reject) => {
     const started = Date.now();
     let firstByteMs = -1;
+    let bodyAt = -1;
     let body = 0;
     let headerDone = false;
     let head = Buffer.alloc(0);
@@ -30,11 +37,12 @@ export function speedTest(outlet: Outlet, dial: Dial): Promise<SpeedResult> {
       socket.destroy();
       const ms = Date.now() - started;
       if (body === 0) { reject(new Error('ничего не скачалось')); return; }
-      resolve({ outlet: outlet.name, bytes: body, ms, mbps: Math.round((body * 8) / (ms / 1000) / 1e5) / 10, firstByteMs, at: Date.now() });
+      const bodyMs = Math.max(1, Date.now() - bodyAt);
+      resolve({ outlet: outlet.name, bytes: body, ms, mbps: Math.round((body * 8) / (ms / 1000) / 1e5) / 10, firstByteMs, bodyMs, at: Date.now() });
     };
-    const timer = setTimeout(finish, MAX_MS);
+    const timer = setTimeout(finish, opts.maxMs ?? MAX_MS);
     socket.once('secureConnect', () => {
-      socket.write(`GET /__down?bytes=${BYTES} HTTP/1.1\r\nHost: ${HOST}\r\nUser-Agent: contour-speedtest\r\nConnection: close\r\n\r\n`);
+      socket.write(`GET /__down?bytes=${want} HTTP/1.1\r\nHost: ${HOST}\r\nUser-Agent: contour-speedtest\r\nConnection: close\r\n\r\n`);
     });
     socket.on('data', (chunk: Buffer) => {
       if (firstByteMs < 0) firstByteMs = Date.now() - started;
@@ -43,6 +51,7 @@ export function speedTest(outlet: Outlet, dial: Dial): Promise<SpeedResult> {
       const end = head.indexOf('\r\n\r\n');
       if (end < 0) return;
       headerDone = true;
+      bodyAt = Date.now();
       if (!/^HTTP\/1\.[01] 200/.test(head.subarray(0, 20).toString('latin1'))) {
         clearTimeout(timer);
         socket.destroy();

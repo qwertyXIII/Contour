@@ -4,6 +4,7 @@ import { errorText, type Logger } from '../log.ts';
 import type { Outlet } from '../outlets/outlet.ts';
 import type { PortLearner } from '../outlets/ports.ts';
 import type { Chooser, ExitNeed } from '../select/chooser.ts';
+import type { SpeedBook } from '../select/speed.ts';
 import type { Router } from '../rules/need.ts';
 import type { Meter } from '../stats/meter.ts';
 
@@ -28,8 +29,8 @@ import type { Meter } from '../stats/meter.ts';
 
 /** `need` — чего соединение требует от выхода (страну), см. `chooser.ts`. */
 export type Target = { host: string; port: number; need?: ExitNeed };
-/** `route` — правила «что + куда» (`rules/need.ts`); нет — как до движка. */
-export type RelayDeps = { chooser: Chooser; consumers: Consumers; log: Logger; meter?: Meter; ports?: PortLearner; route?: Router };
+/** `route` — правила «что + куда» (`rules/need.ts`); нет — как до движка. `speed` — замеры для «самого быстрого». */
+export type RelayDeps = { chooser: Chooser; consumers: Consumers; log: Logger; meter?: Meter; ports?: PortLearner; route?: Router; speed?: SpeedBook };
 export type RelayHooks = {
   /** Первый выход открылся — один раз. */
   onEstablished: () => void;
@@ -43,6 +44,8 @@ const REPLAY_CAP = 256 * 1024;
 export const MAX_ATTEMPTS = 4;
 /** Закрыл молча быстрее — подозрение на фильтр порта: ответ сайта за выходом идёт дольше. */
 export const FAST_CLOSE_MS = 100;
+/** Закрыл молча позже — простой соединения, а не отказ сервиса. */
+const SILENT_CLOSE_MS = 30_000;
 
 export function relay(client: Socket, head: Buffer, who: string, target: Target, deps: RelayDeps, hooks: RelayHooks): void {
   const { chooser, consumers, log, meter } = deps;
@@ -57,6 +60,8 @@ export function relay(client: Socket, head: Buffer, who: string, target: Target,
   let upstream: Socket | null = null;
   let outletName = '';
   let up = 0;
+  /** Когда запрос ушёл в выход: проигран буфер или (CONNECT) пришёл ClientHello после «200». */
+  let sentAt = -1;
   let down = 0;
 
   const finish = (): void => {
@@ -72,23 +77,37 @@ export function relay(client: Socket, head: Buffer, who: string, target: Target,
     upstream = socket;
     outletName = outlet.name;
     const attachedAt = Date.now();
+    sentAt = buffered.length > 0 ? attachedAt : -1;
     let answered = false;
+    // Пассивная скорость выхода — рывками, по этому соединению (`select/speed-flow.ts`).
+    const flow = deps.speed?.flow(outlet.name);
     for (const chunk of buffered) socket.write(chunk);
     // Проигранное считаем один раз — на первом выходе, не на каждом повторе.
     if (attempts === 1) meter?.add(who, outlet.name, target.host, bufferedBytes, 0);
     socket.on('data', (chunk: Buffer) => {
-      if (!answered) { answered = true; deps.ports?.confirm(outlet, target.port); }
+      if (!answered) {
+        answered = true;
+        deps.ports?.confirm(outlet, target.port);
+        chooser.noteOutcome(target.host, outlet, 'answered');
+        deps.speed?.noteTtfb(chooser.serviceKey(target.host), outlet.name, Date.now() - (sentAt >= 0 ? sentAt : attachedAt));
+      }
+      flow?.data(chunk.length);
       if (replayable) { replayable = false; buffered = []; }
       down += chunk.length;
       meter?.add(who, outlet.name, target.host, 0, chunk.length);
-      if (!client.write(chunk)) socket.pause();
+      // Упёрлись в клиента — этот рывок мерил его, а не выход.
+      if (!client.write(chunk)) { socket.pause(); flow?.paused(); }
     });
     socket.on('drain', () => client.resume());
     socket.on('error', () => { /* закрытие ниже решит, повторять ли */ });
     socket.on('close', () => {
+      flow?.end();
       if (finished || socket !== upstream) return;
       upstream = null;
-      if (!answered && Date.now() - attachedAt < FAST_CLOSE_MS) deps.ports?.suspect(outlet, target.port);
+      const lived = Date.now() - attachedAt;
+      if (!answered && lived < FAST_CLOSE_MS) deps.ports?.suspect(outlet, target.port);
+      // Закрыл молча, получив запрос, — отказ сервиса через этот выход (быстрое — фильтр порта, долгое — простой, не отказ).
+      else if (!answered && bufferedBytes > 0 && lived < SILENT_CLOSE_MS) chooser.noteOutcome(target.host, outlet, 'silent');
       if (replayable && !client.destroyed && attempts < MAX_ATTEMPTS) {
         void next(outlet, 'закрыл соединение, не ответив');
       } else {
@@ -125,6 +144,7 @@ export function relay(client: Socket, head: Buffer, who: string, target: Target,
   client.setTimeout(0);
   client.on('data', (chunk: Buffer) => {
     up += chunk.length;
+    if (upstream && sentAt < 0) sentAt = Date.now();
     if (replayable) {
       bufferedBytes += chunk.length;
       if (bufferedBytes > REPLAY_CAP) { replayable = false; buffered = []; }

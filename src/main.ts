@@ -24,9 +24,12 @@ import { GatewayAddresses } from './panel/addresses.ts';
 import { Devices } from './panel/devices.ts';
 import { createPanel, type Panel } from './panel/server.ts';
 import { Sites } from './panel/sites.ts';
-import type { SpeedResult } from './panel/speedtest.ts';
+import { speedTest, type SpeedResult } from './panel/speedtest.ts';
 import { PanelState } from './panel/state.ts';
 import { domainService, startRules } from './rules/index.ts';
+import { OutcomeBook } from './select/outcomes.ts';
+import { SpeedBook } from './select/speed.ts';
+import { SpeedProbe } from './select/speed-probe.ts';
 import { startShare, type Share } from './share/index.ts';
 import { Meter } from './stats/meter.ts';
 
@@ -112,6 +115,10 @@ async function main(): Promise<void> {
   });
   await rivals.init();
   rivals.start();
+  // Самообучение: что открывается через какой выход и страну (select/outcomes.ts);
+  // замеры скорости для правил «самый быстрый» (select/speed.ts) и их редкая проба.
+  const outcomes = new OutcomeBook({ file: path.join(STATE_DIR, 'outlet-outcomes.json'), log });
+  const speed = new SpeedBook({ file: path.join(STATE_DIR, 'outlet-speed.json'), log });
   const health = startHealth(outlets, {
     intervalMs: config.health.intervalSec * 1000,
     connectTimeoutMs: config.health.connectTimeoutSec * 1000,
@@ -123,6 +130,7 @@ async function main(): Promise<void> {
     // Край раздачи ведёт UDP «страны» прямо в выходы этой страны, а правила «через
     // страну» есть только там, где есть выход, — узнали страну, пересобрать то и другое.
     onCountry: () => { shareRefresh?.(); rulesRefresh?.(); },
+    onAlive: (o) => outcomes.exitAlive(o.name),
     log,
     dial,
   });
@@ -144,7 +152,20 @@ async function main(): Promise<void> {
     log,
     dial,
     serviceOf: domainService,
+    outcomes,
+    speed,
   });
+  const speedProbe = new SpeedProbe(speed, {
+    log,
+    outlets: () => outlets,
+    download: async (name, bytes) => {
+      const o = outlets.find((x) => x.name === name);
+      if (!o) throw new Error('выхода нет');
+      const r = await speedTest(o, dial, { bytes, maxMs: 8_000 });
+      return { bytes: r.bytes, ms: r.bodyMs, firstByteMs: r.firstByteMs };
+    },
+  });
+  speedProbe.start();
   const consumers = new Consumers(config.tokens, log);
   consumers.load();
   consumers.startFlushing();
@@ -158,19 +179,19 @@ async function main(): Promise<void> {
   const rules = startRules(config, { sites, outlets, countrySites: () => share?.store.settings().countrySites ?? {}, log });
   const route = rules.route;
   rulesRefresh = () => rules.book.rebuild();
-  const server = await startHttpInlet({ ...config.http, chooser, consumers, log, meter, ports, route });
+  const server = await startHttpInlet({ ...config.http, chooser, consumers, log, meter, ports, route, speed });
   share = startShare(config, { consumers, sites, outlets, countryList: (code) => rules.book.countryList(code), log });
   share?.store.onChange(() => rules.book.rebuild());
   shareRefresh = share ? () => share?.edge.refresh() : null;
   const panel = config.panel.enabled ? startPanel(config, { outlets, meter, dial, ports, rivals, sites, share }) : null;
   const panelHosts = new Set([config.panel.name, config.lan.address]);
   const lanServers = config.lan.enabled
-    ? startLanInlet(config.lan, { chooser, consumers, log, meter, ports, route }, panel ? { hosts: panelHosts, take: panel.take } : null)
+    ? startLanInlet(config.lan, { chooser, consumers, log, meter, ports, route, speed }, panel ? { hosts: panelHosts, take: panel.take } : null)
     : [];
   // Порты игр — по подсказкам DNS (inlets/hints.ts, game-ports.ts).
   const hints = new Hints();
   const hintSocket = config.lan.enabled && config.lan.ports.length > 0 ? hints.listen(config.lan.hintPort, log) : null;
-  const gameServers = hintSocket ? startGamePorts(config.lan, hints, { chooser, consumers, log, meter, ports }) : [];
+  const gameServers = hintSocket ? startGamePorts(config.lan, hints, { chooser, consumers, log, meter, ports, speed }) : [];
   log.info('Contour готов');
 
   let stopping = false;
@@ -184,6 +205,9 @@ async function main(): Promise<void> {
     consumers.stop();
     meter.stop();
     rules.stop();
+    outcomes.stop();
+    speedProbe.stop();
+    speed.stop();
     panel?.server.close();
     server.close();
     server.closeAllConnections();

@@ -33,6 +33,8 @@ export type HealthOptions = {
   countryHost: string;
   /** Страна выхода стала известна или сменилась. */
   onCountry?: (outlet: Outlet) => void;
+  /** Выход ответил проверке — самообучению: неудача сервиса через живой выход — про сервис, не про выход. */
+  onAlive?: (outlet: Outlet) => void;
   log: Logger;
   /** Как соединяться через выход — тем же путём, что и потребители. */
   dial?: Dial;
@@ -88,6 +90,7 @@ export function startHealth(outlets: Outlet[], opts: HealthOptions): Health {
       outlet.latencyMs = Date.now() - started;
       outlet.failures = 0;
       outlet.lastError = null;
+      opts.onAlive?.(outlet);
       // Пока шла проверка, выход могли увести в запасные — его состояние больше не наше.
       if (outlet.state !== 'alive' && !isStandby(outlet)) {
         opts.log.info(`выход «${outlet.name}» жив, ${outlet.latencyMs} мс`);

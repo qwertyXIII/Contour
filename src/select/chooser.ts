@@ -4,6 +4,8 @@ import type { Dial } from '../outlets/connect.ts';
 import { errorText, type Logger } from '../log.ts';
 import type { Outlet } from '../outlets/outlet.ts';
 import { portRank } from '../outlets/ports.ts';
+import { failureKind, type Outcome, type OutcomeBook } from './outcomes.ts';
+import type { SpeedBook } from './speed.ts';
 
 /**
  * Выбор выхода — вся ценность Contour в одном месте.
@@ -68,6 +70,10 @@ export type ChooserOptions = {
   dial?: Dial;
   /** Сервис по имени сайта — ключ прилипания; по умолчанию — само имя. */
   serviceOf?: (host: string) => string;
+  /** Самообучение: что открывалось через какой выход и страну (`outcomes.ts`). */
+  outcomes?: OutcomeBook;
+  /** Замеры скорости для правил «самый быстрый» (`speed.ts`). */
+  speed?: SpeedBook;
 };
 
 export class NoOutletError extends Error {
@@ -91,7 +97,10 @@ export class Chooser {
 
   /** `port` не задан — порт неважен (проверки, тесты): только приоритет и живость. */
   order(host: string, port?: number, now = Date.now(), need: ExitNeed = {}): Outlet[] {
-    const rank = (o: Outlet): number => (port === undefined ? 0 : portRank(o, port));
+    const key = this.service(host);
+    // Порт, потом выученное (хорошие → неизвестные → плохие: плохие не выкидываем — вдруг больше некому).
+    const learned = (o: Outlet): number => this.opts.outcomes?.rank(key, o, now) ?? 0;
+    const rank = (o: Outlet): number => (port === undefined ? 0 : portRank(o, port)) * 3 + learned(o);
     const byPriority = this.outlets.filter((o) => fitsNeed(o, need)).sort((a, b) =>
       rank(a) - rank(b) || a.priority - b.priority || (a.latencyMs ?? Infinity) - (b.latencyMs ?? Infinity) || a.name.localeCompare(b.name));
     // Запасной (не поднят, ждёт своей очереди в группе соперников) не годится никогда.
@@ -99,17 +108,36 @@ export class Chooser {
     const usable = up.filter((o) => o.state !== 'dead');
     const list = usable.length > 0 ? usable : up;
 
-    // Прилипание сильнее приоритета, но не сильнее порта: выход, который этот порт режет, вперёд не пойдёт.
-    const key = this.service(host);
-    const stuck = this.sticky.get(key);
-    if (stuck && stuck.until <= now) this.sticky.delete(key);
-    if (!stuck || stuck.until <= now) return list;
+    // Прилипание сильнее приоритета, но не сильнее порта и выученного: выход, который этот порт режет или где сервис не открывается, вперёд не пойдёт.
+    let stuck = this.sticky.get(key) ?? null;
+    if (stuck && stuck.until <= now) { this.sticky.delete(key); stuck = null; }
     // Страна — вперёд целиком (порядок внутри сохраняется), остальные страны — за ней.
-    const home = stuck.country ? list.filter((o) => o.country === stuck.country) : [];
-    const ordered = home.length > 0 ? [...home, ...list.filter((o) => o.country !== stuck.country)] : list;
+    const country = stuck?.country ?? null;
+    const home = country ? list.filter((o) => o.country === country) : [];
+    const ordered = home.length > 0 ? [...home, ...list.filter((o) => o.country !== country)] : list;
+    if (need.fastest && this.opts.speed) return this.fastest(key, ordered, stuck?.name ?? null, rank, now);
+    if (!stuck) return ordered;
     const index = ordered.findIndex((o) => o.name === stuck.name);
     if (index > 0 && rank(ordered[index] as Outlet) <= rank(ordered[0] as Outlet)) ordered.unshift(...ordered.splice(index, 1));
     return ordered;
+  }
+
+  /**
+   * «Самый быстрый» — только внутри страны первого кандидата (прилипшей или
+   * лучшей по приоритету): страну держим на весь сервис, а между выходами одной
+   * страны выбирает скорость, с гистерезисом вместо прилипания к выходу.
+   */
+  private fastest(key: string, list: Outlet[], current: string | null, tier: (o: Outlet) => number, now: number): Outlet[] {
+    const country = list[0]?.country ?? null;
+    const same = list.filter((o) => o.country === country);
+    const r = (this.opts.speed as SpeedBook).rank(key, same, current, { tier, now });
+    if (r.switched) this.opts.log.info(`${key}: ${r.reason}`);
+    return [...r.order, ...list.filter((o) => o.country !== country)];
+  }
+
+  /** Сервис сайта — ключ прилипания, самообучения и замеров. */
+  serviceKey(host: string): string {
+    return this.service(host);
   }
 
   private service(host: string): string {
@@ -119,6 +147,11 @@ export class Chooser {
   /** Отказ выхода, замеченный уже после соединения (закрыл, не ответив) — на проверку. */
   noteFailure(outlet: Outlet, why: string): void {
     this.opts.onFailure(outlet, new Error(why));
+  }
+
+  /** Исход соединения сайта через выход — самообучению, по сервису сайта. */
+  noteOutcome(host: string, outlet: Outlet, outcome: Outcome): void {
+    this.opts.outcomes?.record(this.service(host), outlet, outcome);
   }
 
   async connect(host: string, port: number, exclude: ReadonlySet<string> = new Set(), need: ExitNeed = {}): Promise<Connected> {
@@ -134,6 +167,8 @@ export class Chooser {
       } catch (error) {
         errors.push(`${outlet.name}: ${errorText(error)}`);
         this.opts.onFailure(outlet, error);
+        const kind = failureKind(error);
+        if (kind) this.noteOutcome(host, outlet, kind);
       }
     }
     throw new NoOutletError(host, port, errors, exclude.size, need);
