@@ -7,6 +7,13 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Contour</title>
+<!-- Значок: изолинии с разрывом и точка — трафик выходит, куда надо (assets/icons/). Вкладка —
+     SVG, запасной PNG и /favicon.ico; «Домой» на iOS — PNG без скругления (скругляет сама). -->
+<link rel="icon" href="/assets/icons/favicon.svg" type="image/svg+xml">
+<link rel="icon" href="/assets/icons/favicon-32.png" sizes="32x32" type="image/png">
+<link rel="apple-touch-icon" href="/assets/icons/apple-touch-icon.png">
+<link rel="manifest" href="/manifest.webmanifest">
+<meta name="apple-mobile-web-app-title" content="Contour">
 <meta name="color-scheme" content="light dark">
 <link rel="stylesheet" href="/shared/vendor/normalize.css">
 <link rel="stylesheet" href="/shared/assets/fonts/inter.css">
@@ -19,7 +26,7 @@
 <main class="console console_login" data-view="login" hidden>
   <form class="card stack stack_gap_l" data-login>
     <header class="bar">
-      <span class="glyph glyph_tone_accent"><svg class="icon" aria-hidden="true"><use href="/shared/assets/icons/sprite.svg#shield-check"/></svg></span>
+      <img src="/assets/icons/favicon.svg" width="44" height="44" alt="">
       <div class="bar__text"><h1 class="bar__title">Contour</h1><p class="bar__subtitle">VPN-выходы дома</p></div>
     </header>
     <div class="field">
@@ -34,6 +41,7 @@
 <!-- Панель -->
 <div class="console" data-view="app" hidden>
   <header class="bar bar_size_l console__head">
+    <img src="/assets/icons/favicon.svg" width="48" height="48" alt="">
     <div class="bar__text"><h1 class="bar__title">Contour</h1><p class="bar__subtitle" data-headline>…</p></div>
     <div class="bar__end">
       <button class="button button_view_ghost button_shape_round" type="button" data-logout aria-label="Выйти"><svg class="icon button__icon" aria-hidden="true"><use href="/shared/assets/icons/sprite.svg#logout"/></svg></button>
