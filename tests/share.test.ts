@@ -151,7 +151,7 @@ test('план телефона: точное имя — строкой; зап�
     { match: { kind: 'domain', name: 'ads.example', exact: false }, action: { target: { kind: 'reject' } } },
     { match: { kind: 'domain', name: 'www.example.org', exact: true }, action: { target: { kind: 'reject' } } },
     { match: { kind: 'domain', name: 'openai.com', exact: false }, action: { target: { kind: 'avoid', countries: ['RU'] }, fastest: true } },
-    { match: { kind: 'cidr', net: (172 * 2 ** 24) + (16 << 16) + (253 << 8), bits: 24 }, action: { target: { kind: 'only', outlets: ['corp'] } } },
+    { match: { kind: 'cidr', net: (172 * 2 ** 24) + (16 << 16) + (42 << 8), bits: 24 }, action: { target: { kind: 'only', outlets: ['corp'] } } },
   ] }]);
   const plan = phonePlan(rules, []);
   assert.deepEqual(plan.reject, ['ads.example']);

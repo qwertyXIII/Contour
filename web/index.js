@@ -4,6 +4,7 @@
 import { startSystem } from '/shared/system.js';
 import { App } from './components/app/app.js';
 import { Devices } from './components/devices/devices.js';
+import { Guide } from './components/guide/guide.js';
 import { Journal } from './components/journal/journal.js';
 import { Outlets } from './components/outlets/outlets.js';
 import { Overview } from './components/overview/overview.js';
@@ -16,6 +17,7 @@ startSystem(document.body);
 const SECTIONS = [
   ['[data-overview]', Overview],
   ['[data-devices]', Devices],
+  ['[data-guide]', Guide],
   ['[data-sites]', Sites],
   ['[data-rules]', Rules],
   ['[data-outlets]', Outlets],
