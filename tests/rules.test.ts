@@ -97,3 +97,24 @@ test('книга: встроенные источники с тем же пов�
   assert.equal(new CompiledRules(tmp('contour-none-')).dnsVia('instagram.com'), undefined, 'набора нет — DNS решает, как раньше');
   book.stop();
 });
+
+test('шлюз: классы из правил — страна с прямым её страны, «не через», «только» с частной подсетью, запрет; имя класса одно в обоих процессах', async () => {
+  const { gatewayClasses, routeOf, routeCountry } = await import('../src/rules/gateway.ts');
+  const { newOutlet } = await import('../src/outlets/outlet.ts');
+  const o = (name: string, priority: number, country: string, direct = false) => Object.assign(newOutlet({ name, kind: 'netns', bridge: 1, protocol: 'wireguard', conf: '/x', env: null, dns: [], mtu: null, priority, enabled: true }, 1080), { country, direct });
+  const outlets = [o('home', 1000, 'RU', true), o('de2', 20, 'DE'), o('de1', 10, 'DE'), o('ru1', 5, 'RU')];
+  const r = new RuleSet([{ layer: 'manual', source: 'мои', entries: [
+    name('gosuslugi.ru', act({ kind: 'country', country: 'RU' })), name('openai.com', act({ kind: 'avoid', countries: ['RU'] })),
+    net('172.16.42.0/24', act({ kind: 'only', outlets: ['de1', 'home'] })), name('ads.example', act({ kind: 'reject' })), name('x.com', TUNNEL), name('y.com', DIRECT),
+  ] }]);
+  const { classes } = gatewayClasses(r, outlets);
+  assert.deepEqual(classes.map((c) => [c.name, c.outlets, c.nets ?? []]), [
+    ['avoid-ru', ['de1', 'de2'], []],
+    ['country-ru', ['ru1', 'home'], []],
+    ['only-de1-home', ['de1'], ['172.16.42.0/24']],
+    ['reject', [], []],
+  ], 'туннель и «напрямую» — как до движка, без классов; прямой — никогда в «только»');
+  assert.equal(routeOf(act({ kind: 'country', country: 'RU' })), 'country-ru');
+  assert.equal(routeCountry('country-ru'), 'RU');
+  assert.equal(routeCountry('only-de1'), undefined);
+});

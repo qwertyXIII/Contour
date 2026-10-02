@@ -3,11 +3,12 @@ import { errorText, log } from '../log.ts';
 import { Learner } from './learn.ts';
 import { Lists } from './lists.ts';
 import { CompiledRules, rulesDir } from '../rules/compiled.ts';
+import { routeCountry } from '../rules/gateway.ts';
 import { Overrides } from './overrides.ts';
 import { startDns, type Decide } from './server.ts';
 import { makeTunnelProbe, readToken } from './tunnel-probe.ts';
 import { TunnelResolver } from './tunnel-resolve.ts';
-import { allowRequest, GatewayClients, gatewayHook } from './gateway.ts';
+import { allowRequest, defaultRoute, GatewayClients, gatewayHook } from './gateway.ts';
 import { Subnets } from './subnets.ts';
 import { hintSender } from '../inlets/hints.ts';
 import { rootCall } from '../root/protocol.ts';
@@ -64,7 +65,9 @@ try {
   const tunnelResolver = proxy ? new TunnelResolver(proxy) : null;
   const gateway = tunnelResolver ? gatewayHook({
     clients: new GatewayClients(undefined, undefined, () => rootCall<string[]>({ cmd: 'gateway.seen' }, 3_000)),
-    resolve: (n) => tunnelResolver.resolve(n),
+    // Куда имени шлюза — по правилам Contour (класс маршрута); правила нет — как до движка.
+    route: (n, d) => rules.gatewayRoute(n) ?? defaultRoute(n, d),
+    resolve: (n, route) => tunnelResolver.resolve(n, routeCountry(route)),
     allow: async (ips, ttl, route) => { await rootCall(allowRequest(ips, ttl, route), 3_000); },
     log: dnsLog,
   }) : undefined;

@@ -36,6 +36,8 @@ export type RootRequest =
   | { cmd: 'gateway.classes'; classes: GatewayClass[] }
   | { cmd: 'gateway.seen' }
   | { cmd: 'gateway.nets'; cidrs: string[] }
+  /** Исключения ограды SOCKS выходов: выход → частные подсети правил «только через него» (root/fence-allow.ts). */
+  | { cmd: 'outlet.fence'; outlets: Record<string, string[]> }
   | { cmd: 'contour.restart' };
 
 /** Класс маршрута шлюза, как он сейчас в ядре: `via` — выход, которым класс идёт; null — никаким (`unreachable`). */

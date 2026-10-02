@@ -35,6 +35,9 @@ set -euo pipefail
 export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 
 KEYS=/etc/contour/keys
+# Исключения ограды SOCKS выхода: <имя> — подсети правил «только через этот выход»
+# (корпоративная сеть), по одной в строке; пишет помощник (outlet.fence).
+FENCE_ALLOW=/etc/contour/fence-allow
 LIB=/var/lib/contour/netns
 SERVICE_USER=contour
 MIHOMO=/opt/contour/bin/mihomo
@@ -112,7 +115,14 @@ write_socks_config() {
   # достучаться до служб самого сервера (10.201.N.1) и домашней сети. Пришло
   # имя — mihomo разрешит его своим DNS через туннель (resolv.conf хоста внутри
   # не годится) и сверит адрес с оградой.
-  local fence c
+  # Исключения — только подсети правил «только через этот выход» (помощник,
+  # outlet.fence) и только частные: их и закрывает ограда. Строка не по
+  # шаблону адреса — пропущена: файл не должен дописать в конфиг что-то своё.
+  local fence allow c
+  allow=""
+  if [ -f "$FENCE_ALLOW/$NAME" ]; then
+    allow=$(grep -E '^(10|172|192|100|169)\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}/[0-9]{1,2}$' "$FENCE_ALLOW/$NAME" | head -64 | while read -r c; do printf '  - IP-CIDR,%s,DIRECT\n' "$c"; done)
+  fi
   fence=$(for c in $FENCE_V4; do printf '  - IP-CIDR,%s,REJECT\n' "$c"; done)
   (umask 077; cat > "$dir/config.yaml" <<EOF
 mode: rule
@@ -133,7 +143,8 @@ listeners:
       - username: $NAME
         password: $SOCKS_PASS
 rules:
-$fence
+${allow:+$allow
+}$fence
   - MATCH,DIRECT
 EOF
   )

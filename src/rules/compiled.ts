@@ -2,7 +2,9 @@ import { statSync } from 'node:fs';
 import path from 'node:path';
 import type { Config } from '../config.ts';
 import { COMPILED_FILE, readCompiled } from './book.ts';
+import type { GatewayRoute } from '../gateway.ts';
 import { RuleSet } from './engine.ts';
+import { routeOf } from './gateway.ts';
 
 /**
  * Правила в процессе DNS — копия, которую кладёт Contour (`RuleBook`):
@@ -47,6 +49,15 @@ export class CompiledRules {
     const t = d.action.target;
     const direct = t.kind === 'direct' || (t.kind === 'country' && t.country === this.directCountry);
     return { tunnel: !direct, source: d.source };
+  }
+
+  /**
+   * Класс маршрута шлюза для имени (`rules/gateway.ts`); правила нет — `null`:
+   * решит прежнее «куда» (заблокированное — «как сейчас», режим устройства).
+   */
+  gatewayRoute(name: string, now = Date.now()): GatewayRoute | null {
+    const d = this.rules(now)?.decideName(name);
+    return d && d.layer !== 'learned' ? routeOf(d.action) : null;
   }
 
   rules(now = Date.now()): RuleSet | null {

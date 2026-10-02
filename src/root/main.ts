@@ -3,6 +3,7 @@ import net from 'node:net';
 import path from 'node:path';
 import { errorText, log } from '../log.ts';
 import { allowAddresses, applyGateway, seenDevices, setDeviceMode, setNets, syncGatewayRoutes } from './gateway.ts';
+import { setFenceAllow } from './fence-allow.ts';
 import { declareClasses, routeAddresses } from './gateway-classes.ts';
 import { activateOutletCmd, addOutletCmd, enableOutletCmd, groupOutletCmd, priorityOutletCmd, removeOutletCmd, restartContourCmd, restartOutletCmd, statusCmd } from './outlets.ts';
 import { MAX_REQUEST_BYTES, ROOT_SOCKET, type RootRequest, type RootResponse } from './protocol.ts';
@@ -66,6 +67,7 @@ async function dispatch(req: RootRequest): Promise<unknown> {
     case 'gateway.classes': return serial(() => declareClasses(req.classes));
     case 'gateway.seen': return seenDevices();
     case 'gateway.nets': return serial(() => setNets(req.cidrs));
+    case 'outlet.fence': return outletJob(() => setFenceAllow(req));
     case 'contour.restart': return serial(async () => restartContourCmd());
     default: throw new Error('неизвестная команда');
   }
