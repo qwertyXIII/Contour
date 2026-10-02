@@ -74,7 +74,7 @@ async function main(): Promise<void> {
     mkdirSync(config.mihomo.dir, { recursive: true, mode: 0o700 });
     const configPath = path.join(config.mihomo.dir, 'config.yaml');
     // Подписки mihomo качает через первый ядерный выход: сайт подписки отсюда может быть закрыт.
-    const kernel = prepared.outlets.find((o) => !prepared.mihomo.some((m) => m.outlet === o));
+    const kernel = prepared.outlets.find((o) => !o.direct && !prepared.mihomo.some((m) => m.outlet === o));
     const fetchVia = kernel ? { ...kernel.socks } : null;
     writeFileSync(configPath, buildMihomoConfig({ outlets: prepared.mihomo, controller: config.mihomo.controller, secret, fetchVia }), { mode: 0o600 });
     chmodSync(configPath, 0o600);
@@ -117,6 +117,9 @@ async function main(): Promise<void> {
     probePath: config.health.probePath,
     ipHost: config.health.ipHost,
     ipIntervalMs: config.health.ipIntervalSec * 1000,
+    countryHost: config.health.countryHost,
+    // Край раздачи ведёт UDP «страны» прямо в выходы этой страны — узнали страну, пересобрать.
+    onCountry: () => shareRefresh?.(),
     log,
     dial,
   });

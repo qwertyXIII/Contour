@@ -29,6 +29,8 @@ export type EdgeOptions = {
   proxy: { host: string; port: number };
   /** Ядерные выходы для UDP, по приоритету (спрашивается на каждом перезапуске). */
   udp: () => UdpOutlet[];
+  /** Страны выхода и их выходы для UDP — тоже на каждом перезапуске: страна выхода узнаётся по ходу. */
+  countries: () => Array<{ code: string; udp: UdpOutlet[] }>;
   probeUrl: string;
   log: Logger;
 };
@@ -100,11 +102,13 @@ export class Edge {
     const configPath = path.join(this.opts.dir, 'config.yaml');
     mkdirSync(this.opts.dir, { recursive: true, mode: 0o700 });
     const udp = this.opts.udp();
+    const countries = this.opts.countries();
     const { listen, port, proxy, probeUrl, controller } = this.opts;
-    const text = buildEdgeConfig({ devices, wsPath: store.settings().path, listen, port, proxy, udp, probeUrl, controller, secret });
+    const text = buildEdgeConfig({ devices, wsPath: store.settings().path, listen, port, proxy, udp, countries, probeUrl, controller, secret });
     writeFileSync(configPath, text, { mode: 0o600 });
     chmodSync(configPath, 0o600);
-    log.info(`край раздачи: устройств ${devices.length}, вход ${listen}:${port}, UDP — ${udp.length > 0 ? udp.map((o) => o.name).join(' → ') : 'нет ядерных выходов, отвергается'}`);
+    const names = (list: UdpOutlet[]): string => (list.length > 0 ? list.map((o) => o.name).join(' → ') : 'нет выходов');
+    log.info(`край раздачи: устройств ${devices.length}, вход ${listen}:${port}, UDP — ${names(udp)}${countries.map((c) => `, ${c.code} — ${names(c.udp)}`).join('')}`);
     this.handle = runMihomo({ bin: this.opts.bin, dir: this.opts.dir, configPath, controller: this.opts.controller, secret, log, label: 'edge' });
     await this.handle.ready;
     this.open = await listening(this.opts.listen, this.opts.port);

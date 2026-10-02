@@ -8,21 +8,25 @@ import { normalizeSite } from '../dns/overrides.ts';
  * на телефоне), и адрес, по которому их ждать.
  *
  * Своё хранилище в папке данных Contour, а не файл `tokens` в `/etc/contour`:
- * тот принадлежит root, а устройства добавляются из панели. У устройства три
- * значения:
+ * тот принадлежит root, а устройства добавляются из панели. У устройства:
  * - `uuid` — его ключ VLESS (вход края, `edge.ts`) и пароль, с которым край
  *   ходит за него в HTTP-прокси Contour (`share.<id>`): одна тайна на одно
  *   устройство, обе стороны — на этой машине;
+ * - `exits` — ещё по ключу на каждую страну выхода (`share.countries`): второй
+ *   сервер в Shadowrocket, «Contour-RU». Всё, что телефон шлёт на него, Contour
+ *   выпускает в этой стране — так решил владелец (2026-10-02): уехал за границу —
+ *   переключил «Россию» на этот сервер, и Госуслуги видят российский адрес;
  * - `list` — отдельный токен ссылки на правила: адрес ссылки попадает в журнал
  *   nginx и в настройки Shadowrocket, а ключ VLESS туда попадать не должен;
  * - `id` — имя устройства для края и счётчиков, без тайны.
  *
  * Секретный путь WebSocket создаётся один раз и не меняется: сменить его —
- * значит отвязать все телефоны.
+ * значит отвязать все телефоны. `countrySites` — свои сайты «только с адресом
+ * этой страны» (банки и прочее, чего нет в общем списке).
  */
 
-export type ShareDevice = { id: string; name: string; uuid: string; list: string; enabled: boolean; created: number };
-export type ShareSettings = { domain: string | null; path: string };
+export type ShareDevice = { id: string; name: string; uuid: string; exits: Record<string, string>; list: string; enabled: boolean; created: number };
+export type ShareSettings = { domain: string | null; path: string; countrySites: Record<string, string[]> };
 
 type File = { settings: ShareSettings; devices: ShareDevice[] };
 
@@ -31,25 +35,32 @@ export const SHARE_PREFIX = 'share.';
 export const shareWho = (id: string): string => `${SHARE_PREFIX}${id}`;
 
 const MAX_DEVICES = 50;
+const MAX_SITES = 500;
 
 function fresh(): File {
-  return { settings: { domain: null, path: `/s-${randomBytes(12).toString('hex')}` }, devices: [] };
+  return { settings: { domain: null, path: `/s-${randomBytes(12).toString('hex')}`, countrySites: {} }, devices: [] };
 }
+
+const copy = (d: ShareDevice): ShareDevice => ({ ...d, exits: { ...d.exits } });
 
 export class ShareStore {
   private readonly file: string;
+  private readonly countries: string[];
   private data: File;
   private readonly listeners: Array<() => void> = [];
 
-  constructor(dir: string) {
+  constructor(dir: string, countries: string[] = []) {
     this.file = path.join(dir, 'share.json');
+    this.countries = countries;
+    let loaded: File | null = null;
     try {
-      this.data = JSON.parse(readFileSync(this.file, 'utf8')) as File;
+      loaded = JSON.parse(readFileSync(this.file, 'utf8')) as File;
     } catch {
       // Первый запуск: путь создаётся сразу и сохраняется — дальше он постоянный.
-      this.data = fresh();
-      this.save();
     }
+    this.data = loaded ?? fresh();
+    // Файл прежней версии: стран и своих сайтов в нём ещё нет — добавить и сохранить.
+    if (this.upgrade() || !loaded) this.save();
   }
 
   onChange(fn: () => void): void {
@@ -57,19 +68,31 @@ export class ShareStore {
   }
 
   settings(): ShareSettings {
-    return { ...this.data.settings };
+    const s = this.data.settings;
+    return { ...s, countrySites: Object.fromEntries(Object.entries(s.countrySites).map(([k, v]) => [k, [...v]])) };
   }
 
   devices(): ShareDevice[] {
-    return this.data.devices.map((d) => ({ ...d }));
+    return this.data.devices.map(copy);
   }
 
   /** Адрес снаружи (`contour.example.ru`); пусто — раздача без адреса, ссылок не будет. */
   setDomain(value: string): ShareSettings {
-    const domain = value.trim() ? normalizeSite(value) : null;
-    this.data.settings.domain = domain;
+    this.data.settings.domain = value.trim() ? normalizeSite(value) : null;
     this.commit();
     return this.settings();
+  }
+
+  /** Свой сайт «только с адресом страны»: добавить (`on`) или убрать. */
+  setCountrySite(country: string, name: string, on: boolean): string[] {
+    if (!this.countries.includes(country)) throw new Error(`страны ${country} нет в share.countries`);
+    const site = normalizeSite(name);
+    const list = new Set(this.data.settings.countrySites[country] ?? []);
+    if (on && list.size >= MAX_SITES) throw new Error(`сайтов уже ${MAX_SITES}`);
+    if (on) list.add(site); else list.delete(site);
+    this.data.settings.countrySites[country] = [...list].sort();
+    this.commit();
+    return [...list].sort();
   }
 
   add(name: string): ShareDevice {
@@ -78,10 +101,11 @@ export class ShareStore {
     if (this.data.devices.length >= MAX_DEVICES) throw new Error(`устройств уже ${MAX_DEVICES}`);
     let id = randomBytes(4).toString('hex');
     while (this.data.devices.some((d) => d.id === id)) id = randomBytes(4).toString('hex');
-    const device: ShareDevice = { id, name: clean, uuid: randomUUID(), list: randomBytes(24).toString('base64url'), enabled: true, created: Date.now() };
+    const exits = Object.fromEntries(this.countries.map((c) => [c, randomUUID()]));
+    const device: ShareDevice = { id, name: clean, uuid: randomUUID(), exits, list: randomBytes(24).toString('base64url'), enabled: true, created: Date.now() };
     this.data.devices.push(device);
     this.commit();
-    return { ...device };
+    return copy(device);
   }
 
   remove(id: string): void {
@@ -103,14 +127,27 @@ export class ShareStore {
     const given = Buffer.from(token);
     for (const d of this.data.devices) {
       const want = Buffer.from(d.list);
-      if (d.enabled && want.length === given.length && timingSafeEqual(want, given)) return { ...d };
+      if (d.enabled && want.length === given.length && timingSafeEqual(want, given)) return copy(d);
     }
     return null;
   }
 
-  /** Пароли края в HTTP-прокси: `share.<id>` → uuid, только включённые. */
+  /** Пароли края в HTTP-прокси: `share.<id>` → uuid, только включённые (страна едет заголовком, а не паролем). */
   proxyTokens(): Map<string, Buffer> {
     return new Map(this.data.devices.filter((d) => d.enabled).map((d) => [shareWho(d.id), Buffer.from(d.uuid)]));
+  }
+
+  /** Недостающее у прежнего файла: свои сайты стран, ключи стран у устройств. */
+  private upgrade(): boolean {
+    let changed = false;
+    if (!this.data.settings.countrySites) { this.data.settings.countrySites = {}; changed = true; }
+    for (const d of this.data.devices) {
+      if (!d.exits) { d.exits = {}; changed = true; }
+      for (const c of this.countries) {
+        if (!d.exits[c]) { d.exits[c] = randomUUID(); changed = true; }
+      }
+    }
+    return changed;
   }
 
   private commit(): void {

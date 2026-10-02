@@ -59,6 +59,9 @@ function parseVless(u: URL): MihomoProxy {
     if (q.get('sni')) proxy.servername = q.get('sni');
     if (q.get('fp')) proxy['client-fingerprint'] = q.get('fp');
     if (truthy(q.get('allowInsecure'))) proxy['skip-cert-verify'] = true;
+    // Раздача другого Contour даёт `alpn=http/1.1`: WebSocket за nginx живёт только поверх HTTP/1.1.
+    const alpn = q.get('alpn')?.split(',').map((a) => a.trim()).filter(Boolean);
+    if (alpn && alpn.length > 0) proxy.alpn = alpn;
   }
   if (security === 'reality') {
     const pbk = q.get('pbk');

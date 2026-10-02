@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import { isIP } from 'node:net';
 import { parse } from 'yaml';
 import { parseCidr } from './cidr.ts';
+import { CLOUDFLARE_V4, DEFAULT_LISTS, DEFAULT_SUBNET_LISTS, GAME_PORTS, LAN_DOMAINS } from './config-lists.ts';
 
 /**
  * Настройки Contour — один YAML, читается при старте.
@@ -50,12 +51,23 @@ export type OutletConfig = {
    * когда работающий не отвечает (`outlets/rivals.ts`). Только у ядерных выходов.
    */
   group: string | null;
+  /** Страна выхода руками (`NL`); null — Contour узнаёт сам по внешнему адресу. */
+  country?: string | null;
 };
+
+/**
+ * «Прямой выход» — интернет самого сервера, без туннеля. Ограда частных адресов
+ * та же. `onRequest` — только когда просят его страну (телефон за границей
+ * просит Россию: Госуслуги и банки не пускают заграничные адреса); выключить —
+ * обычный выход по приоритету (сервер там, где ничего не заблокировано).
+ */
+export type DirectConfig = { enabled: boolean; name: string; priority: number; onRequest: boolean; country: string | null };
 
 export type Config = {
   http: { listen: string; port: number };
   tokens: string;
   outlets: OutletConfig[];
+  direct: DirectConfig;
   mihomo: { bin: string; dir: string; socksBase: number; controller: string };
   health: {
     intervalSec: number;
@@ -68,6 +80,8 @@ export type Config = {
     portsHost: string;
     /** Как часто перепроверять порты: провайдер может поменять фильтр. */
     portsIntervalSec: number;
+    /** Кто называет страну по адресу (`/<адрес>/country`), — когда у выхода сменился внешний адрес. */
+    countryHost: string;
   };
   sticky: { hours: number };
   /** Веб-панель: дома по паролю — http://vpn.home и http://<lan.address>. */
@@ -131,59 +145,20 @@ export type Config = {
    * (VLESS через WebSocket), `listPort` — правила по ссылке. Домен и устройства —
    * в панели, не здесь: их добавляют без root.
    */
-  share: { enabled: boolean; listen: string; port: number; listPort: number; controller: string; dir: string };
+  share: {
+    enabled: boolean; listen: string; port: number; listPort: number; controller: string; dir: string;
+    /** Страны, в которые телефон может попросить выход, — второй сервер в Shadowrocket на каждую («Contour-RU»). */
+    countries: string[];
+  };
 };
 
-/**
- * Supercell: игровой сервер — TCP 9339; все их имена — в общем списке, поэтому
- * DNS отдаёт игре наш адрес. Напрямую нельзя — Supercell не пускает российские
- * адреса. ⚠️ Нужен выход, который пропускает 9339: AmneziaWG `ext` (в России)
- * соединение принимал и сразу рвал, OpenVPN того же провайдера пропускает —
- * Brawl Stars играется (2026-10-01).
- */
-export const GAME_PORTS = [
-  { port: 9339, hosts: ['brawlstarsgame.com', 'clashroyaleapp.com', 'clashofclans.com', 'supercell.com', 'haydaygame.com', 'boombeachgame.com', 'squadbustersgame.com'] },
-];
-
-/** itdoginfo/allow-domains, «Russia inside» — заблокированное и недоступное из России. */
-export const DEFAULT_LISTS = ['https://raw.githubusercontent.com/itdoginfo/allow-domains/main/Russia/inside-raw.lst'];
-
-/**
- * itdoginfo/allow-domains, Subnets/IPv4: Discord (голос — свои сети и Google
- * Cloud), Telegram и Meta (звонки Telegram и WhatsApp, которые в России режут).
- * Решение владельца 2026-10-02: «списки добавить нужно».
- */
-export const DEFAULT_SUBNET_LISTS = ['discord', 'telegram', 'meta']
-  .map((s) => `https://raw.githubusercontent.com/itdoginfo/allow-domains/main/Subnets/IPv4/${s}.lst`);
-
-/**
- * Cloudflare (cloudflare.com/ips-v4): за ним пол-интернета, и в списке Discord
- * он есть. Через VPN по подсети его не ведём — Discord и сайты на Cloudflare и
- * так идут через VPN по именам (DNS), а весь Cloudflare в туннеле — это медленно
- * и дорого по трафику. Так предложено 2026-10-02; владелец ответил «списки
- * добавить нужно», вариант с Cloudflare — заменой этого списка на [].
- */
-export const CLOUDFLARE_V4 = [
-  '173.245.48.0/20', '103.21.244.0/22', '103.22.200.0/22', '103.31.4.0/22', '141.101.64.0/18', '108.162.192.0/18',
-  '190.93.240.0/20', '188.114.96.0/20', '197.234.240.0/22', '198.41.128.0/17', '162.158.0.0/15', '104.16.0.0/13',
-  '104.24.0.0/14', '172.64.0.0/13', '131.0.72.0/22',
-];
-
-/**
- * YouTube целиком: страницы, API приложения для ТВ, видео (googlevideo),
- * картинки. `googleapis.com` целиком не берём — через него ходит пол-Google,
- * а замедлен именно YouTube.
- */
-export const LAN_DOMAINS = [
-  'youtube.com', 'youtu.be', 'yt.be', 'youtube-nocookie.com', 'youtubekids.com',
-  'googlevideo.com', 'ytimg.com', 'ggpht.com',
-  'youtubei.googleapis.com', 'youtube.googleapis.com', 'youtubeembeddedplayer.googleapis.com', 'jnn-pa.googleapis.com',
-];
+export { CLOUDFLARE_V4, COUNTRY_LISTS, DEFAULT_LISTS, DEFAULT_SUBNET_LISTS, GAME_PORTS, LAN_DOMAINS } from './config-lists.ts';
 
 export const DEFAULTS: Config = {
   http: { listen: '127.0.0.1', port: 3128 },
   tokens: '/etc/contour/tokens',
   outlets: [],
+  direct: { enabled: true, name: 'home', priority: 1_000, onRequest: true, country: null },
   mihomo: {
     bin: '/opt/contour/bin/mihomo',
     dir: '/var/lib/contour/mihomo',
@@ -199,6 +174,7 @@ export const DEFAULTS: Config = {
     ipIntervalSec: 300,
     portsHost: 'portquiz.net',
     portsIntervalSec: 86_400,
+    countryHost: 'ipinfo.io',
   },
   sticky: { hours: 24 },
   panel: {
@@ -226,7 +202,7 @@ export const DEFAULTS: Config = {
     ports: GAME_PORTS,
     hintPort: 18053,
   },
-  share: { enabled: true, listen: '127.0.0.1', port: 18300, listPort: 18091, controller: '127.0.0.1:19091', dir: '/var/lib/contour/share' },
+  share: { enabled: true, listen: '127.0.0.1', port: 18300, listPort: 18091, controller: '127.0.0.1:19091', dir: '/var/lib/contour/share', countries: ['RU'] },
 };
 
 export class ConfigError extends Error {}
@@ -274,6 +250,22 @@ function bool(raw: Raw, key: string, fallback: boolean, where: string): boolean 
 }
 
 const NAME = /^[a-z0-9][a-z0-9_-]{0,31}$/;
+const COUNTRY = /^[A-Z]{2}$/;
+
+function country(raw: Raw, key: string, where: string): string | null {
+  if (raw[key] === undefined || raw[key] === null) return null;
+  const c = str(raw, key, '', where).toUpperCase();
+  if (!COUNTRY.test(c)) throw new ConfigError(`${where}.${key}: две латинские буквы страны, например NL`);
+  return c;
+}
+
+function countryList(value: unknown, fallback: string[]): string[] {
+  if (value === undefined || value === null) return fallback;
+  if (!Array.isArray(value) || !value.every((v) => typeof v === 'string' && COUNTRY.test(v.toUpperCase()))) {
+    throw new ConfigError('share.countries: список стран, например [RU]');
+  }
+  return [...new Set((value as string[]).map((v) => v.toUpperCase()))];
+}
 
 function ipv4(raw: Raw, key: string, fallback: string): string {
   const value = str(raw, key, fallback, 'lan');
@@ -344,7 +336,7 @@ function dnsList(value: unknown, where: string): string[] {
 function outlet(raw: unknown, index: number): OutletConfig {
   const where = `outlets[${index}]`;
   if (!isRecord(raw)) throw new ConfigError(`${where}: нужен раздел с полями name, protocol, conf`);
-  onlyKnown(raw, where, ['name', 'kind', 'bridge', 'protocol', 'conf', 'env', 'dns', 'mtu', 'priority', 'enabled', 'group']);
+  onlyKnown(raw, where, ['name', 'kind', 'bridge', 'protocol', 'conf', 'env', 'dns', 'mtu', 'priority', 'enabled', 'group', 'country']);
   const name = str(raw, 'name', '', where);
   if (!NAME.test(name)) {
     throw new ConfigError(`${where}.name: латиница, цифры, «-» и «_», до 32 знаков — имя идёт в логин потребителя`);
@@ -374,26 +366,29 @@ function outlet(raw: unknown, index: number): OutletConfig {
     priority: num(raw, 'priority', 100, where, 0, 10_000),
     enabled: bool(raw, 'enabled', true, where),
     group,
+    country: country(raw, 'country', where),
   };
 }
 
 export function parseConfig(text: string): Config {
   const raw: unknown = parse(text) ?? {};
   if (!isRecord(raw)) throw new ConfigError('в корне должен быть раздел, а не список или строка');
-  onlyKnown(raw, 'корень', ['http', 'tokens', 'outlets', 'mihomo', 'health', 'sticky', 'lan', 'panel', 'share']);
+  onlyKnown(raw, 'корень', ['http', 'tokens', 'outlets', 'direct', 'mihomo', 'health', 'sticky', 'lan', 'panel', 'share']);
 
   const http = section(raw, 'http');
   onlyKnown(http, 'http', ['listen', 'port']);
   const mihomo = section(raw, 'mihomo');
   onlyKnown(mihomo, 'mihomo', ['bin', 'dir', 'socksBase', 'controller']);
   const health = section(raw, 'health');
-  onlyKnown(health, 'health', ['intervalSec', 'connectTimeoutSec', 'probeHost', 'probePath', 'ipHost', 'ipIntervalSec', 'portsHost', 'portsIntervalSec']);
+  onlyKnown(health, 'health', ['intervalSec', 'connectTimeoutSec', 'probeHost', 'probePath', 'ipHost', 'ipIntervalSec', 'portsHost', 'portsIntervalSec', 'countryHost']);
+  const direct = section(raw, 'direct');
+  onlyKnown(direct, 'direct', ['enabled', 'name', 'priority', 'onRequest', 'country']);
   const sticky = section(raw, 'sticky');
   onlyKnown(sticky, 'sticky', ['hours']);
   const panel = section(raw, 'panel');
   onlyKnown(panel, 'panel', ['enabled', 'listen', 'port', 'name', 'passwordFile', 'dataDir']);
   const share = section(raw, 'share');
-  onlyKnown(share, 'share', ['enabled', 'listen', 'port', 'listPort', 'controller', 'dir']);
+  onlyKnown(share, 'share', ['enabled', 'listen', 'port', 'listPort', 'controller', 'dir', 'countries']);
   const lan = section(raw, 'lan');
   onlyKnown(lan, 'lan', ['enabled', 'address', 'allow', 'upstream', 'domains', 'extraDomains', 'tlsPort', 'httpPort', 'lists', 'learn', 'probeBudgetMs', 'dataDir', 'ports', 'hintPort', 'subnetLists', 'subnetSkip']);
 
@@ -412,6 +407,9 @@ export function parseConfig(text: string): Config {
   }
 
   const d = DEFAULTS;
+  const directName = str(direct, 'name', d.direct.name, 'direct');
+  if (!NAME.test(directName)) throw new ConfigError('direct.name: латиница, цифры, «-» и «_», до 32 знаков');
+  if (names.has(directName)) throw new ConfigError(`direct.name: «${directName}» — уже имя выхода из outlets`);
   return {
     http: {
       listen: str(http, 'listen', d.http.listen, 'http'),
@@ -419,6 +417,13 @@ export function parseConfig(text: string): Config {
     },
     tokens: str(raw, 'tokens', d.tokens, 'корень'),
     outlets,
+    direct: {
+      enabled: bool(direct, 'enabled', d.direct.enabled, 'direct'),
+      name: directName,
+      priority: num(direct, 'priority', d.direct.priority, 'direct', 0, 10_000),
+      onRequest: bool(direct, 'onRequest', d.direct.onRequest, 'direct'),
+      country: country(direct, 'country', 'direct'),
+    },
     mihomo: {
       bin: str(mihomo, 'bin', d.mihomo.bin, 'mihomo'),
       dir: str(mihomo, 'dir', d.mihomo.dir, 'mihomo'),
@@ -434,6 +439,7 @@ export function parseConfig(text: string): Config {
       ipIntervalSec: num(health, 'ipIntervalSec', d.health.ipIntervalSec, 'health', 10, 86_400),
       portsHost: str(health, 'portsHost', d.health.portsHost, 'health'),
       portsIntervalSec: num(health, 'portsIntervalSec', d.health.portsIntervalSec, 'health', 3600, 30 * 86_400),
+      countryHost: str(health, 'countryHost', d.health.countryHost, 'health'),
     },
     sticky: { hours: num(sticky, 'hours', d.sticky.hours, 'sticky', 0, 24 * 30) },
     panel: {
@@ -468,6 +474,7 @@ export function parseConfig(text: string): Config {
       listPort: num(share, 'listPort', d.share.listPort, 'share', 1024, 65_535),
       controller: str(share, 'controller', d.share.controller, 'share'),
       dir: str(share, 'dir', d.share.dir, 'share'),
+      countries: countryList(share.countries, d.share.countries),
     },
   };
 }

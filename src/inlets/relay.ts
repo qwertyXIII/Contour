@@ -3,7 +3,7 @@ import type { Consumers } from '../consumers.ts';
 import { errorText, type Logger } from '../log.ts';
 import type { Outlet } from '../outlets/outlet.ts';
 import type { PortLearner } from '../outlets/ports.ts';
-import type { Chooser } from '../select/chooser.ts';
+import type { Chooser, ExitNeed } from '../select/chooser.ts';
 import type { Meter } from '../stats/meter.ts';
 
 /**
@@ -25,7 +25,8 @@ import type { Meter } from '../stats/meter.ts';
  * байт сайта — порт этот выход пропускает.
  */
 
-export type Target = { host: string; port: number };
+/** `need` — чего соединение требует от выхода (страну), см. `chooser.ts`. */
+export type Target = { host: string; port: number; need?: ExitNeed };
 export type RelayDeps = { chooser: Chooser; consumers: Consumers; log: Logger; meter?: Meter; ports?: PortLearner };
 export type RelayHooks = {
   /** Первый выход открылся — один раз. */
@@ -101,7 +102,7 @@ export function relay(client: Socket, head: Buffer, who: string, target: Target,
     }
     attempts += 1;
     try {
-      const { socket, outlet, failed: skipped } = await chooser.connect(target.host, target.port, exclude);
+      const { socket, outlet, failed: skipped } = await chooser.connect(target.host, target.port, exclude, target.need);
       if (client.destroyed) { socket.destroy(); return; }
       if (failed) log.info(`${where} — «${failed.name}» ${why}, повтор через «${outlet.name}»`);
       else if (skipped.length > 0) log.info(`${where} через «${outlet.name}» после отказа ${skipped.join(', ')}`);

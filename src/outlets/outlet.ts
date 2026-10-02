@@ -34,6 +34,14 @@ export type Outlet = {
   ports: PortsInfo;
   /** Отпечаток ключа: тот же выход после перезапуска или новый ключ под старым именем. */
   confHash: string | null;
+  /** Прямой выход — интернет самого сервера (`config.direct`): соединение без SOCKS. */
+  direct: boolean;
+  /** Только когда просят его страну: без просьбы выбор выхода его не видит. */
+  onRequest: boolean;
+  /** Страна выхода (`NL`): из настроек или по внешнему адресу; null — ещё не узнали. */
+  country: string | null;
+  /** Страна задана руками — по адресу не переписывается. */
+  countryFixed: boolean;
 };
 
 /** sha256 файла ключа; не прочитать (в тестах — выдуманный путь) — null. */
@@ -68,7 +76,17 @@ export function newOutlet(config: Omit<OutletConfig, 'group'> & { group?: string
     checkedAt: null,
     ports: unknownPorts(),
     confHash: confHash(config.conf),
+    direct: false,
+    onRequest: false,
+    country: config.country ?? null,
+    countryFixed: Boolean(config.country),
   };
+}
+
+/** Прямой выход: SOCKS ему не нужен — `dialVia` соединяется сам. */
+function directOutlet(d: Config['direct']): Outlet {
+  const o = newOutlet({ name: d.name, kind: 'netns', bridge: null, protocol: 'wireguard', conf: '', env: null, dns: [], mtu: null, priority: d.priority, enabled: true, country: d.country }, 0, { host: '', port: 0, user: '', pass: '' });
+  return { ...o, direct: true, onRequest: d.onRequest };
 }
 
 /**
@@ -166,6 +184,10 @@ function prepareMihomo(oc: OutletConfig, port: number, prepared: Prepared): void
 
 export function prepareOutlets(config: Config): Prepared {
   const prepared: Prepared = { outlets: [], mihomo: [], lines: [] };
+  if (config.direct.enabled) {
+    prepared.outlets.push(directOutlet(config.direct));
+    prepared.lines.push(`выход «${config.direct.name}» — прямой, интернет сервера${config.direct.onRequest ? ', только когда просят его страну' : ''}`);
+  }
   for (const oc of config.outlets) {
     if (!oc.enabled) continue;
     try {

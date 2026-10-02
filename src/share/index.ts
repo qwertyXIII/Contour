@@ -18,7 +18,7 @@ import { ShareStore } from './store.ts';
  */
 
 /** `ports` — куда nginx ведёт домен раздачи: `/` — край, `/list/` — правила. */
-export type Share = { store: ShareStore; edge: Edge; ports: { edge: number; list: number }; stop(): Promise<void> };
+export type Share = { store: ShareStore; edge: Edge; rules: ShareRules; outlets: Outlet[]; ports: { edge: number; list: number }; stop(): Promise<void> };
 
 /**
  * Ядерные выходы для UDP — по приоритету, без запасных: namespace запасного не
@@ -28,7 +28,15 @@ export type Share = { store: ShareStore; edge: Edge; ports: { edge: number; list
  */
 function udpOutlets(config: Config, outlets: Outlet[]): UdpOutlet[] {
   const netns = new Set(config.outlets.filter((c) => c.kind === 'netns' && c.enabled).map((c) => c.name));
-  return outlets.filter((o) => netns.has(o.name) && o.socks.pass && o.state !== 'standby').sort((a, b) => a.priority - b.priority).map((o) => ({ name: o.name, socks: { ...o.socks } }));
+  return outlets.filter((o) => (o.direct || (netns.has(o.name) && o.socks.pass)) && o.state !== 'standby')
+    .sort((a, b) => a.priority - b.priority)
+    .map((o) => ({ name: o.name, direct: o.direct, onRequest: o.onRequest, country: o.country, socks: { ...o.socks } }));
+}
+
+/** UDP стран: выходы этой страны, прямой — тоже (`DIRECT` с края). */
+function countryUdp(config: Config, outlets: Outlet[]): Array<{ code: string; udp: UdpOutlet[] }> {
+  const all = udpOutlets(config, outlets);
+  return config.share.countries.map((code) => ({ code, udp: all.filter((o) => o.country === code) }));
 }
 
 export function startShare(config: Config, deps: { consumers: Consumers; sites: Sites; outlets: Outlet[]; log: Logger }): Share | null {
@@ -36,7 +44,7 @@ export function startShare(config: Config, deps: { consumers: Consumers; sites: 
   const log = deps.log.child({ src: 'share' });
   let store: ShareStore;
   try {
-    store = new ShareStore(config.share.dir);
+    store = new ShareStore(config.share.dir, config.share.countries);
   } catch (error) {
     log.error(`раздача выключена: не открыть ${config.share.dir} — ${errorText(error)}`);
     return null;
@@ -50,19 +58,24 @@ export function startShare(config: Config, deps: { consumers: Consumers; sites: 
     port: config.share.port,
     controller: config.share.controller,
     proxy: { host: config.http.listen === '0.0.0.0' ? '127.0.0.1' : config.http.listen, port: config.http.port },
-    udp: () => udpOutlets(config, deps.outlets),
+    udp: () => udpOutlets(config, deps.outlets).filter((o) => !o.onRequest),
+    countries: () => countryUdp(config, deps.outlets),
     probeUrl: `http://${config.health.probeHost}${config.health.probePath}`,
     log,
   });
   edge.start();
-  const rules = new ShareRules({ sites: deps.sites, dnsDir: config.lan.dataDir, skip: config.lan.subnetSkip });
+  const rules = new ShareRules({ sites: deps.sites, dnsDir: config.lan.dataDir, skip: config.lan.subnetSkip, store, countries: config.share.countries, dir: config.share.dir, log });
+  rules.start();
   const server: http.Server = startShareServer({ listen: config.share.listen, port: config.share.listPort, store, rules, log });
   return {
     store,
     edge,
+    rules,
+    outlets: deps.outlets,
     ports: { edge: config.share.port, list: config.share.listPort },
     async stop() {
       server.close();
+      rules.stop();
       await edge.stop();
     },
   };

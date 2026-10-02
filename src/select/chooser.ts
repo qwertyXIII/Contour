@@ -20,7 +20,16 @@ import { portRank } from '../outlets/ports.ts';
  * - Прилипание: сайт ходит через выход, где открылся, `stickyMs`. Сайт,
  *   который видит тебя то из одной страны, то из другой, выкидывает из входа.
  * - Выхода «напрямую» здесь нет по построению: умерли все — ошибка, не утечка.
+ *   Прямой выход (`config.direct`) — выход как выход, но по умолчанию «по
+ *   просьбе»: его видит только соединение, которое просит его страну.
+ * - Страна выхода (`need.country`): соединение просит, например, Россию —
+ *   выбор только среди выходов этой страны (и «по просьбе» тоже); подходящего
+ *   нет — отказ, а не выход из другой страны: Госуслугам заграничный адрес
+ *   хуже, чем никакого.
  */
+
+/** Чего соединение требует от выхода. */
+export type ExitNeed = { country?: string };
 
 export type Connected = {
   socket: Socket;
@@ -39,10 +48,10 @@ export type ChooserOptions = {
 };
 
 export class NoOutletError extends Error {
-  constructor(host: string, port: number, errors: string[], excluded: number) {
+  constructor(host: string, port: number, errors: string[], excluded: number, need: ExitNeed = {}) {
     super(errors.length > 0
       ? `ни один выход не открыл ${host}:${port} — ${errors.join('; ')}`
-      : excluded > 0 ? 'других выходов нет' : 'нет ни одного выхода');
+      : excluded > 0 ? 'других выходов нет' : need.country ? `нет выхода в стране ${need.country}` : 'нет ни одного выхода');
   }
 }
 
@@ -57,9 +66,11 @@ export class Chooser {
   }
 
   /** `port` не задан — порт неважен (проверки, тесты): только приоритет и живость. */
-  order(host: string, port?: number, now = Date.now()): Outlet[] {
+  order(host: string, port?: number, now = Date.now(), need: ExitNeed = {}): Outlet[] {
     const rank = (o: Outlet): number => (port === undefined ? 0 : portRank(o, port));
-    const byPriority = [...this.outlets].sort((a, b) =>
+    const wanted = need.country;
+    const fits = (o: Outlet): boolean => (wanted ? o.country === wanted : !o.onRequest);
+    const byPriority = this.outlets.filter(fits).sort((a, b) =>
       rank(a) - rank(b) || a.priority - b.priority || (a.latencyMs ?? Infinity) - (b.latencyMs ?? Infinity) || a.name.localeCompare(b.name));
     // Запасной (не поднят, ждёт своей очереди в группе соперников) не годится никогда.
     const up = byPriority.filter((o) => o.state !== 'standby');
@@ -82,9 +93,9 @@ export class Chooser {
     this.opts.onFailure(outlet, new Error(why));
   }
 
-  async connect(host: string, port: number, exclude: ReadonlySet<string> = new Set()): Promise<Connected> {
+  async connect(host: string, port: number, exclude: ReadonlySet<string> = new Set(), need: ExitNeed = {}): Promise<Connected> {
     const errors: string[] = [];
-    for (const outlet of this.order(host, port)) {
+    for (const outlet of this.order(host, port, Date.now(), need)) {
       if (exclude.has(outlet.name)) continue;
       try {
         const socket = this.opts.dial
@@ -97,7 +108,7 @@ export class Chooser {
         this.opts.onFailure(outlet, error);
       }
     }
-    throw new NoOutletError(host, port, errors, exclude.size);
+    throw new NoOutletError(host, port, errors, exclude.size, need);
   }
 
   /** Сколько сайтов сейчас прилипло — для экрана и логов. */

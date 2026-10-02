@@ -51,3 +51,17 @@ test('нет выходов — соединение падает с понят�
   const one = new Chooser([outlet('a', 1, 'alive')], opts);
   await assert.rejects(one.connect('x.com', 443, new Set(['a'])), /других выходов нет/);
 });
+
+test('страна выхода: просьба «RU» — только выходы России (и «по просьбе»); без просьбы «по просьбе» не виден; нет страны — отказ', async () => {
+  const de = outlet('de', 10, 'alive');
+  de.country = 'DE';
+  const home = outlet('home', 1000, 'alive');
+  home.country = 'RU';
+  home.onRequest = true;
+  const unknown = outlet('new', 5, 'alive');
+  const chooser = new Chooser([de, home, unknown], opts);
+  assert.deepEqual(chooser.order('gosuslugi.ru', 443, Date.now(), { country: 'RU' }).map((o) => o.name), ['home']);
+  assert.deepEqual(chooser.order('instagram.com', 443).map((o) => o.name), ['new', 'de'], 'прямой «по просьбе» без просьбы не виден');
+  assert.deepEqual(chooser.order('x.com', 443, Date.now(), { country: 'NL' }), []);
+  await assert.rejects(chooser.connect('x.com', 443, new Set(), { country: 'NL' }), /нет выхода в стране NL/, 'не из другой страны: Госуслугам заграничный адрес хуже никакого');
+});

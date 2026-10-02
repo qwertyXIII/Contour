@@ -167,3 +167,11 @@ test('parseAuthority: host:port и [v6]:port', () => {
   assert.equal(parseAuthority(''), null);
   assert.equal(parseAuthority(undefined), null);
 });
+
+test('Contour-Exit: страна — две буквы в любом регистре, мусор — без требования', async () => {
+  const { exitNeed } = await import('../src/inlets/http-proxy.ts');
+  assert.deepEqual(exitNeed('ru'), { country: 'RU' });
+  assert.deepEqual(exitNeed(['NL', 'RU']), { country: 'NL' });
+  assert.deepEqual(exitNeed('Russia'), {});
+  assert.deepEqual(exitNeed(undefined), {});
+});

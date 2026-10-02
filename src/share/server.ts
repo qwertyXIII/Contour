@@ -10,11 +10,12 @@ import type { ShareStore } from './store.ts';
  * два файла по токену устройства. Панель с паролем наружу не выходит.
  *
  * `/list/<токен>/contour.conf` — конфиг Shadowrocket, `/list/<токен>/domains.list` —
- * список сайтов к нему. Чужой токен, выключенное устройство, адрес не задан —
+ * список сайтов к нему, `/list/<токен>/country-ru.list` — сайты «только с
+ * российским адресом». Чужой токен, выключенное устройство, адрес не задан —
  * один и тот же 404: по ответу не понять, есть ли такой токен.
  */
 
-const ROUTE = /^\/list\/([A-Za-z0-9_-]{16,64})\/(contour\.conf|domains\.list)$/;
+const ROUTE = /^\/list\/([A-Za-z0-9_-]{16,64})\/(contour\.conf|domains\.list|country-([a-z]{2})\.list)$/;
 
 export type ShareServerOptions = { listen: string; port: number; store: ShareStore; rules: ShareRules; log: Logger };
 
@@ -35,9 +36,14 @@ export function answer(url: string, opts: Pick<ShareServerOptions, 'store' | 'ru
   const device = opts.store.byList(m[1] as string);
   const domain = opts.store.settings().domain;
   if (!device || !domain) return null;
-  const base = `https://${domain}/list/${device.list}`;
   if (m[2] === 'domains.list') return { body: domainSetText(opts.rules.domains().tunnel), device: device.name, file: 'список сайтов' };
-  const body = shadowrocketConf({ base, device: device.name, direct: opts.rules.domains().direct, nets: opts.rules.nets() });
+  if (m[3]) {
+    const code = m[3].toUpperCase();
+    if (!opts.rules.countries.includes(code)) return null;
+    return { body: domainSetText(opts.rules.countryNames(code).names, `сайты только с адресом ${code}`), device: device.name, file: `список ${code}` };
+  }
+  const base = `https://${domain}/list/${device.list}`;
+  const body = shadowrocketConf({ base, device: device.name, direct: opts.rules.domains().direct, nets: opts.rules.nets(), countries: opts.rules.countries });
   return { body, device: device.name, file: 'конфиг' };
 }
 

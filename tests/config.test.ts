@@ -15,7 +15,7 @@ outlets:
     bridge: 1
     conf: /etc/contour/keys/ext.conf
 `);
-  assert.deepEqual(c.outlets, [{ name: 'ext', kind: 'netns', bridge: 1, protocol: 'amneziawg', conf: '/etc/contour/keys/ext.conf', env: null, dns: [], mtu: null, priority: 100, enabled: true, group: null }]);
+  assert.deepEqual(c.outlets, [{ name: 'ext', kind: 'netns', bridge: 1, protocol: 'amneziawg', conf: '/etc/contour/keys/ext.conf', env: null, dns: [], mtu: null, priority: 100, enabled: true, group: null, country: null }]);
   assert.throws(() => parseConfig('outlets:\n  - name: ext\n    protocol: amneziawg\n    conf: /x\n    prioriti: 1\n'), /неизвестное поле «prioriti»/);
   assert.throws(() => parseConfig('htpp: {}\n'), /неизвестное поле «htpp»/);
 });
@@ -32,4 +32,13 @@ test('выход netns: номер моста обязателен и не по�
   assert.throws(() => parseConfig('outlets:\n  - {name: a, protocol: amneziawg, conf: /x, bridge: 1}\n  - {name: b, protocol: wireguard, conf: /y, bridge: 1}\n'), /мост 1/);
   const c = parseConfig('outlets:\n  - {name: m, kind: mihomo, protocol: wireguard, conf: /x}\n');
   assert.equal(c.outlets[0]?.bridge, null);
+});
+
+test('прямой выход: по умолчанию есть и только по просьбе; страна — две буквы; имя не занято выходом', () => {
+  assert.deepEqual(parseConfig('outlets: []').direct, { enabled: true, name: 'home', priority: 1000, onRequest: true, country: null });
+  assert.equal(parseConfig('direct: {country: ru}').direct.country, 'RU');
+  assert.equal(parseConfig('outlets:\n  - {name: nl, protocol: wireguard, bridge: 3, conf: /x, country: nl}\n').outlets[0]?.country, 'NL');
+  assert.throws(() => parseConfig('direct: {country: Russia}'), /две латинские буквы/);
+  assert.throws(() => parseConfig('outlets:\n  - {name: home, protocol: wireguard, bridge: 3, conf: /x}\n'), /уже имя выхода/);
+  assert.deepEqual(parseConfig('share: {countries: [ru, RU, nl]}').share.countries, ['RU', 'NL']);
 });

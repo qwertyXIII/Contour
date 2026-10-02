@@ -39,11 +39,11 @@ let failed = 0;
 const check = (ok: boolean, what: string): void => { console.log(`${ok ? 'ok  ' : 'FAIL'} ${what}`); if (!ok) failed += 1; };
 
 // Подставной Contour: CONNECT с Basic, записывает имя и цель.
-const seen: Array<{ who: string; target: string }> = [];
+const seen: Array<{ who: string; target: string; exit?: string }> = [];
 const proxy = http.createServer();
 proxy.on('connect', (req, socket: net.Socket, head) => {
   const auth = Buffer.from(String(req.headers['proxy-authorization'] ?? '').replace(/^Basic /, ''), 'base64').toString();
-  seen.push({ who: auth, target: req.url ?? '' });
+  seen.push({ who: auth, target: req.url ?? '', exit: req.headers['contour-exit'] as string | undefined });
   const [host, port] = (req.url ?? '').split(':');
   const up = net.connect(Number(port), host as string, () => { socket.write('HTTP/1.1 200 OK\r\n\r\n'); up.write(head); up.pipe(socket); socket.pipe(up); });
   up.on('error', () => socket.destroy());
@@ -66,11 +66,11 @@ let echoed = 0;
 echo.on('message', (m, r) => { echoed += 1; echo.send(m, r.port, r.address); });
 await new Promise<void>((r) => echo.bind(PORTS.echo, '127.0.0.1', r));
 
-const store = new ShareStore(dir);
+const store = new ShareStore(dir, ['RU']);
 const phone = store.add('iPhone');
 store.setDomain('c.example.ru');
 const udp = [{ name: 'fake', socks: { host: '127.0.0.1', port: PORTS.outlet, user: 'fake', pass: 'fake-pass' } }];
-const edge = new Edge({ store, bin: BIN, dir: path.join(dir, 'edge'), listen: '127.0.0.1', port: PORTS.edge, controller: `127.0.0.1:${PORTS.edgeApi}`, proxy: { host: '127.0.0.1', port: PORTS.proxy }, udp: () => udp, probeUrl: 'http://cp.cloudflare.com/generate_204', log });
+const edge = new Edge({ store, bin: BIN, dir: path.join(dir, 'edge'), listen: '127.0.0.1', port: PORTS.edge, controller: `127.0.0.1:${PORTS.edgeApi}`, proxy: { host: '127.0.0.1', port: PORTS.proxy }, udp: () => udp, countries: () => [{ code: 'RU', udp: [{ name: 'home', direct: true, socks: { host: '', port: 0, user: '', pass: '' } }] }], probeUrl: 'http://cp.cloudflare.com/generate_204', log });
 edge.start();
 await sleep(3_000);
 
@@ -128,6 +128,18 @@ check((await socksUdp({ name: 'localhost', port: PORTS.echo }, Buffer.from('ping
 good.kill();
 await sleep(1_000);
 
+// Второй сервер — «Contour-RU»: TCP в прокси с заголовком страны, UDP — напрямую с края (выход в России — дом).
+const ru = startPhone(phone.exits.RU as string, 'ru');
+await sleep(4_000);
+const seenBefore = seen.length;
+check((await curl(['--socks5-hostname', `127.0.0.1:${PORTS.phone}`, 'http://example.com/'])) === '200', 'сервер страны: страница открылась');
+check(seen.slice(seenBefore).some((s) => s.who === `share.${phone.id}:${phone.uuid}` && s.exit === 'RU'), 'сервер страны: в прокси с Contour-Exit: RU, под тем же именем устройства');
+const ruDns = await socksUdp({ ip: '1.1.1.1', port: 53 }, query);
+check(ruDns !== null && (dnsPacket.decode(ruDns).answers?.length ?? 0) > 0, 'сервер страны: UDP напрямую с края — ответ пришёл');
+check((await socksUdp({ ip: '127.0.0.1', port: PORTS.echo }, Buffer.from('ping'), 3_000)) === null && echoed === 0, 'сервер страны: UDP к 127.0.0.1 — ограда края (без ограды выхода)');
+ru.kill();
+await sleep(1_000);
+
 const before = seen.length;
 const bad = startPhone('00000000-0000-4000-8000-000000000000', 'bad');
 await sleep(2_000);
@@ -135,10 +147,11 @@ check((await curl(['--socks5-hostname', `127.0.0.1:${PORTS.phone}`, 'http://exam
 check(seen.length === before, 'чужой ключ до прокси не доходит');
 bad.kill();
 
-const rules = new ShareRules({ sites: new Sites({ dnsDir: dir, own: ['youtube.com'] }), dnsDir: dir, skip: [] });
+const rules = new ShareRules({ sites: new Sites({ dnsDir: dir, own: ['youtube.com'] }), dnsDir: dir, skip: [], store, countries: ['RU'], dir, log });
 const server = startShareServer({ listen: '127.0.0.1', port: PORTS.list, store, rules, log });
 await sleep(300);
 check((await curl([`http://127.0.0.1:${PORTS.list}/list/${phone.list}/contour.conf`])) === '200', 'правила по токену');
+check((await curl([`http://127.0.0.1:${PORTS.list}/list/${phone.list}/country-ru.list`])) === '200', 'список «только с российским адресом» по токену');
 check((await curl([`http://127.0.0.1:${PORTS.list}/list/${'A'.repeat(32)}/contour.conf`])) === '404', 'чужой токен — 404');
 
 store.setEnabled(phone.id, false);

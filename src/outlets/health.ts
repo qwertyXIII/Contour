@@ -17,7 +17,9 @@ import type { Outlet } from './outlet.ts';
  * себе — сайт мог просто не ответить, — а только зовёт внеочередную проверку.
  *
  * Раз в `ipIntervalMs` — внешний адрес выхода: главный ответ на вопрос
- * «а точно через VPN?».
+ * «а точно через VPN?». Сменился адрес — заново и страна выхода (`countryHost`,
+ * ipinfo: `/<адрес>/country` → `NL`), если её не задали руками: по ней выбор
+ * ведёт соединения, которые просят страну (`chooser.ts`).
  */
 
 export type HealthOptions = {
@@ -27,6 +29,9 @@ export type HealthOptions = {
   probePath: string;
   ipHost: string;
   ipIntervalMs: number;
+  countryHost: string;
+  /** Страна выхода стала известна или сменилась. */
+  onCountry?: (outlet: Outlet) => void;
   log: Logger;
   /** Как соединяться через выход — тем же путём, что и потребители. */
   dial?: Dial;
@@ -118,9 +123,28 @@ export function startHealth(outlets: Outlet[], opts: HealthOptions): Health {
       if (ip !== outlet.externalIp) {
         opts.log.info(`выход «${outlet.name}»: внешний адрес ${ip}`);
         outlet.externalIp = ip;
+        if (!outlet.countryFixed) await country(outlet, ip);
+      } else if (!outlet.countryFixed && outlet.country === null) {
+        await country(outlet, ip);
       }
     } catch (error) {
       opts.log.warn(`выход «${outlet.name}»: внешний адрес не узнать — ${errorText(error)}`);
+    }
+  };
+
+  const country = async (outlet: Outlet, ip: string): Promise<void> => {
+    try {
+      const socket = await dial(outlet, opts.countryHost, 80);
+      const { status, body } = await httpOverSocket(socket, opts.countryHost, `/${ip}/country`, RESPONSE_TIMEOUT_MS);
+      const cc = body.trim().toUpperCase();
+      if (status !== 200 || !/^[A-Z]{2}$/.test(cc)) throw new Error(`ответ ${status}: ${cc.slice(0, 40)}`);
+      if (cc !== outlet.country) {
+        opts.log.info(`выход «${outlet.name}»: страна ${cc}`);
+        outlet.country = cc;
+        opts.onCountry?.(outlet);
+      }
+    } catch (error) {
+      opts.log.warn(`выход «${outlet.name}»: страну не узнать — ${errorText(error)}`);
     }
   };
 

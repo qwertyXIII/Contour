@@ -3,7 +3,7 @@ import type { Socket } from 'node:net';
 import type { Consumers } from '../consumers.ts';
 import { errorText, type Logger } from '../log.ts';
 import type { Outlet } from '../outlets/outlet.ts';
-import type { Chooser } from '../select/chooser.ts';
+import type { Chooser, ExitNeed } from '../select/chooser.ts';
 import type { Meter } from '../stats/meter.ts';
 import { checkDestination } from './fence.ts';
 import { MAX_ATTEMPTS, relay, type RelayDeps, type Target } from './relay.ts';
@@ -22,7 +22,18 @@ import { MAX_ATTEMPTS, relay, type RelayDeps, type Target } from './relay.ts';
  * соединении, а **с проигрыванием**: пока от сайта не пришло ни байта, байты
  * клиента копятся в буфере; выход закрылся молча — соединяемся через следующий
  * и проигрываем буфер. Для TLS это ровно ClientHello, клиент ничего не замечает.
+ *
+ * Заголовок `Contour-Exit: RU` — «выпусти в этой стране» (край раздачи ставит
+ * его второму серверу телефона, «Contour-RU»). Сайту он не уходит.
  */
+
+export const EXIT_HEADER = 'contour-exit';
+
+/** Страна из `Contour-Exit`; нет или мусор — без требования. */
+export function exitNeed(value: string | string[] | undefined): ExitNeed {
+  const v = (Array.isArray(value) ? value[0] : value)?.trim().toUpperCase();
+  return v && /^[A-Z]{2}$/.test(v) ? { country: v } : {};
+}
 
 export type HttpInletOptions = {
   listen: string;
@@ -77,7 +88,7 @@ function serveConnect(client: Socket, head: Buffer, who: string, target: Target,
 
 // ─── Проброс http: запрос целиком, повтор для запросов без тела ────────────
 
-function serveForward(req: http.IncomingMessage, res: http.ServerResponse, who: string, target: URL, deps: Deps): void {
+function serveForward(req: http.IncomingMessage, res: http.ServerResponse, who: string, target: URL, deps: Deps, need: ExitNeed): void {
   const { chooser, consumers, log, meter } = deps;
   const host = target.hostname.replace(/^\[|\]$/g, '');
   const port = Number(target.port) || 80;
@@ -92,6 +103,7 @@ function serveForward(req: http.IncomingMessage, res: http.ServerResponse, who: 
   const headers = { ...req.headers };
   delete headers['proxy-authorization'];
   delete headers['proxy-connection'];
+  delete headers[EXIT_HEADER];
   headers.connection = 'close';
   headers.host = target.host;
 
@@ -106,7 +118,7 @@ function serveForward(req: http.IncomingMessage, res: http.ServerResponse, who: 
     let socket: Socket;
     let outlet: Outlet;
     try {
-      ({ socket, outlet } = await chooser.connect(host, port, exclude));
+      ({ socket, outlet } = await chooser.connect(host, port, exclude, need));
     } catch (error) {
       fail(errorText(error));
       return;
@@ -158,7 +170,7 @@ export function startHttpInlet(opts: HttpInletOptions): Promise<http.Server> {
       refuse(socket, 403, fence.reason);
       return;
     }
-    serveConnect(socket, head, who, target, deps);
+    serveConnect(socket, head, who, { ...target, need: exitNeed(req.headers[EXIT_HEADER]) }, deps);
   });
 
   server.on('request', (req, res) => {
@@ -189,7 +201,7 @@ export function startHttpInlet(opts: HttpInletOptions): Promise<http.Server> {
       res.end(`${fence.reason}\n`);
       return;
     }
-    serveForward(req, res, who, target, deps);
+    serveForward(req, res, who, target, deps, exitNeed(req.headers[EXIT_HEADER]));
   });
 
   server.on('clientError', (error: NodeJS.ErrnoException, socket: Socket) => {

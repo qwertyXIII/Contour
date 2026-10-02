@@ -1,3 +1,4 @@
+import { Resolver as DnsResolver } from 'node:dns/promises';
 import { isIP } from 'node:net';
 import { dialVia } from '../dial.ts';
 import { DOH_TIMEOUT_MS, dohLookup } from './doh.ts';
@@ -15,6 +16,9 @@ import type { Outlet } from './outlet.ts';
  *
  * Кэш — на выход и имя, по TTL ответа (от 30 с до часа); одинаковые запросы
  * в полёте сливаются в один.
+ *
+ * Прямой выход — резолвер этой машины: российский сервис через него получает
+ * российский узел CDN, как у любого абонента дома.
  */
 
 const MIN_TTL_S = 30;
@@ -45,7 +49,13 @@ export class Resolver {
     return job;
   }
 
-  private lookup(outlet: Outlet, name: string): Promise<{ ips: string[]; ttl: number }> {
+  private readonly system = new DnsResolver({ timeout: DOH_TIMEOUT_MS, tries: 2 });
+
+  private async lookup(outlet: Outlet, name: string): Promise<{ ips: string[]; ttl: number }> {
+    if (outlet.direct) {
+      const records = await this.system.resolve4(name, { ttl: true });
+      return { ips: records.map((r) => r.address), ttl: Math.min(...records.map((r) => r.ttl)) };
+    }
     return dohLookup((server) => dialVia(outlet, server.ip, 443, DOH_TIMEOUT_MS), name, `через «${outlet.name}»`);
   }
 }

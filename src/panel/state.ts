@@ -85,14 +85,17 @@ export class PanelState {
     const today = meter.todayTotals().outlet;
     const live = new Map(this.deps.outlets.map((o) => [o.name, o]));
     // Список — из настроек (помощник знает и выключенные), здоровье — из живых.
-    const names = runtime.length > 0 ? runtime.map((r) => r.name) : [...live.keys()];
+    // Прямого выхода помощник не знает (в outlets его нет) — он из живых.
+    const names = runtime.length > 0 ? [...runtime.map((r) => r.name), ...[...live.values()].filter((o) => o.direct).map((o) => o.name)] : [...live.keys()];
     return names.map((name) => {
       const o = live.get(name);
       const r = runtime.find((x) => x.name === name);
       return {
         name,
-        kind: r?.kind ?? null,
-        protocol: r?.protocol ?? null,
+        kind: o?.direct ? 'direct' : r?.kind ?? null,
+        protocol: o?.direct ? 'direct' : r?.protocol ?? null,
+        country: o?.country ?? null,
+        onRequest: o?.onRequest ?? false,
         enabled: r?.enabled ?? true,
         priority: r?.priority ?? o?.priority ?? null,
         group: r?.group ?? null,

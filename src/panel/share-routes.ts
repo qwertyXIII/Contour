@@ -1,6 +1,7 @@
 import type { Router } from 'express';
 import { z } from 'zod';
 import { shareLinks } from '../share/links.ts';
+import { countryGroup, countryNode } from '../share/rules.ts';
 import { shareWho } from '../share/store.ts';
 import { fail, parse } from './respond.ts';
 import type { RoutesDeps } from './routes.ts';
@@ -14,11 +15,13 @@ import type { RoutesDeps } from './routes.ts';
  */
 
 const ID = z.string().regex(/^[0-9a-f]{8}$/, 'неверное устройство');
+const CODE = z.string().regex(/^[A-Z]{2}$/, 'страна — две буквы');
 
 const schemas = {
   settings: z.object({ domain: z.string().max(253) }),
   device: z.object({ name: z.string().min(1, 'нужно имя').max(40) }),
   enable: z.object({ enabled: z.boolean() }),
+  site: z.object({ name: z.string().min(3).max(253), on: z.boolean() }),
 };
 
 const ZERO = { up: 0, down: 0 };
@@ -40,7 +43,27 @@ export function shareRoutes(router: Router, d: RoutesDeps): void {
       const who = shareWho(x.id);
       return { id: x.id, name: x.name, enabled: x.enabled, created: x.created, today: today[who] ?? ZERO, rate: rates[who] ?? ZERO, lastSeen: seen[who] ?? null };
     });
-    res.json({ ok: true, data: { enabled: true, running: edge.running(), domain: store.settings().domain, ports, devices } });
+    // Страны: чем выпускать (живой выход этой страны — прямой дома или туннель) и сколько сайтов в списке.
+    const countries = d.share.rules.countries.map((code) => {
+      const exit = d.share!.outlets.filter((o) => o.country === code && o.state !== 'standby').sort((a, b) => Number(b.state === 'alive') - Number(a.state === 'alive') || a.priority - b.priority)[0];
+      const list = d.share!.rules.countryNames(code);
+      return { code, group: countryGroup(code), node: countryNode(code), exit: exit ? { name: exit.name, direct: exit.direct, alive: exit.state === 'alive', ip: exit.externalIp } : null, common: list.common, own: list.own };
+    });
+    res.json({ ok: true, data: { enabled: true, running: edge.running(), domain: store.settings().domain, ports, devices, countries } });
+  });
+
+  router.post('/share/countries/:code/sites', (req, res) => {
+    const code = CODE.safeParse(String(req.params.code).toUpperCase());
+    const b = parse(schemas.site, req, res);
+    if (!b || off(res)) return;
+    if (!code.success) { fail(res, 400, 'VALIDATION', 'страна — две буквы'); return; }
+    try {
+      const own = d.share!.store.setCountrySite(code.data, b.name, b.on);
+      d.log.info(`панель: «${b.name}» — ${b.on ? `только с адресом ${code.data}` : `снят из списка ${code.data}`}`);
+      res.json({ ok: true, data: { own } });
+    } catch (error) {
+      fail(res, 400, 'VALIDATION', (error as Error).message);
+    }
   });
 
   router.post('/share/settings', (req, res) => {
