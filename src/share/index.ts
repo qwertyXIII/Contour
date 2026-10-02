@@ -54,7 +54,7 @@ function countryUdp(config: Config, outlets: Outlet[], store: ShareStore): Array
 }
 
 /** `countryList` — готовый список страны у книги правил (`RuleBook.countryList`). */
-export function startShare(config: Config, deps: { consumers: Consumers; sites: Sites; outlets: Outlet[]; countryList: (code: string) => string[]; log: Logger }): Share | null {
+export function startShare(config: Config, deps: { consumers: Consumers; sites: Sites; outlets: Outlet[]; countryList: (code: string) => string[]; allowTcp?: () => string[]; log: Logger }): Share | null {
   if (!config.share.enabled) return null;
   const log = deps.log.child({ src: 'share' });
   let store: ShareStore;
@@ -76,6 +76,7 @@ export function startShare(config: Config, deps: { consumers: Consumers; sites: 
     udp: () => udpOutlets(config, deps.outlets).filter((o) => !o.onRequest),
     countries: () => countryUdp(config, deps.outlets, store),
     probeUrl: `http://${config.health.probeHost}${config.health.probePath}`,
+    allowTcp: deps.allowTcp,
     log,
   });
   edge.start();

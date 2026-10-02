@@ -1,5 +1,6 @@
 import { getDomain } from 'tldts';
-import { formatCidr, parseCidr, type Cidr } from '../cidr.ts';
+import { formatCidr, overlaps, parseCidr, type Cidr } from '../cidr.ts';
+import { PRIVATE_V4 } from '../inlets/fence.ts';
 import type { Config } from '../config.ts';
 import { serviceNets } from '../dns/subnets.ts';
 import type { Logger } from '../log.ts';
@@ -15,7 +16,8 @@ import { routeFor, type Router } from './need.ts';
  * адресу.
  */
 
-export type Rules = { book: RuleBook; route: Router; stop(): void };
+/** `allowNets` — частные подсети правил «только через эти выходы»: исключения ограды для края и namespace. */
+export type Rules = { book: RuleBook; route: Router; allowNets(): string[]; stop(): void };
 
 /**
  * Сервис — ключ прилипания к стране: основной домен по списку публичных
@@ -26,6 +28,9 @@ export type Rules = { book: RuleBook; route: Router; stop(): void };
 export function domainService(host: string): string {
   return getDomain(host, { allowPrivateDomains: true }) ?? host.toLowerCase();
 }
+
+const PRIVATE = PRIVATE_V4.map(([net, bits]) => parseCidr(`${net}/${bits}`) as Cidr);
+const isPrivateNet = (c: Cidr): boolean => PRIVATE.some((p) => overlaps(p, c));
 
 export function startRules(config: Config, deps: { sites: Sites; outlets: Outlet[]; countrySites: () => Record<string, string[]>; log: Logger }): Rules {
   const skip = config.lan.subnetSkip.map((s) => parseCidr(s)).filter((c): c is Cidr => c !== null);
@@ -40,5 +45,10 @@ export function startRules(config: Config, deps: { sites: Sites; outlets: Outlet
   });
   book.start();
   deps.sites.onChange(() => book.rebuild());
-  return { book, route: (host, asked) => routeFor(book.rules(), host, asked), stop: () => book.stop() };
+  return {
+    book,
+    route: (host, asked) => routeFor(book.rules(), host, asked),
+    allowNets: () => [...new Set(book.rules().onlyNets().filter((n) => isPrivateNet(n)).map((n) => formatCidr(n)))].sort(),
+    stop: () => book.stop(),
+  };
 }

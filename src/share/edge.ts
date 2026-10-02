@@ -32,6 +32,8 @@ export type EdgeOptions = {
   /** Страны выхода и их выходы для UDP — тоже на каждом перезапуске: страна выхода узнаётся по ходу. */
   countries: () => Array<{ code: string; udp: UdpOutlet[] }>;
   probeUrl: string;
+  /** Частные подсети правил «только через эти выходы» — TCP к ним край пропускает в прокси. */
+  allowTcp?: () => string[];
   log: Logger;
 };
 
@@ -119,7 +121,8 @@ export class Edge {
     const udp = this.opts.udp();
     const countries = this.opts.countries();
     const { listen, port, proxy, probeUrl, controller } = this.opts;
-    const text = buildEdgeConfig({ devices, wsPath: store.settings().path, listen, port, proxy, udp, countries, probeUrl, controller, secret });
+    const allowTcp = this.opts.allowTcp?.() ?? [];
+    const text = buildEdgeConfig({ devices, wsPath: store.settings().path, listen, port, proxy, udp, countries, probeUrl, controller, secret, allowTcp });
     writeFileSync(configPath, text, { mode: 0o600 });
     chmodSync(configPath, 0o600);
     const names = (list: UdpOutlet[]): string => (list.length > 0 ? list.map((o) => o.name).join(' → ') : 'нет выходов');

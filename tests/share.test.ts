@@ -240,3 +240,13 @@ test('страны: прежний файл сохраняет выданные 
   assert.ok(r.indexOf(`IN-USER,${a.id}.ru,via-${a.id}-ru`) < r.indexOf(`IN-USER,${a.id},via-${a.id}`));
   assert.ok(r.indexOf('IP-CIDR,127.0.0.0/8,REJECT,no-resolve') < r.indexOf(`AND,((NETWORK,udp),(IN-USER,${a.id}.ru)),udp-RU`), 'ограда — до DIRECT');
 });
+
+test('край: подсеть правила «только через эти выходы» — TCP в прокси, UDP — отказ; остальная частная сеть — отказ', () => {
+  const store = new ShareStore(tmp('contour-share-'));
+  store.add('iPhone');
+  const doc = parse(buildEdgeConfig({ devices: store.devices(), wsPath: '/s', listen: '127.0.0.1', port: 18300, proxy: { host: '127.0.0.1', port: 3128 }, udp: [], countries: [], probeUrl: 'http://x/', controller: 'c', secret: 's', allowTcp: ['172.16.42.0/24'] })) as { rules: string[] };
+  assert.ok(doc.rules.includes('AND,((NETWORK,udp),(IP-CIDR,172.16.42.0/24,no-resolve)),REJECT'));
+  assert.ok(doc.rules.includes('AND,((IP-CIDR,172.16.0.0/12,no-resolve),(NOT,((IP-CIDR,172.16.42.0/24,no-resolve)))),REJECT'));
+  assert.ok(doc.rules.includes('IP-CIDR,10.0.0.0/8,REJECT,no-resolve'));
+  assert.ok(!doc.rules.includes('IP-CIDR,172.16.0.0/12,REJECT,no-resolve'));
+});

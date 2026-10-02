@@ -1,5 +1,6 @@
 import { stringify } from 'yaml';
 import { EXIT_HEADER } from '../inlets/http-proxy.ts';
+import { overlaps, parseCidr } from '../cidr.ts';
 import { PRIVATE_V4 } from '../inlets/fence.ts';
 import { deviceCountries, shareWho, type ShareDevice } from './store.ts';
 
@@ -44,6 +45,12 @@ export type EdgeInput = {
   countries: Array<{ code: string; udp: UdpOutlet[] }>;
   /** Проверка живости выходов в группах UDP (`health.probeHost` + `probePath`). */
   probeUrl: string;
+  /**
+   * Частные подсети правил «только через эти выходы» (корпоративная сеть): TCP
+   * к ним край не режет, а ведёт в прокси — там правило и ограда с исключением;
+   * UDP — режет: он идёт мимо Contour, прямо в выходы, и правил не знает.
+   */
+  allowTcp?: string[];
   controller: string;
   secret: string;
 };
@@ -81,13 +88,31 @@ function groups(input: EdgeInput): Record<string, unknown>[] {
   ];
 }
 
+/** Ограда края: частные сети — отказ; подсети `allowTcp` внутри них — только UDP. */
+function fence(allow: string[]): string[] {
+  const nets = PRIVATE_V4.map(([net, bits]) => `${net}/${bits}`);
+  const inside = (outer: string, inner: string): boolean => {
+    const o = parseCidr(outer);
+    const i = parseCidr(inner);
+    return Boolean(o && i && i.bits >= o.bits && overlaps(o, i));
+  };
+  return [
+    ...allow.map((c) => `AND,((NETWORK,udp),(IP-CIDR,${c},no-resolve)),REJECT`),
+    ...nets.map((net) => {
+      const holes = allow.filter((c) => inside(net, c));
+      if (holes.length === 0) return `IP-CIDR,${net},REJECT,no-resolve`;
+      return `AND,((IP-CIDR,${net},no-resolve),${holes.map((c) => `(NOT,((IP-CIDR,${c},no-resolve)))`).join(',')}),REJECT`;
+    }),
+  ];
+}
+
 function rules(input: EdgeInput, devices: ShareDevice[], codes: string[]): string[] {
   const countryUdp = input.countries.flatMap((c) => {
     const who = devices.filter((d) => own(d, codes).includes(c.code)).map((d) => `${d.id}.${lower(c.code)}`);
     return who.length > 0 ? [`AND,((NETWORK,udp),(IN-USER,${who.join('/')})),${c.udp.length > 0 ? `udp-${c.code}` : 'REJECT'}`] : [];
   });
   return [
-    ...PRIVATE_V4.map(([net, bits]) => `IP-CIDR,${net}/${bits},REJECT,no-resolve`),
+    ...fence(input.allowTcp ?? []),
     ...countryUdp,
     `NETWORK,udp,${input.udp.length > 0 ? UDP_GROUP : 'REJECT'}`,
     ...devices.flatMap((d) => [...own(d, codes).map((c) => `IN-USER,${d.id}.${lower(c)},via-${d.id}-${lower(c)}`), `IN-USER,${d.id},via-${d.id}`]),

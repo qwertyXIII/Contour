@@ -180,7 +180,13 @@ async function main(): Promise<void> {
   const route = rules.route;
   rulesRefresh = () => rules.book.rebuild();
   const server = await startHttpInlet({ ...config.http, chooser, consumers, log, meter, ports, route, speed });
-  share = startShare(config, { consumers, sites, outlets, countryList: (code) => rules.book.countryList(code), log });
+  share = startShare(config, { consumers, sites, outlets, countryList: (code) => rules.book.countryList(code), allowTcp: () => rules.allowNets(), log });
+  // Край перезапускается, только когда сменились его исключения ограды: телефоны при этом переподключаются.
+  let allowed = rules.allowNets().join(' ');
+  rules.book.onChange(() => {
+    const now = rules.allowNets().join(' ');
+    if (now !== allowed) { allowed = now; shareRefresh?.(); }
+  });
   share?.store.onChange(() => rules.book.rebuild());
   shareRefresh = share ? () => share?.edge.refresh() : null;
   const panel = config.panel.enabled ? startPanel(config, { outlets, meter, dial, ports, rivals, sites, share }) : null;
