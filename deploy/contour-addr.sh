@@ -17,6 +17,18 @@
 #    и трогать его нельзя. Своя таблица nft `ip contour` с DNAT срабатывает до
 #    того, как пакет увидит nginx, и касается только этого адреса. Чужие
 #    таблицы и правила не трогаются; при остановке таблица снимается целиком.
+#
+# 3. Чужое из домашней сети на адресах Contour — отказ. Программы сервера
+#    слушают на всех адресах (0.0.0.0), и с нашим адресом и мостами выходов
+#    (10.201.N.1, `contour-netns.sh`) они вдруг стали доступны из сети: мосты —
+#    устройствам, у которых шлюз — этот адрес. Живьём 2026-10-05 это сломало
+#    голос Alter'а: WebRTC предлагает телефону все адреса сервера, проверка на
+#    мост или на этот адрес приходила первой, и сервер закреплял пару, ответы
+#    которой уходят с основного адреса, — устройство их выбрасывает. Поэтому:
+#    на этот адрес по UDP — только DNS (TCP — DNS, SNI-вход и панель, их не
+#    трогаем), к мостам — ничего. `reject`, а не `drop`: «порт закрыт» сразу,
+#    как и раньше, когда там никто не слушал, — QUIC мгновенно уходит на TCP.
+#    Шлюз это не задевает: пересылка идёт в чужие адреса, а не на наши.
 set -uo pipefail
 export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 
@@ -24,6 +36,8 @@ ADDR="${1:-}"
 TLS_PORT="${2:-}"
 HTTP_PORT="${3:-}"
 TABLE=contour
+# Мосты выходов: 10.201.N.1 на хосте (`contour-netns.sh`, N от 1 до 250).
+BRIDGES=10.201.0.0/16
 [[ "$ADDR" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "использование: contour-addr <IPv4> <порт TLS> <порт HTTP>" >&2; exit 2; }
 [[ "$TLS_PORT" =~ ^[0-9]+$ && "$HTTP_PORT" =~ ^[0-9]+$ ]] || { echo "порты — числа" >&2; exit 2; }
 [ "$(id -u)" -eq 0 ] || { echo "нужен root" >&2; exit 1; }
@@ -38,7 +52,8 @@ detect() {
 }
 
 present() { ip -o -4 addr show | grep -q " inet $ADDR/"; }
-table_present() { nft list table ip "$TABLE" >/dev/null 2>&1; }
+# По цепочке input, а не по таблице: таблицу прошлой версии (без отказа чужому) — переложить.
+table_present() { nft list chain ip "$TABLE" input >/dev/null 2>&1; }
 
 put_table() {
   # Пересоздаём целиком: так в ней никогда не останется старых правил.
@@ -55,6 +70,12 @@ table ip $TABLE {
     type nat hook output priority -100; policy accept;
     ip daddr $ADDR tcp dport 443 dnat to $ADDR:$TLS_PORT
     ip daddr $ADDR tcp dport 80 dnat to $ADDR:$HTTP_PORT
+  }
+  # Из домашней сети: на этот адрес по UDP — только DNS, к мостам выходов — ничего (пункт 3 шапки).
+  chain input {
+    type filter hook input priority filter; policy accept;
+    iifname "$IFACE" ip daddr $BRIDGES reject
+    iifname "$IFACE" ip daddr $ADDR udp dport != 53 reject
   }
 }
 EOF

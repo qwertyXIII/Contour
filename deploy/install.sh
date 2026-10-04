@@ -314,6 +314,9 @@ refresh_socks() {
 # Домашняя сеть: сторож второго адреса (root) и DNS (contour). Включает их
 # enable-lan.sh — здесь только ставятся.
 ensure_lan_units() {
+  # Сторож держит таблицу nft своей версии — новый скрипт вступает в силу только перезапуском.
+  local addr_changed=0
+  cmp -s "$SRC/deploy/contour-addr.sh" "$PREFIX/sbin/contour-addr" || addr_changed=1
   install -m 755 -o root -g root "$SRC/deploy/contour-addr.sh" "$PREFIX/sbin/contour-addr"
   install -d -m 750 -o "$SERVICE_USER" -g "$SERVICE_USER" "$LIB/dns"
   cat > /etc/systemd/system/contour-addr.service <<EOF
@@ -363,6 +366,8 @@ ReadWritePaths=$LOG $LIB/dns
 WantedBy=multi-user.target
 EOF
   systemctl daemon-reload
+  # Перезапуск — секунды без второго адреса (DNS устройств переспросит); только если скрипт новый и unit работает.
+  [ "$addr_changed" = 1 ] && systemctl try-restart contour-addr.service
   note "домашняя сеть: $PREFIX/sbin/contour-addr, unit'ы contour-addr и contour-dns (включает enable-lan.sh)"
 }
 

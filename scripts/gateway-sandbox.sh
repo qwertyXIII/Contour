@@ -90,8 +90,9 @@ done
 # «Как сейчас» (таблица 2701, её ведёт contour-netns.sh) в песочнице — один de1, как и было.
 ip route replace default via 10.201.9.2 dev ctv9 metric 10 table 2701
 
-# Эхо в «интернете»: TCP и UDP, ответ — адрес отправителя.
-inns router python3 - <<'PY' &
+# Эхо в «интернете»: TCP и UDP, ответ — адрес отправителя. nsenter — прямо, не через
+# inns: у функции в фоне `$!` — её оболочка, и kill оставлял бы python жить после песочницы.
+nsenter --net=/run/netns/router python3 - <<'PY' &
 import socket, threading
 def tcp(port):
     s = socket.socket(); s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1); s.bind(('0.0.0.0', port)); s.listen()
@@ -108,7 +109,8 @@ threading.Event().wait()
 PY
 ECHO=$!
 HELPER=''
-trap 'kill $ECHO $HELPER 2>/dev/null || true' EXIT
+LISTEN=''
+trap 'kill $ECHO $HELPER $LISTEN 2>/dev/null || true' EXIT
 sleep 0.5
 
 # MAC — из ip, не из /sys: /sys в песочнице показывает сеть «сервера», а не устройства.
@@ -145,6 +147,34 @@ check "dev1 → обычный сайт — напрямую" 192.168.0.50 "$(tc
 check "dev1 → адрес из подсети списка (не из DNS) — через выход" 172.31.0.2 "$(tcp dev1 198.51.100.30 80)"
 check "dev1 → обычный, UDP — напрямую" 192.168.0.50 "$(udp dev1 198.51.100.20 50000)"
 check "dev2 («всё через VPN») → обычный сайт — через выход" 172.31.0.2 "$(tcp dev2 198.51.100.20 80)"
+
+# Адреса Contour из домашней сети — таблица `ip contour` из contour-addr.sh как есть.
+# Чужая программа сервера на 0.0.0.0 (голос Alter'а, UDP 400xx) и DNS на :53;
+# основной адрес сервера — .113, как дома.
+ip addr add 192.168.0.113/24 dev lan0
+python3 - <<'PY' &
+import socket, threading
+def udp(port, answer):
+    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM); s.bind(('0.0.0.0', port))
+    while True:
+        d, a = s.recvfrom(100); s.sendto(answer, a)
+for port, answer in ((40099, b'alter'), (53, b'dns')): threading.Thread(target=udp, args=(port, answer), daemon=True).start()
+threading.Event().wait()
+PY
+LISTEN=$!
+sleep 0.3
+echo "Адреса Contour в домашней сети:"
+check "без отказа: dev1 через шлюз достаёт чужое на мосту — так ломался голос" alter "$(udp dev1 10.201.9.1 40099)"
+ADDR=192.168.0.50 TLS_PORT=18443 HTTP_PORT=18080 IFACE=lan0 TABLE=contour BRIDGES=10.201.0.0/16 bash -c 'eval "cat <<EOF
+$(sed -n "/nft -f - <<EOF/,/^EOF/p" "$1" | sed "1d;\$d")
+EOF"' _ "$ROOT/deploy/contour-addr.sh" | nft -f -
+check "мост выхода из сети — отказ" "нет связи" "$(udp dev1 10.201.9.1 40099)"
+check "чужое на .50 по UDP — отказ" "нет связи" "$(udp dev1 192.168.0.50 40099)"
+check "DNS на .50 — работает" dns "$(udp dev1 192.168.0.50 53)"
+check "чужое на основном адресе .113 — как было" alter "$(udp dev2 192.168.0.113 40099)"
+check "шлюз не задет: заблокированное, UDP — через выход" 172.31.0.2 "$(udp dev1 198.51.100.10 50000)"
+check "шлюз не задет: заблокированное, TCP — через выход" 172.31.0.2 "$(tcp dev1 198.51.100.10 9339)"
+check "шлюз не задет: «всё через VPN» — через выход" 172.31.0.2 "$(tcp dev2 198.51.100.20 80)"
 
 check "кто на деле ходит через сервер — оба устройства" "$(printf '%s\n%s\n' "$MAC1" "$MAC2" | sort | paste -sd,)" "$(ts <<'TS'
 import { seenDevices } from './src/root/gateway.ts';
