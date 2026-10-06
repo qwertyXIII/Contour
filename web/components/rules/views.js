@@ -117,3 +117,26 @@ export function sourcesView() {
 }
 
 export { FORMAT };
+
+/**
+ * Подсказка «добавь подсеть»: имя правила «только через выход» разрешилось DNS
+ * выхода во внутренний адрес, а его подсети в правилах нет — ограда не пустила.
+ * Кнопка дописывает /24 в тот же список (`data-rules-hint` — имя).
+ */
+export function hintCard() {
+  const title = h('p', { class: 'callout__title' });
+  const text = h('p', { class: 'callout__text' });
+  const label = h('span', { class: 'button__text' });
+  const add = h('button', { class: 'button button_size_s button_view_primary', type: 'button' }, svgIcon('plus', 'button__icon'), label);
+  const el = h('div', { class: 'callout callout_tone_warn' }, svgIcon('lock', 'callout__icon'),
+    h('div', { class: 'callout__body stack stack_gap_s' }, title, text, h('div', { class: 'cluster cluster_gap_s' }, add)));
+  return {
+    el,
+    update(x) {
+      setText(title, `${x.name} — внутренний адрес ${x.ip}`);
+      setText(text, `DNS выхода «${x.outlet}» знает его изнутри, но подсети ${x.net} в правилах нет — ограда соединение не пустила. Внутренние подсети открываются только явно: строкой в списке «${x.list}».`);
+      setText(label, `Добавить ${x.net} в «${x.list}»`);
+      add.dataset.rulesHint = x.name;
+    },
+  };
+}

@@ -9,7 +9,7 @@ import { plural } from '../../utils/format.js';
 import { cardList, setHidden } from '../../utils/view.js';
 import { confirmDialog } from '../outlets/confirm.js';
 import { addForm } from './add-form.js';
-import { checkView, listCard, sourcesView } from './views.js';
+import { checkView, hintCard, listCard, sourcesView } from './views.js';
 
 export class Rules {
   #root;
@@ -19,6 +19,8 @@ export class Rules {
   #cards = new Map();
   #form;
   #sources;
+  #hints;
+  #hintsGroup;
   #titles = {};
   #timer = null;
 
@@ -27,7 +29,7 @@ export class Rules {
   }
 
   init() {
-    this.#root.append(this.#checkView(), this.#listsView(), this.#sourcesGroup());
+    this.#root.append(this.#checkView(), this.#hintsView(), this.#listsView(), this.#sourcesGroup());
     this.#listen();
     new MutationObserver(() => this.#watch()).observe(this.#root, { attributes: true, attributeFilter: ['hidden'] });
     return this;
@@ -41,6 +43,14 @@ export class Rules {
     form.addEventListener('submit', (e) => { e.preventDefault(); void this.#run(); });
     this.#check = checkView();
     return group('Куда пойдёт сайт', 'какое правило его берёт и через какой выход Contour его поведёт', h('div', { class: 'card stack stack_gap_l' }, form, this.#check.el));
+  }
+
+  // Внутренние адреса от DNS выхода, которых нет в правилах: видно, только когда они есть.
+  #hintsView() {
+    this.#hints = cardList((x) => x.name, () => hintCard(), h('div', { hidden: true }));
+    this.#hintsGroup = group('Внутренние адреса', 'корпоративный DNS выхода отвечает адресом внутри сети — ограда пустит его, когда подсеть есть в правиле', this.#hints.el);
+    this.#hintsGroup.hidden = true;
+    return this.#hintsGroup;
   }
 
   #listsView() {
@@ -59,6 +69,10 @@ export class Rules {
   }
 
   #listen() {
+    this.#root.addEventListener('click', (e) => {
+      const b = e.target.closest('button[data-rules-hint]');
+      if (b) void this.#applyHint(b);
+    });
     this.#root.addEventListener('change', (e) => {
       const t = e.target.closest('input[data-rules-act="enable"]');
       if (t) void this.#post(API.rulesList(t.dataset.id), { enabled: t.checked }, t.checked ? 'Список действует' : 'Список выключен');
@@ -114,6 +128,18 @@ export class Rules {
     }
   }
 
+  async #applyHint(b) {
+    b.disabled = true;
+    try {
+      const l = await api(API.rulesHints, { method: 'POST', body: { name: b.dataset.rulesHint } });
+      toast(`Подсеть дописана в «${l.title}»: ${plural(l.stats?.entries ?? 0, ['правило', 'правила', 'правил'])}`, 'ok');
+    } catch (error) {
+      toast(error.message, 'danger');
+    }
+    b.disabled = false;
+    void this.#load();
+  }
+
   async #remove(id, title) {
     if (!(await confirmDialog(`Удалить «${title}»?`, 'Его правила перестанут действовать сразу — у прокси, телевизора и телефонов.', 'Удалить'))) return;
     try {
@@ -144,6 +170,8 @@ export class Rules {
     }
     this.#titles = Object.fromEntries(d.countries.map((c) => [c.code, c.title]));
     this.#form.set(d.countries, d.outlets);
+    this.#hints.render(d.hints ?? []);
+    setHidden(this.#hintsGroup, (d.hints ?? []).length === 0);
     this.#lists.render(d.lists);
     this.#sources.set(d.sources);
   }

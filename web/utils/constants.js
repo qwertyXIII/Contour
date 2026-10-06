@@ -21,6 +21,7 @@ export const API = {
   rules: '/api/rules',
   rulesCheck: (host) => `/api/rules/check?host=${encodeURIComponent(host)}`,
   rulesLists: '/api/rules/lists',
+  rulesHints: '/api/rules/hints',
   rulesList: (id) => `/api/rules/lists/${encodeURIComponent(id)}`,
 };
 

@@ -10,7 +10,8 @@ import { Hints } from './inlets/hints.ts';
 import { startLanInlet } from './inlets/lan.ts';
 import { errorText, log } from './log.ts';
 import { startHealth } from './outlets/health.ts';
-import { makeDial, type FenceAllow } from './outlets/connect.ts';
+import { makeDial, type Blocked, type FenceAllow } from './outlets/connect.ts';
+import { OutletDns } from './outlets/outlet-dns.ts';
 import { buildMihomoConfig } from './outlets/mihomo-config.ts';
 import { runMihomo, type MihomoHandle } from './outlets/mihomo.ts';
 import { prepareOutlets, reloadNetnsPassword, type Outlet } from './outlets/outlet.ts';
@@ -94,9 +95,13 @@ async function main(): Promise<void> {
   }
 
   const outlets = prepared.outlets;
-  // Исключение ограды частных адресов — у правил («только через»); они поднимаются позже.
+  // Исключение ограды частных адресов и DNS выхода для имён — у правил («только через»); они поднимаются позже.
   let fenceAllow: FenceAllow = () => false;
-  const dial = makeDial(new Resolver(), config.health.connectTimeoutSec * 1000, (ip, o) => fenceAllow(ip, o));
+  let internalDns: (outlet: string, host: string) => string[] = () => [];
+  let blocked: Blocked = () => {};
+  const outletDns = new OutletDns();
+  const resolver = new Resolver({ internal: (o, name) => internalDns(o.name, name), warn: (text) => log.warn(text) });
+  const dial = makeDial(resolver, config.health.connectTimeoutSec * 1000, (ip, o) => fenceAllow(ip, o), (o, host, ips) => blocked(o, host, ips));
   // Соперники — до проверки живости: запасной не поднят, и проверка его не трогает.
   let recheck: ((o: Outlet) => void) | null = null;
   let shareRefresh: (() => void) | null = null;
@@ -182,10 +187,12 @@ async function main(): Promise<void> {
   // Правила «что + куда» — до входов: прокси, SNI и раздача ведут по ним. Свои
   // сайты стран — у раздачи, она поднимается позже (её край ходит в прокси).
   let share: Share | null = null;
-  const rules = startRules(config, { sites, outlets, countrySites: () => share?.store.settings().countrySites ?? {}, log });
+  const rules = startRules(config, { sites, outlets, countrySites: () => share?.store.settings().countrySites ?? {}, outletDns: (name) => outletDns.servers(name), log });
   const route = rules.route;
   serviceOf = (host) => rules.services.serviceOf(host);
   fenceAllow = (ip, o) => !o.direct && rules.allowsPrivate(ip, o.name);
+  internalDns = (outlet, host) => rules.internalDns(outlet, host);
+  blocked = (o, host, ips) => { if (!o.direct) rules.blocked(o.name, host, ips); };
   rulesRefresh = () => rules.book.rebuild();
   // Запись сайтов телефона раздачи — у раздачи, она поднимается позже: вход зовёт её по имени.
   const server = await startHttpInlet({ ...config.http, chooser, consumers, log, meter, ports, route, speed, trace: (who, host, port, o) => share?.trace.note(who, host, port, o) });
@@ -198,7 +205,7 @@ async function main(): Promise<void> {
   });
   share?.store.onChange(() => rules.book.rebuild());
   shareRefresh = share ? () => share?.edge.refresh() : null;
-  const panelRules = { book: rules.book, lists: rules.lists, route, order: (host: string, need: ExitNeed) => chooser.order(host, undefined, Date.now(), need) };
+  const panelRules = { book: rules.book, lists: rules.lists, route, order: (host: string, need: ExitNeed) => chooser.order(host, undefined, Date.now(), need), hints: () => rules.hints(), applyHint: (name: string) => rules.applyHint(name) };
   const panel = config.panel.enabled ? startPanel(config, { outlets, meter, dial, ports, rivals, sites, share, rules: panelRules }) : null;
   const panelHosts = new Set([config.panel.name, config.lan.address]);
   const lanServers = config.lan.enabled

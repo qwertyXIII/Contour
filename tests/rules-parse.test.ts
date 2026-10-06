@@ -259,6 +259,10 @@ test('свой формат: непонятный раздел — ошибка 
 test('разделы своего формата по отдельности', () => {
   assert.deepEqual(parseSection('[через туннель, самый быстрый]'), { action: { target: { kind: 'tunnel' }, fastest: true } });
   assert.deepEqual(parseSection('[только: corp_ext, ext, ext]'), { action: { target: { kind: 'only', outlets: ['corp_ext', 'ext'] } } });
+  // Как подписывает панель — так и должно читаться: переписал оттуда, а раздел ушёл в ошибку.
+  assert.deepEqual(parseSection('[только через: corp_ext]'), { action: { target: { kind: 'only', outlets: ['corp_ext'] } } });
+  assert.deepEqual(parseSection('[only via: corp_ext]'), { action: { target: { kind: 'only', outlets: ['corp_ext'] } } });
+  assert.equal(parseRuleList('[только через: corp_ext]\nconfluence.example.com\n').entries.length, 1, 'и раздел узнаётся как свой формат');
   assert.deepEqual(parseSection('[через: vpn]'), { action: { target: { kind: 'tunnel' } } });
   assert.match(JSON.stringify(parseSection('[напрямую, самый быстрый]')), /самый быстрый/);
   assert.match(JSON.stringify(parseSection('[напрямую: DE]')), /не бывает списка/);

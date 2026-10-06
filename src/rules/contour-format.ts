@@ -19,6 +19,7 @@ import type { Action, Target } from './types.ts';
  *                                 а не другая страна
  *     [не через: RU, BY]          через выходы, кроме этих стран
  *     [только: corp_ext, ext]  только этими выходами и никогда напрямую
+ *                                 (можно [только через: …] — как пишет панель)
  *     [запретить]                 отказать сразу
  *   «, самый быстрый» в конце раздела — из подходящих выходов брать самый
  *   быстрый: [через: DE, самый быстрый], [через VPN, самый быстрый].
@@ -55,7 +56,8 @@ const WORDS: Record<string, Kind> = {
   'через vpn': 'tunnel', 'через впн': 'tunnel', 'через туннель': 'tunnel', 'через туннели': 'tunnel', 'tunnel': 'tunnel', 'vpn': 'tunnel',
   'через': 'country', 'via': 'country',
   'не через': 'avoid', 'кроме': 'avoid', 'avoid': 'avoid', 'not via': 'avoid',
-  'только': 'only', 'only': 'only',
+  // «только через» — так назначение подписывает сама панель (живьём 2026-10-06: переписал оттуда — раздел ушёл в ошибку).
+  'только': 'only', 'только через': 'only', 'only': 'only', 'only via': 'only',
   'запретить': 'reject', 'запрет': 'reject', 'reject': 'reject', 'block': 'reject',
 };
 
@@ -142,6 +144,18 @@ export function parseSection(text: string): { action: Action } | { error: string
       return bad ? { error: `«${bad}» — не имя выхода: латиница, цифры, «-» и «_»` } : action({ kind: 'only', outlets });
     }
   }
+}
+
+/** Назначение → заголовок раздела (обратное `parseSection`): так панель дописывает строки в свой список. */
+export function sectionText(action: Action): string {
+  const t = action.target;
+  const head = t.kind === 'direct' ? 'напрямую'
+    : t.kind === 'tunnel' ? 'через VPN'
+      : t.kind === 'reject' ? 'запретить'
+        : t.kind === 'country' ? `через: ${t.country}`
+          : t.kind === 'avoid' ? `не через: ${t.countries.join(', ')}`
+            : `только через: ${t.outlets.join(', ')}`;
+  return `[${head}${action.fastest ? ', самый быстрый' : ''}]`;
 }
 
 /** Страна без выхода и неизвестный выход — не ошибка (выход может появиться), но сказать надо. */

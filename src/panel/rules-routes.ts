@@ -3,7 +3,8 @@ import { z } from 'zod';
 import { formatCidr } from '../cidr.ts';
 import { outletCountries, type Outlet } from '../outlets/outlet.ts';
 import type { RuleBook } from '../rules/book.ts';
-import type { RuleLists } from '../rules/lists.ts';
+import type { InternalHint } from '../rules/hints.ts';
+import type { RuleList, RuleLists } from '../rules/lists.ts';
 import type { Router } from '../rules/need.ts';
 import type { ExitNeed } from '../select/chooser.ts';
 import { countryTitle } from '../share/rules.ts';
@@ -16,8 +17,15 @@ import type { RoutesDeps } from './routes.ts';
  * Contour — процесс DNS получает набор файлом (`rules/book.ts`).
  */
 
-/** Что нужно панели от правил; `order` — какие выходы выбор попробует для этого требования. */
-export type PanelRules = { book: RuleBook; lists: RuleLists; route: Router; order: (host: string, need: ExitNeed) => Outlet[] };
+/**
+ * Что нужно панели от правил; `order` — какие выходы выбор попробует для этого
+ * требования; `hints` — внутренние адреса от DNS выхода, которых нет в правилах,
+ * `applyHint` — дописать подсеть подсказки в её список.
+ */
+export type PanelRules = {
+  book: RuleBook; lists: RuleLists; route: Router; order: (host: string, need: ExitNeed) => Outlet[];
+  hints?: () => InternalHint[]; applyHint?: (name: string) => RuleList;
+};
 
 const ID = z.string().regex(/^[0-9a-f]{8}$/, 'неверный список');
 const CODE = z.string().regex(/^[A-Z]{2}$/, 'страна — две буквы');
@@ -33,6 +41,7 @@ const format = z.enum(['auto', 'plain', 'clash', 'shadowrocket', 'v2fly', 'conto
 
 const schemas = {
   add: z.object({ title: z.string().min(1).max(60), kind: z.enum(['url', 'file', 'manual']), url: z.string().max(2048).optional(), text: z.string().max(5 * 1024 * 1024).optional(), format, action }),
+  hint: z.object({ name: z.string().min(1).max(253) }),
   update: z.object({ title: z.string().min(1).max(60).optional(), enabled: z.boolean().optional(), format: format.optional(), action: action.optional(), text: z.string().max(5 * 1024 * 1024).optional() }),
 };
 
@@ -60,7 +69,21 @@ export function rulesRoutes(router: Express, d: RoutesDeps): void {
     const { book, lists } = d.rules!;
     const countries = outletCountries(d.outlets).map((code) => ({ code, title: countryTitle(code) }));
     const outlets = d.outlets.filter((o) => !o.direct).map((o) => ({ name: o.name, country: o.country }));
-    res.json({ ok: true, data: { lists: lists.all(), sources: sourcesView(book), size: book.rules().size, countries, outlets, allowNets: book.rules().onlyNets().map((n) => formatCidr(n)) } });
+    res.json({ ok: true, data: { lists: lists.all(), sources: sourcesView(book), size: book.rules().size, countries, outlets, allowNets: book.rules().onlyNets().map((n) => formatCidr(n)), hints: d.rules!.hints?.() ?? [] } });
+  });
+
+  // Подсказка «добавь подсеть»: внутренний адрес от DNS выхода — в список, чьё правило взяло имя.
+  router.post('/rules/hints', (req, res) => {
+    const b = parse(schemas.hint, req, res);
+    if (!b || off(res)) return;
+    if (!d.rules!.applyHint) { fail(res, 409, 'OFF', 'подсказок нет'); return; }
+    try {
+      const list = d.rules!.applyHint(b.name);
+      d.log.info(`панель: правила — подсеть для «${b.name}» дописана в «${list.title}»`);
+      res.json({ ok: true, data: list });
+    } catch (error) {
+      fail(res, 400, 'VALIDATION', (error as Error).message);
+    }
   });
 
   // Куда пойдёт сайт: какое правило его берёт и какие выходы выбор попробует.
