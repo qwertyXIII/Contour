@@ -1,4 +1,5 @@
 import { inSet } from '../dns/lists.ts';
+import { isPrivateV4 } from '../inlets/fence.ts';
 import type { Policy, PhonePlan } from './plan.ts';
 import type { ShareStore } from './store.ts';
 
@@ -66,6 +67,20 @@ export type ConfInput = {
 };
 
 /** Имя политики в конфиге: узел Contour, DIRECT, REJECT или группа страны. */
+/**
+ * Частные подсети правил, которым нужен Contour (корпоративная сеть «только через
+ * выход»), — маршрутами в туннель. Shadowrocket по умолчанию выпускает все частные
+ * сети мимо туннеля (`tun-excluded-routes`: 10/8, 172.16/12, 192.168/16…), и до
+ * правила `IP-CIDR` такой адрес не доходит — уходит к роутеру той сети, где
+ * устройство (живьём 2026-10-06: мак вне дома, `172.16.42.5` — через `en0`).
+ * Исключения не трогаем — своя локальная сеть и дальше мимо туннеля; узкий
+ * `tun-included-routes` сильнее широкого исключения (справка Shadowrocket).
+ */
+function includedRoutes(plan: PhonePlan): string[] {
+  const nets = plan.nets.filter((n) => n.policy.kind !== 'direct' && isPrivateV4(n.cidr.split('/')[0] as string)).map((n) => n.cidr);
+  return nets.length > 0 ? [`tun-included-routes = ${nets.join(', ')}`] : [];
+}
+
 function policyName(p: Policy): string {
   if (p.kind === 'contour') return SHARE_NODE;
   if (p.kind === 'country') return countryGroup(p.code);
@@ -103,6 +118,7 @@ export function shadowrocketConf(input: ConfInput): string {
     // Не разрешилось имя «прямого» сайта — не уводить его через Contour: местные
     // сервисы за чужим выходом не работают (Госуслуги, Альфа — живьём 2026-10-02).
     'dns-direct-fallback-proxy = false',
+    ...includedRoutes(plan),
     `update-url = ${base}/contour.conf`,
     '',
     ...(input.countries.length > 0 ? ['[Proxy Group]', ...input.countries.map((c) => `${countryGroup(c)} = select,DIRECT,${countryNode(c)}`), ''] : []),
