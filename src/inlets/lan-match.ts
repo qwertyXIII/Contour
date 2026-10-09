@@ -1,4 +1,5 @@
 import { isIPv4 } from 'node:net';
+import type { LanClient } from '../config.ts';
 
 /**
  * Кому и что разрешено на входе для домашней сети.
@@ -25,4 +26,14 @@ export function inCidr(address: string, cidr: string): boolean {
   const bits = Number(bitsRaw);
   const mask = bits === 0 ? 0 : (~0 << (32 - bits)) >>> 0;
   return (v4ToInt(ip) & mask) === (v4ToInt(net) & mask);
+}
+
+/** Клиент входа (`lan.clients`) по адресу; не клиент — null. */
+export function lanClient(address: string, clients: readonly LanClient[]): LanClient | null {
+  return clients.find((c) => inCidr(address, c.net)) ?? null;
+}
+
+/** Пускать ли на вход и в DNS: домашняя сеть или клиент входа. */
+export function admitted(address: string, lan: { allow: string; clients: readonly LanClient[] }): boolean {
+  return inCidr(address, lan.allow) || lanClient(address, lan.clients) !== null;
 }

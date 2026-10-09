@@ -139,6 +139,11 @@ export type Config = {
     subnetLists: string[];
     /** Подсети, которые из списков выбрасываются (по умолчанию — Cloudflare). */
     subnetSkip: string[];
+    /**
+     * Клиенты входа — свои подсети вне домашней сети, которые ходят через Contour
+     * целиком (`LanClient`): например, namespace шлюза агентов на veth.
+     */
+    clients: LanClient[];
   };
   /**
    * Раздача (`src/share/`): телефоны из любой сети через Shadowrocket. Снаружи —
@@ -158,6 +163,16 @@ export type Config = {
 };
 
 export { CLOUDFLARE_V4, COUNTRY_LISTS, DEFAULT_LISTS, DEFAULT_SUBNET_LISTS, GAME_PORTS, LAN_DOMAINS } from './config-lists.ts';
+
+/**
+ * Клиент входа для домашней сети (решение владельца 2026-10-09, шлюз агентов
+ * AI-Proxy): подсеть, которой DNS отвечает адресом Contour на **любое** имя, а
+ * вход ведёт всё через выходы — по правилам, а со страной `country` — только
+ * через выходы этой страны (нет живого — отказ, не другая страна). Остальной
+ * дом не трогается: общие правила и списки — как были. Учёт — под именем
+ * `lan:<name>`.
+ */
+export type LanClient = { name: string; net: string; country: string | null };
 
 export const DEFAULTS: Config = {
   http: { listen: '127.0.0.1', port: 3128 },
@@ -206,6 +221,7 @@ export const DEFAULTS: Config = {
     dataDir: '/var/lib/contour/dns',
     ports: GAME_PORTS,
     hintPort: 18053,
+    clients: [],
   },
   share: { enabled: true, listen: '127.0.0.1', port: 18300, listPort: 18091, controller: '127.0.0.1:19091', dir: '/var/lib/contour/share', countries: null },
 };
@@ -294,6 +310,28 @@ function domainList(value: unknown, where: string, fallback: string[]): string[]
     const d = typeof v === 'string' ? v.trim().toLowerCase().replace(/^\*\./, '').replace(/\.$/, '') : '';
     if (!DOMAIN.test(d)) throw new ConfigError(`${where}: «${String(v)}» — не имя сайта`);
     return d;
+  });
+}
+
+/** `lan.clients`: [{name, net, country?}] — имя как у выхода, подсеть IPv4, страна — код. */
+function lanClients(value: unknown): LanClient[] {
+  if (value === undefined || value === null) return [];
+  if (!Array.isArray(value)) throw new ConfigError('lan.clients: список вида [{name: aiproxy, net: 10.200.0.0/30, country: DE}]');
+  const names = new Set<string>();
+  return value.map((raw, i) => {
+    const where = `lan.clients[${i}]`;
+    if (!isRecord(raw)) throw new ConfigError(`${where}: нужен раздел с name и net`);
+    onlyKnown(raw, where, ['name', 'net', 'country']);
+    const name = typeof raw.name === 'string' ? raw.name : '';
+    if (!NAME.test(name)) throw new ConfigError(`${where}.name: латиница, цифры, «-» и «_», до 32 знаков`);
+    if (names.has(name)) throw new ConfigError(`${where}.name: «${name}» встречается дважды`);
+    names.add(name);
+    const net = typeof raw.net === 'string' ? raw.net.trim() : '';
+    const [ip, bits] = net.split('/');
+    if (isIP(ip ?? '') !== 4 || !(Number(bits) >= 8 && Number(bits) <= 32)) throw new ConfigError(`${where}.net: нужна сеть вида 10.200.0.0/30`);
+    const code = raw.country === undefined || raw.country === null ? null : String(raw.country).toUpperCase();
+    if (code !== null && !COUNTRY.test(code)) throw new ConfigError(`${where}.country: код страны, например DE`);
+    return { name, net, country: code };
   });
 }
 
@@ -395,7 +433,7 @@ export function parseConfig(text: string): Config {
   const share = section(raw, 'share');
   onlyKnown(share, 'share', ['enabled', 'listen', 'port', 'listPort', 'controller', 'dir', 'countries']);
   const lan = section(raw, 'lan');
-  onlyKnown(lan, 'lan', ['enabled', 'address', 'allow', 'upstream', 'domains', 'extraDomains', 'tlsPort', 'httpPort', 'lists', 'learn', 'probeBudgetMs', 'dataDir', 'ports', 'hintPort', 'subnetLists', 'subnetSkip']);
+  onlyKnown(lan, 'lan', ['enabled', 'address', 'allow', 'upstream', 'domains', 'extraDomains', 'tlsPort', 'httpPort', 'lists', 'learn', 'probeBudgetMs', 'dataDir', 'ports', 'hintPort', 'subnetLists', 'subnetSkip', 'clients']);
 
   const outletsRaw = raw.outlets ?? [];
   if (!Array.isArray(outletsRaw)) throw new ConfigError('outlets: нужен список выходов');
@@ -466,6 +504,7 @@ export function parseConfig(text: string): Config {
       lists: urlList(lan.lists, d.lan.lists),
       subnetLists: urlList(lan.subnetLists, d.lan.subnetLists, 'lan.subnetLists'),
       subnetSkip: cidrList(lan.subnetSkip, d.lan.subnetSkip),
+      clients: lanClients(lan.clients),
       learn: bool(lan, 'learn', d.lan.learn, 'lan'),
       probeBudgetMs: num(lan, 'probeBudgetMs', d.lan.probeBudgetMs, 'lan', 100, 5_000),
       dataDir: str(lan, 'dataDir', d.lan.dataDir, 'lan'),

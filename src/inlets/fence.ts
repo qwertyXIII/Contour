@@ -31,6 +31,12 @@ export const PRIVATE_V4: Array<[string, number]> = [
 
 const LOCAL_SUFFIXES = ['.localhost', '.local', '.lan', '.internal', '.home', '.home.arpa', '.corp', '.intranet'];
 
+/** Имя местной сети: без точки или с местным окончанием (`.local`, `.home`…). */
+export function isLocalName(name: string): boolean {
+  const bare = name.toLowerCase().replace(/\.$/, '');
+  return !bare.includes('.') || LOCAL_SUFFIXES.some((s) => bare.endsWith(s));
+}
+
 function v4ToInt(ip: string): number {
   return ip.split('.').reduce((acc, part) => ((acc << 8) + Number(part)) >>> 0, 0);
 }

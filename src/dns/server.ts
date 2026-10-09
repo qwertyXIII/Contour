@@ -3,7 +3,8 @@ import net from 'node:net';
 import dnsPacket, { type Packet } from 'dns-packet';
 import type { Config } from '../config.ts';
 import { errorText, type Logger } from '../log.ts';
-import { inCidr } from '../inlets/lan-match.ts';
+import { isLocalName } from '../inlets/fence.ts';
+import { admitted, lanClient } from '../inlets/lan-match.ts';
 
 /**
  * «Умный DNS» для устройств домашней сети.
@@ -144,6 +145,12 @@ export async function resolvePacket(packet: Buffer, deps: DnsDeps, client = ''):
     return null;
   }
   const name = ownQuestion(query);
+  // Клиент входа (`lan.clients`) ходит через Contour целиком: любое публичное имя —
+  // наш адрес, сразу, без решения и проб самообучения. Местные — как всем.
+  if (name && !isLocalName(name) && lanClient(client, lan.clients)) {
+    const own = answerOwn(query, lan);
+    if (own) return own;
+  }
   const decision: Decision = name !== null ? await decide(name) : { tunnel: false };
   let path: GatewayAnswer = null;
   if (name && !decision.local && gateway?.isGateway(client)) {
@@ -170,7 +177,7 @@ export function startDns(deps: DnsDeps): { udp: dgram.Socket; tcp: net.Server } 
   const { lan, log } = deps;
   const udp = dgram.createSocket('udp4');
   udp.on('message', (msg, rinfo) => {
-    if (!inCidr(rinfo.address, lan.allow)) return;
+    if (!admitted(rinfo.address, lan)) return;
     void resolvePacket(msg, deps, rinfo.address).then((answer) => {
       if (answer) udp.send(answer, rinfo.port, rinfo.address);
     });
@@ -180,7 +187,7 @@ export function startDns(deps: DnsDeps): { udp: dgram.Socket; tcp: net.Server } 
 
   // TCP — на случай длинного ответа (флаг TC) и для клиентов, которые спрашивают по TCP.
   const tcp = net.createServer((socket) => {
-    if (!inCidr(socket.remoteAddress ?? '', lan.allow)) { socket.destroy(); return; }
+    if (!admitted(socket.remoteAddress ?? '', lan)) { socket.destroy(); return; }
     let buf = Buffer.alloc(0);
     socket.setTimeout(10_000, () => socket.destroy());
     socket.on('data', (chunk: Buffer) => {
