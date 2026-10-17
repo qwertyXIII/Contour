@@ -6,7 +6,7 @@ import path from 'node:path';
 import test from 'node:test';
 import tls from 'node:tls';
 import dnsPacket from 'dns-packet';
-import { DEFAULTS, parseConfig } from '../src/config.ts';
+import { DEFAULTS, httpHomeBlock, parseConfig } from '../src/config.ts';
 import { Consumers } from '../src/consumers.ts';
 import { resolvePacket } from '../src/dns/server.ts';
 import { serveForTest } from '../src/inlets/lan.ts';
@@ -26,6 +26,13 @@ test('клиенты входа в настройке: имя, подсеть, �
   assert.throws(() => parseConfig('lan:\n  clients:\n    - { name: aiproxy, net: 10.200.0.0/30, country: Germany }\n'), /country/);
   assert.throws(() => parseConfig('lan:\n  clients:\n    - { name: a, net: 10.0.0.0/30 }\n    - { name: a, net: 10.0.1.0/30 }\n'), /дважды/);
   assert.throws(() => parseConfig('lan:\n  clients:\n    - { name: a, net: 10.0.0.0/30, exit: x }\n'), /неизвестное поле/);
+});
+
+test('прокси для дома: открывается сам; не открыть — причина словами, а не ошибка настроек', () => {
+  assert.equal(httpHomeBlock(parseConfig('lan:\n  enabled: true\n')), null);
+  assert.match(httpHomeBlock(parseConfig('http:\n  listen: 0.0.0.0\n')) ?? '', /уже слушает 0\.0\.0\.0:3128/);
+  assert.match(httpHomeBlock(parseConfig('http:\n  port: 9339\n')) ?? '', /9339 .* занят \(lan\.ports\)/);
+  assert.match(httpHomeBlock(parseConfig('http:\n  port: 53\n')) ?? '', /занят \(DNS\)/);
 });
 
 test('кого пускать: домашняя сеть и подсети клиентов, больше никого', () => {

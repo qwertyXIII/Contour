@@ -1,5 +1,6 @@
 import http from 'node:http';
 import type { Socket } from 'node:net';
+import type { LanClient } from '../config.ts';
 import type { Consumers } from '../consumers.ts';
 import { errorText, type Logger } from '../log.ts';
 import type { Outlet } from '../outlets/outlet.ts';
@@ -7,6 +8,8 @@ import { noRules } from '../rules/need.ts';
 import type { Chooser, ExitNeed } from '../select/chooser.ts';
 import type { Meter } from '../stats/meter.ts';
 import { checkDestination } from './fence.ts';
+import { inCidr, lanClient } from './lan-match.ts';
+import { listenRetrying } from './listen.ts';
 import { MAX_ATTEMPTS, relay, type RelayDeps, type Target } from './relay.ts';
 
 /**
@@ -26,6 +29,12 @@ import { MAX_ATTEMPTS, relay, type RelayDeps, type Target } from './relay.ts';
  *
  * Заголовок `Contour-Exit: RU` — «выпусти в этой стране» (край раздачи ставит
  * его второму серверу телефона, «Contour-RU»). Сайту он не уходит.
+ *
+ * Для домашней сети тот же прокси открывается на `lan.address`
+ * (`startHttpLanInlet`, 2026-10-17 — мод Minecraft: в нём только адрес и порт,
+ * поля для логина нет). Там, как у SNI-входа, дом пускают **без токена**
+ * (учёт — `lan:<адрес>`), клиента входа (`lan.clients`) — по имени и с его
+ * страной; остальным — токен. На 127.0.0.1 адрес ничего не значит: только токен.
  */
 
 export const EXIT_HEADER = 'contour-exit';
@@ -51,6 +60,29 @@ export type HttpInletOptions = {
 };
 
 type Deps = RelayDeps;
+
+/** Кого вход для дома пускает без токена: домашняя сеть и клиенты входа (`lan.allow`, `lan.clients`). */
+export type Home = { allow: string; clients: readonly LanClient[] };
+
+/** Кто пришёл: имя для учёта и страна клиента входа. */
+type Caller = { who: string; country: string | null };
+
+/** Токен, а на входе для дома без токена — по адресу, как у SNI-входа. */
+function identify(req: http.IncomingMessage, consumers: Consumers, home: Home | null): Caller | null {
+  const who = consumers.authorize(req.headers['proxy-authorization']);
+  if (who) return { who, country: null };
+  if (!home) return null;
+  const from = req.socket.remoteAddress ?? '';
+  const member = lanClient(from, home.clients);
+  if (member) return { who: `lan:${member.name}`, country: member.country };
+  return inCidr(from, home.allow) ? { who: `lan:${from.replace(/^::ffff:/, '')}`, country: null } : null;
+}
+
+/** Страна из заголовка, а без него — страна клиента. */
+function needOf(req: http.IncomingMessage, caller: Caller): ExitNeed {
+  const need = exitNeed(req.headers[EXIT_HEADER]);
+  return need.country || !caller.country ? need : { country: caller.country };
+}
 
 const STATUS_TEXT: Record<number, string> = {
   400: 'Bad Request',
@@ -156,7 +188,7 @@ function serveForward(req: http.IncomingMessage, res: http.ServerResponse, who: 
 
 // ─── Сервер ────────────────────────────────────────────────────────────────
 
-export function startHttpInlet(opts: HttpInletOptions): Promise<http.Server> {
+function createServer(opts: HttpInletOptions, home: Home | null): http.Server {
   const { chooser, consumers, log } = opts;
   const deps: Deps = { chooser, consumers, log, meter: opts.meter, ports: opts.ports, route: opts.route, speed: opts.speed, trace: opts.trace };
   const route = opts.route ?? noRules;
@@ -166,11 +198,12 @@ export function startHttpInlet(opts: HttpInletOptions): Promise<http.Server> {
   server.keepAliveTimeout = 65_000;
 
   server.on('connect', (req, socket: Socket, head) => {
-    const who = consumers.authorize(req.headers['proxy-authorization']);
-    if (!who) { refuse(socket, 407, 'нужен токен', AUTH_HEADERS); return; }
+    const caller = identify(req, consumers, home);
+    if (!caller) { refuse(socket, 407, 'нужен токен', AUTH_HEADERS); return; }
+    const { who } = caller;
     const target = parseAuthority(req.url);
     if (!target) { refuse(socket, 400, 'CONNECT host:port'); return; }
-    const routed = route(target.host, exitNeed(req.headers[EXIT_HEADER]));
+    const routed = route(target.host, needOf(req, caller));
     const fence = checkDestination(target.host, target.port);
     if (!fence.ok && !routed.fenceException) {
       log.warn(`${who}: отказ ограды — ${fence.reason}`);
@@ -193,12 +226,13 @@ export function startHttpInlet(opts: HttpInletOptions): Promise<http.Server> {
       res.end(url === '/' ? 'contour\n' : 'не найдено\n');
       return;
     }
-    const who = consumers.authorize(req.headers['proxy-authorization']);
-    if (!who) {
+    const caller = identify(req, consumers, home);
+    if (!caller) {
       res.writeHead(407, { ...AUTH_HEADERS, 'Content-Type': 'text/plain; charset=utf-8' });
       res.end('нужен токен\n');
       return;
     }
+    const { who } = caller;
     let target: URL;
     try {
       target = new URL(url);
@@ -207,7 +241,7 @@ export function startHttpInlet(opts: HttpInletOptions): Promise<http.Server> {
     }
     if (target.protocol !== 'http:') { res.writeHead(400); res.end('через проброс только http; для https — CONNECT\n'); return; }
     const host = target.hostname.replace(/^\[|\]$/g, '');
-    const routed = route(host, exitNeed(req.headers[EXIT_HEADER]));
+    const routed = route(host, needOf(req, caller));
     const fence = checkDestination(host, Number(target.port) || 80);
     if ((!fence.ok && !routed.fenceException) || routed.reject) {
       const reason = routed.reject ? `запрещено правилом «${routed.why}»` : fence.ok ? '' : fence.reason;
@@ -223,7 +257,12 @@ export function startHttpInlet(opts: HttpInletOptions): Promise<http.Server> {
     if (error.code !== 'ECONNRESET' && socket.writable) refuse(socket, 400, 'плохой запрос');
     else socket.destroy();
   });
+  return server;
+}
 
+export function startHttpInlet(opts: HttpInletOptions): Promise<http.Server> {
+  const { log } = opts;
+  const server = createServer(opts, null);
   return new Promise((resolve, reject) => {
     server.once('error', reject);
     server.listen(opts.port, opts.listen, () => {
@@ -232,4 +271,14 @@ export function startHttpInlet(opts: HttpInletOptions): Promise<http.Server> {
       resolve(server);
     });
   });
+}
+
+/**
+ * Тот же прокси для домашней сети — на `opts.listen` (`lan.address`). Адреса
+ * может ещё не быть (его держит сторож `contour-addr`) — повтор, старт не ждёт.
+ */
+export function startHttpLanInlet(opts: HttpInletOptions & { home: Home }): http.Server {
+  const server = createServer(opts, opts.home);
+  void listenRetrying(server, opts.listen, opts.port, opts.log, 'вход HTTP-прокси для домашней сети');
+  return server;
 }

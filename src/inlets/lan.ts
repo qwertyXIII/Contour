@@ -1,11 +1,10 @@
 import net, { type Socket } from 'node:net';
-import { setTimeout as sleep } from 'node:timers/promises';
 import type { Config } from '../config.ts';
-import { errorText, type Logger } from '../log.ts';
 import { noRules } from '../rules/need.ts';
 import { checkDestination } from './fence.ts';
 import { inCidr, lanClient } from './lan-match.ts';
 import { clientStatus, isStatusRequest, replyStatus } from './lan-status.ts';
+import { listenRetrying } from './listen.ts';
 import { relay, type RelayDeps } from './relay.ts';
 import { parseHttpHost, parseSni } from './sni.ts';
 
@@ -28,7 +27,6 @@ type LanConfig = Config['lan'];
 const HELLO_TIMEOUT_MS = 10_000;
 /** Больше этого ClientHello не бывает; дальше — не TLS или атака. */
 const HELLO_CAP = 16 * 1024 + 5;
-const RETRY_BIND_MS = 10_000;
 
 type Sniffed = { name: string } | { reject: string };
 
@@ -104,23 +102,6 @@ function serve(kind: 'tls' | 'http', port: number, client: Socket, lan: LanConfi
   client.on('error', () => client.destroy());
 }
 
-/** Слушать адрес, которого может ещё не быть (unit второго адреса не поднялся) — повторяя. */
-async function listen(server: net.Server, address: string, port: number, log: Logger): Promise<void> {
-  for (;;) {
-    try {
-      await new Promise<void>((resolve, reject) => {
-        server.once('error', reject);
-        server.listen(port, address, () => { server.off('error', reject); resolve(); });
-      });
-      log.info(`вход для домашней сети слушает ${address}:${port}`);
-      return;
-    } catch (error) {
-      log.error(`вход для домашней сети ${address}:${port} не открылся: ${errorText(error)}; повтор через ${RETRY_BIND_MS / 1000} с`);
-      await sleep(RETRY_BIND_MS);
-    }
-  }
-}
-
 /** Тот же разбор для тестов — порт 443 в тесте не взять. */
 export const serveForTest = serve;
 
@@ -130,7 +111,7 @@ export function startLanInlet(lan: LanConfig, deps: RelayDeps, panel: PanelHook 
   // nft от contour-addr (сами :443/:80 на всех адресах держит nginx).
   for (const [kind, port, listenPort] of [['tls', 443, lan.tlsPort], ['http', 80, lan.httpPort]] as const) {
     const server = net.createServer((client) => serve(kind, port, client, lan, deps, panel));
-    void listen(server, lan.address, listenPort, deps.log);
+    void listenRetrying(server, lan.address, listenPort, deps.log, 'вход для домашней сети');
     servers.push(server);
   }
   deps.log.info(`домашняя сеть: ${lan.allow}, сайтов в списке ${lan.domains.length}${lan.clients.length > 0 ? `; клиенты входа: ${lan.clients.map((c) => `${c.name} ${c.net}${c.country ? ` → ${c.country}` : ''}`).join(', ')}` : ''}`);

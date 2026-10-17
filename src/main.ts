@@ -3,8 +3,8 @@ import { randomBytes } from 'node:crypto';
 import { chmodSync, mkdirSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { Consumers } from './consumers.ts';
-import { ConfigError, loadConfig } from './config.ts';
-import { startHttpInlet } from './inlets/http-proxy.ts';
+import { ConfigError, httpHomeBlock, loadConfig } from './config.ts';
+import { startHttpInlet, startHttpLanInlet } from './inlets/http-proxy.ts';
 import { startGamePorts } from './inlets/game-ports.ts';
 import { Hints } from './inlets/hints.ts';
 import { startLanInlet } from './inlets/lan.ts';
@@ -195,7 +195,12 @@ async function main(): Promise<void> {
   blocked = (o, host, ips) => { if (!o.direct) rules.blocked(o.name, host, ips); };
   rulesRefresh = () => rules.book.rebuild();
   // Запись сайтов телефона раздачи — у раздачи, она поднимается позже: вход зовёт её по имени.
-  const server = await startHttpInlet({ ...config.http, chooser, consumers, log, meter, ports, route, speed, trace: (who, host, port, o) => share?.trace.note(who, host, port, o) });
+  const httpDeps = { chooser, consumers, log, meter, ports, route, speed, trace: (who: string, host: string, port: number, o: Outlet) => share?.trace.note(who, host, port, o) };
+  const server = await startHttpInlet({ listen: config.http.listen, port: config.http.port, ...httpDeps });
+  // Тот же прокси для программ домашней сети (мод Minecraft) — на адресе входа для дома, без токена.
+  const homeBlock = config.lan.enabled ? httpHomeBlock(config) : null;
+  if (homeBlock) log.warn(`HTTP-прокси для домашней сети не открыт: ${homeBlock}`);
+  const httpLan = config.lan.enabled && !homeBlock ? startHttpLanInlet({ listen: config.lan.address, port: config.http.port, home: config.lan, ...httpDeps }) : null;
   share = startShare(config, { consumers, outlets, countryList: (code) => rules.book.countryList(code), ruleset: () => rules.book.rules(), allowTcp: () => rules.allowNets(), log });
   // Край перезапускается, только когда сменились его исключения ограды: телефоны при этом переподключаются.
   let allowed = rules.allowNets().join(' ');
@@ -232,8 +237,7 @@ async function main(): Promise<void> {
     speedProbe.stop();
     speed.stop();
     panel?.server.close();
-    server.close();
-    server.closeAllConnections();
+    for (const s of [server, httpLan]) { s?.close(); s?.closeAllConnections(); }
     for (const s of [...lanServers, ...gameServers]) s.close();
     hintSocket?.close();
     void Promise.allSettled([mihomo?.stop(), share?.stop()]).finally(() => process.exit(0));

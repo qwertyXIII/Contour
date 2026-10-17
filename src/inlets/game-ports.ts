@@ -1,9 +1,8 @@
 import net, { type Socket } from 'node:net';
-import { setTimeout as sleep } from 'node:timers/promises';
 import type { Config } from '../config.ts';
-import { errorText, type Logger } from '../log.ts';
 import type { Hints, PortRule } from './hints.ts';
 import { inCidr } from './lan-match.ts';
+import { listenRetrying } from './listen.ts';
 import { relay, type RelayDeps } from './relay.ts';
 
 /**
@@ -16,24 +15,6 @@ import { relay, type RelayDeps } from './relay.ts';
  *
  * Только TCP. UDP (бои в реальном времени, голос) — дело режима шлюза.
  */
-
-const RETRY_BIND_MS = 10_000;
-
-async function listen(server: net.Server, address: string, port: number, log: Logger): Promise<void> {
-  for (;;) {
-    try {
-      await new Promise<void>((resolve, reject) => {
-        server.once('error', reject);
-        server.listen(port, address, () => { server.off('error', reject); resolve(); });
-      });
-      log.info(`порт игр слушает ${address}:${port}`);
-      return;
-    } catch (error) {
-      log.error(`порт игр ${address}:${port} не открылся: ${errorText(error)}; повтор через ${RETRY_BIND_MS / 1000} с`);
-      await sleep(RETRY_BIND_MS);
-    }
-  }
-}
 
 function serve(client: Socket, rule: PortRule, lan: Config['lan'], hints: Hints, deps: RelayDeps): void {
   const from = (client.remoteAddress ?? '').replace(/^::ffff:/, '');
@@ -55,7 +36,7 @@ function serve(client: Socket, rule: PortRule, lan: Config['lan'], hints: Hints,
 export function startGamePorts(lan: Config['lan'], hints: Hints, deps: RelayDeps): net.Server[] {
   return lan.ports.map((rule) => {
     const server = net.createServer((client) => serve(client, rule, lan, hints, deps));
-    void listen(server, lan.address, rule.port, deps.log);
+    void listenRetrying(server, lan.address, rule.port, deps.log, 'порт игр');
     return server;
   });
 }

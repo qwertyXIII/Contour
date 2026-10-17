@@ -65,6 +65,11 @@ export type OutletConfig = {
 export type DirectConfig = { enabled: boolean; name: string; priority: number; onRequest: boolean; country: string | null };
 
 export type Config = {
+  /**
+   * Вход HTTP-прокси для программ машины. С включённым `lan` тот же прокси
+   * открывается и на `lan.address:port` — для программ домашней сети, без
+   * токена (`httpHomeBlock`).
+   */
   http: { listen: string; port: number };
   tokens: string;
   outlets: OutletConfig[];
@@ -521,6 +526,18 @@ export function parseConfig(text: string): Config {
       countries: countryList(share.countries, d.share.countries),
     },
   };
+}
+
+/**
+ * Почему прокси для дома не открыть на `lan.address:http.port`; null — можно.
+ * Не ошибка настроек: прокси для дома открывается сам, и прежний файл
+ * настроек не должен из-за него перестать запускаться.
+ */
+export function httpHomeBlock({ http, lan }: Config): string | null {
+  if (http.listen === '0.0.0.0' || http.listen === lan.address) return `прокси уже слушает ${http.listen}:${http.port} — там только по токену`;
+  const taken = new Map<number, string>([[53, 'DNS'], [lan.tlsPort, 'lan.tlsPort'], [lan.httpPort, 'lan.httpPort'], ...lan.ports.map((p) => [p.port, 'lan.ports'] as [number, string])]);
+  const busy = taken.get(http.port);
+  return busy ? `порт ${http.port} на ${lan.address} уже занят (${busy}) — смените http.port` : null;
 }
 
 export function loadConfig(path: string): Config {

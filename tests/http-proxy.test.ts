@@ -1,14 +1,15 @@
 import assert from 'node:assert/strict';
 import { mkdtempSync, writeFileSync } from 'node:fs';
+import { once } from 'node:events';
 import http from 'node:http';
 import net from 'node:net';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
 import { Consumers } from '../src/consumers.ts';
-import { parseAuthority, startHttpInlet } from '../src/inlets/http-proxy.ts';
+import { type Home, parseAuthority, startHttpInlet, startHttpLanInlet } from '../src/inlets/http-proxy.ts';
 import { newOutlet, type Outlet } from '../src/outlets/outlet.ts';
-import { Chooser } from '../src/select/chooser.ts';
+import { Chooser, type ExitNeed } from '../src/select/chooser.ts';
 import { createLogger } from '../src/vendor/logger.js';
 
 /**
@@ -20,7 +21,8 @@ import { createLogger } from '../src/vendor/logger.js';
 const quiet = createLogger({ enabled: false });
 const TOKEN = '0123456789abcdef0123456789abcdef';
 
-async function setup(): Promise<{ proxy: string; target: http.Server; close: () => void }> {
+/** `home` — вход для домашней сети (`startHttpLanInlet`) на 127.0.0.1 вместо обычного. */
+async function setup(home?: Home): Promise<{ proxy: string; target: http.Server; needs: ExitNeed[]; close: () => void }> {
   const target = http.createServer((req, res) => {
     res.setHeader('x-seen-host', req.headers.host ?? '');
     res.end(`ok ${req.method} ${req.url}`);
@@ -38,17 +40,26 @@ async function setup(): Promise<{ proxy: string; target: http.Server; close: () 
   fake.state = 'alive';
   const chooser = new Chooser([fake], { stickyMs: 0, connectTimeoutMs: 1000, onFailure: () => {}, log: quiet });
   // Любой адрес ведёт в локальную цель — ограда при этом проверяет то, что просил клиент.
-  chooser.connect = async () => {
+  const needs: ExitNeed[] = [];
+  chooser.connect = async (_host, _port, _exclude, need) => {
+    needs.push(need ?? {});
     const socket = net.connect(targetPort, '127.0.0.1');
     await new Promise<void>((r, j) => { socket.once('connect', r); socket.once('error', j); });
     return { socket, outlet: fake, failed: [] };
   };
 
-  const server = await startHttpInlet({ listen: '127.0.0.1', port: 0, chooser, consumers, log: quiet });
+  let server: http.Server;
+  if (home) {
+    server = startHttpLanInlet({ listen: '127.0.0.1', port: 0, home, chooser, consumers, log: quiet });
+    await once(server, 'listening');
+  } else {
+    server = await startHttpInlet({ listen: '127.0.0.1', port: 0, chooser, consumers, log: quiet });
+  }
   const proxyPort = (server.address() as net.AddressInfo).port;
   return {
     proxy: `127.0.0.1:${proxyPort}`,
     target,
+    needs,
     close: () => { server.close(); server.closeAllConnections(); target.close(); target.closeAllConnections(); },
   };
 }
@@ -80,6 +91,38 @@ test('без токена — 407, с токеном CONNECT открывает 
     assert.match(ok, /ok GET \/t/, 'байты после 200 дошли до цели и обратно');
   } finally {
     s.close();
+  }
+});
+
+test('вход для дома: домашняя сеть — без токена; клиент входа — со своей страной; не дом — токен', async () => {
+  const connect = 'CONNECT mc.example.com:25565 HTTP/1.1\r\nHost: mc.example.com:25565\r\n';
+  const ping = 'GET /t HTTP/1.1\r\nHost: example.com\r\nConnection: close\r\n\r\n';
+  const home = await setup({ allow: '127.0.0.0/8', clients: [] });
+  try {
+    const ok = await rawRequest(home.proxy, `${connect}\r\n${ping}`);
+    assert.match(ok, /^HTTP\/1\.1 200 Connection Established/);
+    assert.match(ok, /ok GET \/t/, 'мод Minecraft: только адрес и порт');
+    assert.deepEqual(home.needs.at(-1), {}, 'без страны — по правилам');
+    const fenced = await rawRequest(home.proxy, 'CONNECT 192.168.0.1:443 HTTP/1.1\r\n\r\n');
+    assert.match(fenced, /^HTTP\/1\.1 403 /, 'ограда — и без токена');
+  } finally {
+    home.close();
+  }
+  const client = await setup({ allow: '10.9.9.0/24', clients: [{ name: 'aiproxy', net: '127.0.0.1/32', country: 'DE' }] });
+  try {
+    assert.match(await rawRequest(client.proxy, `${connect}\r\n${ping}`), /^HTTP\/1\.1 200 /);
+    assert.equal(client.needs.at(-1)?.country, 'DE', 'страна клиента — как заголовок');
+    await rawRequest(client.proxy, `${connect}Contour-Exit: NL\r\n\r\n${ping}`);
+    assert.equal(client.needs.at(-1)?.country, 'NL', 'заголовок сильнее страны клиента');
+  } finally {
+    client.close();
+  }
+  const away = await setup({ allow: '10.9.9.0/24', clients: [] });
+  try {
+    assert.match(await rawRequest(away.proxy, `${connect}\r\n`), /^HTTP\/1\.1 407 /);
+    assert.match(await rawRequest(away.proxy, `${connect}${auth}\r\n\r\n${ping}`), /^HTTP\/1\.1 200 /, 'с токеном — как на 127.0.0.1');
+  } finally {
+    away.close();
   }
 });
 
