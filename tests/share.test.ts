@@ -162,7 +162,7 @@ test('план телефона: точное имя — строкой; зап�
   assert.match(conf, /^DOMAIN,www\.example\.org,REJECT$/m);
   assert.match(conf, /^DOMAIN-SET,B\/reject\.list,REJECT$/m);
   // Shadowrocket по умолчанию пускает частные сети мимо туннеля — до правила адрес не дошёл бы.
-  assert.match(conf, /^tun-included-routes = 172\.16\.42\.0\/24$/m, 'корпоративная подсеть — маршрутом в туннель');
+  assert.match(conf, /^tun-included-routes = 0\.0\.0\.0\/0, 172\.16\.42\.0\/24$/m, 'корпоративная подсеть — маршрутом в туннель, и маршрут по умолчанию первым: без него в туннеле только она');
   assert.ok(conf.indexOf('tun-included-routes') < conf.indexOf('[Rule]'), 'в [General]');
   const plain = shadowrocketConf({ base: 'B', device: 'x', plan: { ...plan, nets: [{ cidr: '91.108.4.0/22', policy: { kind: 'contour' } }, { cidr: '10.1.0.0/16', policy: { kind: 'direct' } }] }, countries: [] });
   assert.doesNotMatch(plain, /tun-included-routes/, 'публичные и «напрямую» — не маршрутами: их и так видит туннель или они не наши');

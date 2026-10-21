@@ -75,10 +75,17 @@ export type ConfInput = {
  * устройство (живьём 2026-10-06: мак вне дома, `172.16.42.5` — через `en0`).
  * Исключения не трогаем — своя локальная сеть и дальше мимо туннеля; узкий
  * `tun-included-routes` сильнее широкого исключения (справка Shadowrocket).
+ *
+ * ⚠️ Первым — `0.0.0.0/0`: `tun-included-routes` — это «в туннель только эти
+ * сети», а не «ещё и эти». Без маршрута по умолчанию туннель после
+ * переподключения брал одну корпоративную сеть, мимо него уходили весь
+ * интернет и его же DNS `198.18.0.2` (живьём 2026-10-22, Mac: маршрут по
+ * умолчанию — `en0`, DNS «no servers could be reached», `getaddrinfo` — 57 с;
+ * терминал и Claude Code висели, Chrome жил через системный прокси).
  */
 function includedRoutes(plan: PhonePlan): string[] {
   const nets = plan.nets.filter((n) => n.policy.kind !== 'direct' && isPrivateV4(n.cidr.split('/')[0] as string)).map((n) => n.cidr);
-  return nets.length > 0 ? [`tun-included-routes = ${nets.join(', ')}`] : [];
+  return nets.length > 0 ? [`tun-included-routes = ${['0.0.0.0/0', ...nets].join(', ')}`] : [];
 }
 
 function policyName(p: Policy): string {
