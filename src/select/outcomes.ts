@@ -1,7 +1,7 @@
 import { readJson, writeJson } from '../json-file.ts';
 import { errorText, type Logger } from '../log.ts';
 import { FenceError } from '../outlets/connect.ts';
-import { ResolveError } from '../outlets/doh.ts';
+import { ResolveError, ResolverDownError } from '../outlets/doh.ts';
 
 /**
  * Самообучение по выходам и странам: пускает ли сервис через этот выход.
@@ -104,8 +104,9 @@ type Pulse = { last: { service: string; at: number } | null; prev: { service: st
 
 /** Вид отказа по ошибке соединения (`dial`); null — это не исход выхода. */
 export function failureKind(error: unknown): FailKind | null {
-  // Ограда — наш собственный отказ, «имени нет» — ответ DNS, одинаковый через любой выход.
-  if (error instanceof FenceError || error instanceof ResolveError) return null;
+  // Ограда — наш собственный отказ, «имени нет» — ответ DNS, одинаковый через любой выход;
+  // DNS выхода не ответил — болезнь выхода (её видит проверка живости), а не отказ сервиса.
+  if (error instanceof FenceError || error instanceof ResolveError || error instanceof ResolverDownError) return null;
   const code = (error as NodeJS.ErrnoException | null)?.code ?? '';
   if (code === 'ENOTFOUND' || code === 'ENODATA') return null;
   return code === 'ETIMEDOUT' || /timed out|нет соединения за|нет ответа/i.test(errorText(error)) ? 'timeout' : 'refused';

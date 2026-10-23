@@ -13,7 +13,7 @@ import { shareLinks } from '../src/share/links.ts';
 import { RuleBook } from '../src/rules/book.ts';
 import { RuleSet } from '../src/rules/engine.ts';
 import { phonePlan } from '../src/share/plan.ts';
-import { shadowrocketConf } from '../src/share/rules.ts';
+import { setVersion, shadowrocketConf } from '../src/share/rules.ts';
 import { answer } from '../src/share/server.ts';
 import { ShareStore, type ShareDevice } from '../src/share/store.ts';
 import { createLogger } from '../src/vendor/logger.js';
@@ -126,20 +126,24 @@ test('правила телефона из движка: исключения с
   assert.deepEqual(plan.direct, ['x.com'], 'ручное «напрямую» сильнее общего списка');
   const conf = shadowrocketConf({ base: 'https://c.example.ru/list/T', device: 'iPhone', plan, countries: ['RU', 'DE'] });
   const rules = conf.slice(conf.indexOf('[Rule]')).split('\n').filter(Boolean);
+  const v = (names: string[]): string => `?v=${setVersion(names)}`;
   assert.deepEqual(rules, [
     '[Rule]',
     'DOMAIN-KEYWORD,netseer-ipaddr-assoc,REJECT',
     'DOMAIN-SUFFIX,music.youtube.com,DIRECT',
-    'DOMAIN-SET,https://c.example.ru/list/T/domains.list,Contour',
-    'DOMAIN-SET,https://c.example.ru/list/T/direct.list,DIRECT',
+    `DOMAIN-SET,https://c.example.ru/list/T/domains.list${v(plan.tunnel)},Contour`,
+    `DOMAIN-SET,https://c.example.ru/list/T/direct.list${v(plan.direct)},DIRECT`,
     'IP-CIDR,91.108.4.0/22,Contour,no-resolve',
-    'DOMAIN-SET,https://c.example.ru/list/T/country-ru.list,Россия',
+    `DOMAIN-SET,https://c.example.ru/list/T/country-ru.list${v(plan.country.RU ?? [])},Россия`,
     'GEOIP,RU,Россия',
     'GEOIP,DE,Германия',
     'FINAL,DIRECT',
   ], 'узлы — по имени, а не «выбранный на главной»; пустой список страны не зовём');
   assert.match(conf, /^\[Proxy Group\]\nРоссия = select,DIRECT,Contour-RU\nГермания = select,DIRECT,Contour-DE$/m, 'там — напрямую, уехал — через выход в стране: группа названием страны');
   assert.match(conf, /^update-url = https:\/\/c\.example\.ru\/list\/T\/contour\.conf$/m);
+  // Поменялись только сайты — меняется и конфиг: Shadowrocket при обновлении берёт новые наборы, а не держит старые.
+  assert.notEqual(setVersion(plan.tunnel), setVersion([...plan.tunnel, 'meet.google.com']));
+  assert.equal(setVersion(plan.tunnel), setVersion([...plan.tunnel]), 'то же содержимое — та же версия: конфиг не дёргается зря');
   assert.match(conf, /^block-quic = all-proxy$/m);
   assert.match(conf, /^dns-direct-fallback-proxy = false$/m, 'прямой сайт не уходит через Contour, если имя не разрешилось');
   assert.deepEqual(phonePlan(book.rules(), []).country, {}, 'страна не открыта телефону — её сайты напрямую, как раньше');
@@ -160,7 +164,7 @@ test('план телефона: точное имя — строкой; зап�
   assert.deepEqual(plan.nets.map((n) => [n.cidr, n.policy.kind]), [['172.16.42.0/24', 'contour']], 'корпоративная сеть с телефона — через Contour, там правило');
   const conf = shadowrocketConf({ base: 'B', device: 'x', plan, countries: [] });
   assert.match(conf, /^DOMAIN,www\.example\.org,REJECT$/m);
-  assert.match(conf, /^DOMAIN-SET,B\/reject\.list,REJECT$/m);
+  assert.match(conf, /^DOMAIN-SET,B\/reject\.list\?v=[0-9a-f]{10},REJECT$/m);
   // Shadowrocket по умолчанию пускает частные сети мимо туннеля — до правила адрес не дошёл бы.
   assert.match(conf, /^tun-included-routes = 0\.0\.0\.0\/0, 172\.16\.42\.0\/24$/m, 'корпоративная подсеть — маршрутом в туннель, и маршрут по умолчанию первым: без него в туннеле только она');
   assert.ok(conf.indexOf('tun-included-routes') < conf.indexOf('[Rule]'), 'в [General]');
@@ -187,6 +191,7 @@ test('ссылка на правила: по токену включённого
   assert.equal(answer(`/list/${d.list}/country-ru.list`, opts), null, 'страна не открыта телефону — и списка нет');
   store.setCountry(d.id, 'RU', true);
   assert.equal(answer(`/list/${d.list}/country-ru.list`, opts)?.body, '# Contour: сайты только с адресом RU, 2\n.alfabank.ru\n.gosuslugi.ru\n', 'готовый список и свой из панели');
+  assert.equal(answer(`/list/${d.list}/country-ru.list?v=0123456789`, opts)?.body, answer(`/list/${d.list}/country-ru.list`, opts)?.body, 'метка версии в ссылке ничего не меняет');
   assert.match(answer(conf, opts)?.body ?? '', /^Россия = select,DIRECT,Contour-RU$/m);
   assert.equal(answer(`/list/${d.list}/country-ru.list`, { ...opts, allowed: ['DE'] }), null, 'share.countries сужает');
   assert.equal(answer(`/list/${'A'.repeat(32)}/contour.conf`, opts), null);

@@ -47,6 +47,12 @@ export type Health = {
 };
 
 const DEAD_AFTER = 2;
+/**
+ * Внеочередная проверка (отказ потребителя) — не чаще: каждый оборванный запрос
+ * звал её сразу, и при потерях пакетов две неудачи подряд набирались за
+ * секунды — выход «умирал» от пачки запросов, а не от болезни (2026-10-23).
+ */
+const RECHECK_GAP_MS = 5_000;
 /** Функцией, а не сравнением на месте: между await выход могут увести в запасные, а сужение типа этого не знает. */
 const isStandby = (o: Outlet): boolean => o.state === 'standby';
 const RESPONSE_TIMEOUT_MS = 8_000;
@@ -159,6 +165,6 @@ export function startHealth(outlets: Outlet[], opts: HealthOptions): Health {
 
   return {
     stop() { stopped = true; clearInterval(timer); },
-    recheck(outlet) { void probe(outlet); },
+    recheck(outlet) { if (Date.now() - (outlet.checkedAt ?? 0) >= RECHECK_GAP_MS) void probe(outlet); },
   };
 }

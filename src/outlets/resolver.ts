@@ -3,7 +3,7 @@ import { isIP } from 'node:net';
 import { dialVia } from '../dial.ts';
 import { errorText } from '../log.ts';
 import { tcpLookup } from './dns-tcp.ts';
-import { DOH_TIMEOUT_MS, dohLookup, ResolveError, type DohResult } from './doh.ts';
+import { DOH_TIMEOUT_MS, dohLookup, ResolveError, ResolverDownError, type DohResult } from './doh.ts';
 import type { Outlet } from './outlet.ts';
 
 /**
@@ -100,6 +100,6 @@ export class Resolver {
         errors.push(`${ip}: ${errorText(error)}`);
       }
     }
-    throw new Error(`DNS выхода «${outlet.name}» не ответил (${errors.join('; ')})`);
+    throw new ResolverDownError(`DNS выхода «${outlet.name}» не ответил (${errors.join('; ')})`);
   }
 }

@@ -118,6 +118,9 @@ test('сигналы с трафика: быстрый молчаливый ра
     probe.confirm(awg, 9339);
     assert.ok(!awg.ports.cut.has(9339) && awg.ports.pass.has(9339));
     assert.equal(awg.ports.filter, 'all', 'больше ничего не режет');
+    probe.suspect(awg, 443);
+    await sleep(50);
+    assert.ok(!awg.ports.cut.has(443), 'ходовой порт по живому соединению не режем: сравнивать его не с чем');
   } finally {
     probe.stop();
     fake.close();

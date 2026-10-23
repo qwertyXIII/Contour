@@ -117,6 +117,9 @@ test('требования правил: только эти выходы (ни�
   const chooser = new Chooser([de, ru, home], opts);
   assert.deepEqual(chooser.order('x', undefined, Date.now(), { only: ['de', 'home'] }).map((o) => o.name), ['de']);
   assert.deepEqual(chooser.order('x', undefined, Date.now(), { avoid: ['RU'] }).map((o) => o.name), ['de']);
+  const unknown = outlet('new', 1, 'alive');
+  const withUnknown = new Chooser([de, ru, unknown], opts);
+  assert.deepEqual(withUnknown.order('x', undefined, Date.now(), { avoid: ['RU'] }).map((o) => o.name), ['de'], 'страну не узнали — может оказаться той самой: не пускаем, пока есть выходы с известной');
   assert.deepEqual(chooser.order('x', undefined, Date.now(), { direct: true }).map((o) => o.name), ['home']);
   assert.deepEqual(chooser.order('x', undefined, Date.now(), { country: 'RU' }).map((o) => o.name), ['home', 'ru']);
   assert.deepEqual(chooser.order('x').map((o) => o.name), ['ru', 'de'], 'без требования прямой «по просьбе» не виден');

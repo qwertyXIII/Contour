@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { inSet } from '../dns/lists.ts';
 import { isPrivateV4 } from '../inlets/fence.ts';
 import type { Policy, PhonePlan } from './plan.ts';
@@ -66,6 +67,11 @@ export type ConfInput = {
   countries: string[];
 };
 
+/** Версия набора — короткий отпечаток его имён. */
+export function setVersion(names: readonly string[]): string {
+  return createHash('sha256').update(names.join('\n')).digest('hex').slice(0, 10);
+}
+
 /** Имя политики в конфиге: узел Contour, DIRECT, REJECT или группа страны. */
 /**
  * Частные подсети правил, которым нужен Contour (корпоративная сеть «только через
@@ -111,7 +117,10 @@ function policyName(p: Policy): string {
  */
 export function shadowrocketConf(input: ConfInput): string {
   const { plan, base } = input;
-  const set = (file: string, names: string[], policy: string): string[] => (names.length > 0 ? [`DOMAIN-SET,${base}/${file},${policy}`] : []);
+  // `?v=` — версия содержимого набора (сервер её отбрасывает): поменялись только сайты — поменялся и конфиг,
+  // и Shadowrocket при обновлении берёт новые наборы, а не держит старые (Meet, 2026-10-23).
+  const url = (file: string, names: string[]): string => `${base}/${file}?v=${setVersion(names)}`;
+  const set = (file: string, names: string[], policy: string): string[] => (names.length > 0 ? [`DOMAIN-SET,${url(file, names)},${policy}`] : []);
   return [
     `# Contour — правила для «${input.device}»: заблокированное через Contour, остальное напрямую.`,
     '# Обновляются сами (update-url ниже); правка руками здесь пропадёт при обновлении.',
@@ -133,7 +142,7 @@ export function shadowrocketConf(input: ConfInput): string {
     ...REJECT_KEYWORDS.map((k) => `DOMAIN-KEYWORD,${k},REJECT`),
     ...plan.exceptions.map((e) => `${e.exact ? 'DOMAIN' : 'DOMAIN-SUFFIX'},${e.name},${policyName(e.policy)}`),
     ...set('reject.list', plan.reject, 'REJECT'),
-    `DOMAIN-SET,${base}/domains.list,${SHARE_NODE}`,
+    `DOMAIN-SET,${url('domains.list', plan.tunnel)},${SHARE_NODE}`,
     ...set('direct.list', plan.direct, 'DIRECT'),
     ...plan.nets.map((n) => `IP-CIDR,${n.cidr},${policyName(n.policy)},no-resolve`),
     ...input.countries.flatMap((c) => [...set(`country-${c.toLowerCase()}.list`, plan.country[c] ?? [], countryGroup(c)), `GEOIP,${c},${countryGroup(c)}`]),

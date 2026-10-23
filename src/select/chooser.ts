@@ -126,7 +126,9 @@ export class Chooser {
     const byPriority = this.outlets.filter((o) => fitsNeed(o, need)).sort((a, b) =>
       rank(a) - rank(b) || a.priority - b.priority || (a.latencyMs ?? Infinity) - (b.latencyMs ?? Infinity) || a.name.localeCompare(b.name));
     // Запасной (не поднят, ждёт своей очереди в группе соперников) не годится никогда.
-    const up = byPriority.filter((o) => o.state !== 'standby');
+    // «Не через» страны: выход, чью страну ещё не узнали, может оказаться той самой — только если других нет.
+    const sure = need.avoid ? byPriority.filter((o) => o.country !== null) : byPriority;
+    const up = (sure.length > 0 ? sure : byPriority).filter((o) => o.state !== 'standby');
 
     let stuck = free(need) ? this.sticky.get(key) ?? null : null;
     if (stuck && stuck.until <= now) { this.sticky.delete(key); stuck = null; }

@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
 import { FenceError } from '../src/outlets/connect.ts';
-import { ResolveError } from '../src/outlets/doh.ts';
+import { ResolveError, ResolverDownError } from '../src/outlets/doh.ts';
 import { failureKind, OutcomeBook, type ExitRef } from '../src/select/outcomes.ts';
 import { createLogger } from '../src/vendor/logger.js';
 
@@ -211,6 +211,7 @@ test('снимок: сначала то, где что-то известно; с
 test('вид отказа по ошибке соединения: ограда и «имени нет» — не исход выхода', () => {
   assert.equal(failureKind(new FenceError('частный адрес')), null);
   assert.equal(failureKind(new ResolveError('имени нет')), null);
+  assert.equal(failureKind(new ResolverDownError('имя «x» не разрешилось через «ext» — 1.1.1.1: нет ответа')), null, 'DNS выхода не ответил — болезнь выхода, не отказ сервиса');
   assert.equal(failureKind(Object.assign(new Error('getaddrinfo'), { code: 'ENOTFOUND' })), null);
   assert.equal(failureKind(new Error('Proxy connection timed out')), 'timeout');
   assert.equal(failureKind(new Error('нет соединения за 8 с')), 'timeout');

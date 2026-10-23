@@ -25,6 +25,14 @@ type Answer = { Status?: number; Answer?: Array<{ type?: number; data?: string; 
 /** «Имени нет» или «нет IPv4» — ответ, а не сбой: второй сервер скажет то же самое. */
 export class ResolveError extends Error {}
 
+/**
+ * DNS выхода не ответил ни одним сервером — сбой выхода, а не отказ сайта:
+ * самообучение его не записывает (`outcomes.ts`, `failureKind`). Был обычной
+ * ошибкой «… нет ответа» и считался тайм-аутом сервиса: 40 с сбоя DNS выхода —
+ * и каждый активный сервис на 3 дня «плохой» на основном выходе (2026-10-23).
+ */
+export class ResolverDownError extends Error {}
+
 export type DohResult = { ips: string[]; ttl: number };
 
 /** Один запрос: TLS поверх `raw`, GET, разбор JSON. */
@@ -68,5 +76,5 @@ export async function dohLookup(open: (server: DohServer) => Promise<Socket>, na
       errors.push(`${server.ip}: ${errorText(error)}`);
     }
   }
-  throw new Error(`имя «${name}» не разрешилось ${via} — ${errors.join('; ')}`);
+  throw new ResolverDownError(`имя «${name}» не разрешилось ${via} — ${errors.join('; ')}`);
 }

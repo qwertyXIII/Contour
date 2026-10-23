@@ -198,6 +198,9 @@ export class PortProbe implements PortLearner {
   }
 
   suspect(outlet: Outlet, port: number): void {
+    // Ходовые порты — сравнивать не с чем (для 443 «рядом» был он же сам: ответила одна проба из двух — и весь HTTPS
+    // уходил с выхода до суточной проверки). Их проверяет плановая проверка портов.
+    if (port === 80 || port === 443) return;
     const key = `${outlet.name}:${port}`;
     if (Date.now() - (this.suspectedAt.get(key) ?? 0) < SUSPECT_GAP_MS) return;
     this.suspectedAt.set(key, Date.now());
