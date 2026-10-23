@@ -19,11 +19,18 @@ import type { SpeedBook } from './speed.ts';
  * - Повтор: не соединилось через первый — сразу через следующий, и клиент
  *   получает ответ только когда соединение уже есть. Отказ одного выхода он
  *   не видит.
- * - Прилипание — **страна на весь сервис** (владелец 2026-10-02: за
- *   «телепортацию» выкидывают из учёток и могут забанить): сервис (основной
- *   домен или группа доменов — `serviceOf`) держится страны выхода, где
- *   открылся, `stickyMs`; первым идёт тот же выход, за ним — другие выходы той
- *   же страны, остальные страны — только когда в ней не осталось ни одного.
+ * - Прилипание — **страна на весь сервис, замком** (владелец 2026-10-02: за
+ *   «телепортацию» выкидывают из учёток и могут забанить; 2026-10-23: «нельзя
+ *   допускать, чтобы мы телепортировались»): сервис (основной домен или группа
+ *   доменов — `serviceOf`) держится страны выхода, через который **сайт
+ *   ответил** (`confirm`, не «успех» SOCKS: mihomo отвечает его раньше сайта),
+ *   `stickyMs` от последнего ответа; первым идёт тот же выход, за ним — другие
+ *   выходы той же страны, **другие страны — никогда**: в стране сервиса не
+ *   открылось — отказ. Повтор внутри соединения тоже держит страну первого
+ *   выхода (`keep`), даже когда сервис ещё не прилип. Замок только у свободного
+ *   выбора: «только эти выходы», страна из правила или заголовка и «напрямую» —
+ *   решение правила, они замок не трогают и не ставят. Выход без страны (её ещё
+ *   не узнали) замком не служит — только первым в очереди.
  * - Выхода «напрямую» здесь нет по построению: умерли все — ошибка, не утечка.
  *   Прямой выход (`config.direct`) — выход как выход, но по умолчанию «по
  *   просьбе»: его видит только соединение, которое просит его страну.
@@ -77,12 +84,20 @@ export type ChooserOptions = {
 };
 
 export class NoOutletError extends Error {
-  constructor(host: string, port: number, errors: string[], excluded: number, need: ExitNeed = {}) {
+  constructor(host: string, port: number, errors: string[], excluded: number, need: ExitNeed = {}, locked: string | null = null) {
+    const where = locked ? ` в стране ${locked} (другую страну не берём)` : '';
     super(errors.length > 0
-      ? `ни один выход не открыл ${host}:${port} — ${errors.join('; ')}`
-      : excluded > 0 ? 'других выходов нет' : needText(need));
+      ? `ни один выход${where} не открыл ${host}:${port} — ${errors.join('; ')}`
+      : excluded > 0 ? `других выходов${where} нет` : locked ? `нет выхода${where}` : needText(need));
   }
 }
+
+/** Свободный выбор — без требования правила к выходу; только его держит страна сервиса. */
+function free(need: ExitNeed): boolean {
+  return !need.only && !need.country && !need.direct;
+}
+
+type Plan = { list: Outlet[]; locked: string | null };
 
 export class Chooser {
   /** Сервис → выход, где открылся, и его страна. */
@@ -95,8 +110,15 @@ export class Chooser {
     this.opts = opts;
   }
 
-  /** `port` не задан — порт неважен (проверки, тесты): только приоритет и живость. */
-  order(host: string, port?: number, now = Date.now(), need: ExitNeed = {}): Outlet[] {
+  /**
+   * `port` не задан — порт неважен (проверки, тесты): только приоритет и живость.
+   * `keep` — страна первого выхода этого соединения: повтор не уходит из неё.
+   */
+  order(host: string, port?: number, now = Date.now(), need: ExitNeed = {}, keep: string | null = null): Outlet[] {
+    return this.plan(host, port, now, need, keep).list;
+  }
+
+  private plan(host: string, port: number | undefined, now: number, need: ExitNeed, keep: string | null): Plan {
     const key = this.service(host);
     // Порт, потом выученное (хорошие → неизвестные → плохие: плохие не выкидываем — вдруг больше некому).
     const learned = (o: Outlet): number => this.opts.outcomes?.rank(key, o, now) ?? 0;
@@ -105,21 +127,23 @@ export class Chooser {
       rank(a) - rank(b) || a.priority - b.priority || (a.latencyMs ?? Infinity) - (b.latencyMs ?? Infinity) || a.name.localeCompare(b.name));
     // Запасной (не поднят, ждёт своей очереди в группе соперников) не годится никогда.
     const up = byPriority.filter((o) => o.state !== 'standby');
-    const usable = up.filter((o) => o.state !== 'dead');
-    const list = usable.length > 0 ? usable : up;
 
-    // Прилипание сильнее приоритета, но не сильнее порта и выученного: выход, который этот порт режет или где сервис не открывается, вперёд не пойдёт.
-    let stuck = this.sticky.get(key) ?? null;
+    let stuck = free(need) ? this.sticky.get(key) ?? null : null;
     if (stuck && stuck.until <= now) { this.sticky.delete(key); stuck = null; }
-    // Страна — вперёд целиком (порядок внутри сохраняется), остальные страны — за ней.
-    const country = stuck?.country ?? null;
-    const home = country ? list.filter((o) => o.country === country) : [];
-    const ordered = home.length > 0 ? [...home, ...list.filter((o) => o.country !== country)] : list;
-    if (need.fastest && this.opts.speed) return this.fastest(key, ordered, stuck?.name ?? null, rank, now);
-    if (!stuck) return ordered;
-    const index = ordered.findIndex((o) => o.name === stuck.name);
-    if (index > 0 && rank(ordered[index] as Outlet) <= rank(ordered[0] as Outlet)) ordered.unshift(...ordered.splice(index, 1));
-    return ordered;
+    // Замок страны: только выходы страны сервиса (или первого выхода соединения), живые — раньше мёртвых.
+    // Правило больше не пускает в эту страну ни одного выхода («не через» её) — замок не держит: страну выбрало правило.
+    const wanted = keep ?? stuck?.country ?? null;
+    const locked = wanted && up.some((o) => o.country === wanted) ? wanted : null;
+    const pool = locked ? up.filter((o) => o.country === locked) : up;
+    const usable = pool.filter((o) => o.state !== 'dead');
+    const list = usable.length > 0 ? usable : pool;
+
+    // Прилипание к выходу сильнее приоритета, но не сильнее порта и выученного: выход, который этот порт режет или где сервис не открывается, вперёд не пойдёт.
+    if (need.fastest && this.opts.speed) return { list: this.fastest(key, list, stuck?.name ?? null, rank, now), locked };
+    if (!stuck) return { list, locked };
+    const index = list.findIndex((o) => o.name === stuck.name);
+    if (index > 0 && rank(list[index] as Outlet) <= rank(list[0] as Outlet)) list.unshift(...list.splice(index, 1));
+    return { list, locked };
   }
 
   /**
@@ -149,20 +173,31 @@ export class Chooser {
     this.opts.onFailure(outlet, new Error(why));
   }
 
+  /**
+   * Сайт ответил через выход — сервис прилипает к его стране (и продлевает
+   * срок). Только у свободного выбора: выход по требованию правила страну
+   * сервиса не переносит (Google push по правилу через США не уводит весь
+   * Google из Германии).
+   */
+  confirm(host: string, outlet: Outlet, need: ExitNeed = {}, now = Date.now()): void {
+    if (this.opts.stickyMs > 0 && free(need)) this.sticky.set(this.service(host), { name: outlet.name, country: outlet.country, until: now + this.opts.stickyMs });
+  }
+
   /** Исход соединения сайта через выход — самообучению, по сервису сайта. */
   noteOutcome(host: string, outlet: Outlet, outcome: Outcome): void {
     this.opts.outcomes?.record(this.service(host), outlet, outcome);
   }
 
-  async connect(host: string, port: number, exclude: ReadonlySet<string> = new Set(), need: ExitNeed = {}): Promise<Connected> {
+  /** `keep` — страна, из которой это соединение не уходит (первый выход его же повтора). */
+  async connect(host: string, port: number, exclude: ReadonlySet<string> = new Set(), need: ExitNeed = {}, keep: string | null = null): Promise<Connected> {
     const errors: string[] = [];
-    for (const outlet of this.order(host, port, Date.now(), need)) {
+    const { list, locked } = this.plan(host, port, Date.now(), need, keep);
+    for (const outlet of list) {
       if (exclude.has(outlet.name)) continue;
       try {
         const socket = this.opts.dial
           ? await this.opts.dial(outlet, host, port)
           : await dialVia(outlet, host, port, this.opts.connectTimeoutMs);
-        if (this.opts.stickyMs > 0) this.sticky.set(this.service(host), { name: outlet.name, country: outlet.country, until: Date.now() + this.opts.stickyMs });
         return { socket, outlet, failed: errors.map((e) => e.split(':')[0] as string) };
       } catch (error) {
         errors.push(`${outlet.name}: ${errorText(error)}`);
@@ -171,7 +206,7 @@ export class Chooser {
         if (kind) this.noteOutcome(host, outlet, kind);
       }
     }
-    throw new NoOutletError(host, port, errors, exclude.size, need);
+    throw new NoOutletError(host, port, errors, exclude.size, need, locked);
   }
 
   /** Сколько сайтов сейчас прилипло — для экрана и логов. */

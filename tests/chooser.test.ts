@@ -66,7 +66,7 @@ test('страна выхода: просьба «RU» — только выхо
   await assert.rejects(chooser.connect('x.com', 443, new Set(), { country: 'NL' }), /нет выхода в стране NL/, 'не из другой страны: Госуслугам заграничный адрес хуже никакого');
 });
 
-test('прилипание — страна на весь сервис: упал свой выход — сначала другой той же страны; другие страны — за ней', async () => {
+test('страна сервиса — замок: прилипает по ответу сайта; упал свой выход — другой той же страны; другой страны — нет, отказ', async () => {
   const de1 = Object.assign(outlet('de1', 10, 'alive'), { country: 'DE' });
   const de2 = Object.assign(outlet('de2', 30, 'alive'), { country: 'DE' });
   const nl = Object.assign(outlet('nl', 1, 'alive'), { country: 'NL' });
@@ -76,13 +76,38 @@ test('прилипание — страна на весь сервис: упал
     serviceOf: (h) => h.split('.').slice(-2).join('.'),
     dial: async (o) => { opened.push(o.name); if (o.name === 'nl') throw new Error('сброс'); return { destroy() {} } as never; },
   });
-  // Первый раз сервис открылся через de1 (nl не смог) — сервис держится Германии.
-  await chooser.connect('chatgpt.com', 443);
+  // Первый раз сервис открылся через de1 (nl не смог).
+  const { outlet: first } = await chooser.connect('chatgpt.com', 443);
   assert.deepEqual(opened, ['nl', 'de1']);
-  assert.deepEqual(chooser.order('cdn.chatgpt.com').map((o) => o.name), ['de1', 'de2', 'nl'], 'поддомен — тот же сервис');
+  assert.equal(chooser.stickyCount(), 0, '«успех» выхода — ещё не ответ сайта: не прилипаем');
+  chooser.confirm('chatgpt.com', first);
+  assert.deepEqual(chooser.order('cdn.chatgpt.com').map((o) => o.name), ['de1', 'de2'], 'поддомен — тот же сервис; чужой страны в очереди нет вовсе');
   de1.state = 'dead';
-  assert.deepEqual(chooser.order('chatgpt.com').map((o) => o.name), ['de2', 'nl'], 'другой выход той же страны — раньше более приоритетной чужой');
-  assert.deepEqual(chooser.order('example.org').map((o) => o.name), ['nl', 'de2'], 'чужой сервис не прилип');
+  assert.deepEqual(chooser.order('chatgpt.com').map((o) => o.name), ['de2'], 'другой выход той же страны');
+  de2.state = 'dead';
+  assert.deepEqual(chooser.order('chatgpt.com').map((o) => o.name), ['de1', 'de2'], 'мёртвые своей страны — но не живая чужая');
+  await assert.rejects(chooser.connect('chatgpt.com', 443, new Set(['de1', 'de2'])), /в стране DE \(другую страну не берём\)/);
+  assert.deepEqual(chooser.order('example.org').map((o) => o.name), ['nl'], 'чужой сервис не прилип');
+});
+
+test('повтор соединения держит страну своего первого выхода, даже пока сервис не прилип', async () => {
+  const de = Object.assign(outlet('de', 10, 'alive'), { country: 'DE' });
+  const nl = Object.assign(outlet('nl', 1, 'alive'), { country: 'NL' });
+  const chooser = new Chooser([de, nl], opts);
+  assert.deepEqual(chooser.order('x.com', 443, Date.now(), {}, 'NL').map((o) => o.name), ['nl']);
+  await assert.rejects(chooser.connect('x.com', 443, new Set(['nl']), {}, 'NL'), /других выходов в стране NL \(другую страну не берём\) нет/);
+  assert.deepEqual(chooser.order('x.com', 443).map((o) => o.name), ['nl', 'de'], 'без страны соединения — все');
+});
+
+test('требование правила не трогает страну сервиса: ни замка, ни прилипания; «не через» её — замок не держит', () => {
+  const de = Object.assign(outlet('de', 10, 'alive'), { country: 'DE' });
+  const us = Object.assign(outlet('us', 20, 'alive'), { country: 'US' });
+  const chooser = new Chooser([de, us], { ...opts, serviceOf: () => 'google' });
+  chooser.confirm('www.google.com', de);
+  assert.deepEqual(chooser.order('mtalk.google.com', 5228, Date.now(), { only: ['us'] }).map((o) => o.name), ['us'], 'правило «только через» сильнее замка');
+  chooser.confirm('mtalk.google.com', us, { only: ['us'] });
+  assert.deepEqual(chooser.order('www.google.com').map((o) => o.name), ['de'], 'выход по правилу не перенёс страну всего сервиса');
+  assert.deepEqual(chooser.order('www.google.com', undefined, Date.now(), { avoid: ['DE'] }).map((o) => o.name), ['us'], 'правило не пускает в страну сервиса — страну выбрало правило');
 });
 
 test('требования правил: только эти выходы (никогда прямой), не через страны, напрямую', () => {

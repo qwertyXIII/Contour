@@ -25,6 +25,14 @@ import type { Meter } from '../stats/meter.ts';
  * быстрее `FAST_CLOSE_MS` — так рвёт фильтр по дороге, не сайт за выходом
  * (вход AmneziaWG рвал за 26 мс при 88 мс до сервера выхода); пришёл первый
  * байт сайта — порт этот выход пропускает.
+ *
+ * Страна (владелец 2026-10-23: «телепортироваться нельзя»): повтор не уходит из
+ * страны первого выхода соединения (`keep` у `chooser.connect`), а сервис
+ * прилипает к стране только когда сайт ответил (`chooser.confirm`). Простой —
+ * не отказ: клиент ничего не прислал, а соединение закрылось позже
+ * `IDLE_GRACE_MS` (Google закрывает такие через ~10 с) — клиенту закрытие, без
+ * повтора и без перепроверки выхода: раньше это «закрыл, не ответив» гнало
+ * соединение по выходам других стран и сервис прилипал к ним на сутки.
  */
 
 /** `need` — чего соединение требует от выхода (страну), см. `chooser.ts`. */
@@ -53,6 +61,8 @@ export const MAX_ATTEMPTS = 4;
 export const FAST_CLOSE_MS = 100;
 /** Закрыл молча позже — простой соединения, а не отказ сервиса. */
 const SILENT_CLOSE_MS = 30_000;
+/** Клиент ничего не прислал, а выход закрыл позже — простой (сайт закрыл пустое соединение), не отказ выхода. */
+export const IDLE_GRACE_MS = 3_000;
 
 export function relay(client: Socket, head: Buffer, who: string, target: Target, deps: RelayDeps, hooks: RelayHooks): void {
   const { chooser, consumers, log, meter } = deps;
@@ -66,6 +76,8 @@ export function relay(client: Socket, head: Buffer, who: string, target: Target,
   let finished = false;
   let upstream: Socket | null = null;
   let outletName = '';
+  /** Страна первого выхода: повтор из неё не уходит. `undefined` — выхода ещё не было. */
+  let keep: string | null | undefined;
   let up = 0;
   /** Когда запрос ушёл в выход: проигран буфер или (CONNECT) пришёл ClientHello после «200». */
   let sentAt = -1;
@@ -83,6 +95,7 @@ export function relay(client: Socket, head: Buffer, who: string, target: Target,
   const attach = (socket: Socket, outlet: Outlet): void => {
     upstream = socket;
     outletName = outlet.name;
+    if (keep === undefined) keep = outlet.country;
     const attachedAt = Date.now();
     sentAt = buffered.length > 0 ? attachedAt : -1;
     deps.trace?.(who, target.host, target.port, outlet);
@@ -96,6 +109,7 @@ export function relay(client: Socket, head: Buffer, who: string, target: Target,
       if (!answered) {
         answered = true;
         deps.ports?.confirm(outlet, target.port);
+        chooser.confirm(target.host, outlet, target.need);
         chooser.noteOutcome(target.host, outlet, 'answered');
         deps.speed?.noteTtfb(chooser.serviceKey(target.host), outlet.name, Date.now() - (sentAt >= 0 ? sentAt : attachedAt));
       }
@@ -116,7 +130,9 @@ export function relay(client: Socket, head: Buffer, who: string, target: Target,
       if (!answered && lived < FAST_CLOSE_MS) deps.ports?.suspect(outlet, target.port);
       // Закрыл молча, получив запрос, — отказ сервиса через этот выход (быстрое — фильтр порта, долгое — простой, не отказ).
       else if (!answered && bufferedBytes > 0 && lived < SILENT_CLOSE_MS) chooser.noteOutcome(target.host, outlet, 'silent');
-      if (replayable && !client.destroyed && attempts < MAX_ATTEMPTS) {
+      // Повтор — только отказу: клиент прислал запрос (и выход молчал меньше SILENT_CLOSE_MS) или выход закрыл сразу.
+      const refused = !answered && (bufferedBytes > 0 ? lived < SILENT_CLOSE_MS : lived < IDLE_GRACE_MS);
+      if (refused && replayable && !client.destroyed && attempts < MAX_ATTEMPTS) {
         void next(outlet, 'закрыл соединение, не ответив');
       } else {
         finish();
@@ -131,7 +147,7 @@ export function relay(client: Socket, head: Buffer, who: string, target: Target,
     }
     attempts += 1;
     try {
-      const { socket, outlet, failed: skipped } = await chooser.connect(target.host, target.port, exclude, target.need);
+      const { socket, outlet, failed: skipped } = await chooser.connect(target.host, target.port, exclude, target.need, keep ?? null);
       if (client.destroyed) { socket.destroy(); return; }
       if (failed) log.info(`${where} — «${failed.name}» ${why}, повтор через «${outlet.name}»`);
       else if (skipped.length > 0) log.info(`${where} через «${outlet.name}» после отказа ${skipped.join(', ')}`);

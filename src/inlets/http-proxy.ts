@@ -133,6 +133,8 @@ function serveForward(req: http.IncomingMessage, res: http.ServerResponse, who: 
   const exclude = new Set<string>();
   const retriable = req.method === 'GET' || req.method === 'HEAD';
   let attempts = 0;
+  /** Страна первого выхода: повтор из неё не уходит (`chooser.ts`, замок страны). */
+  let keep: string | null | undefined;
   let up = 0;
   let down = 0;
   req.on('data', (chunk: Buffer) => { up += chunk.length; });
@@ -155,7 +157,8 @@ function serveForward(req: http.IncomingMessage, res: http.ServerResponse, who: 
     let socket: Socket;
     let outlet: Outlet;
     try {
-      ({ socket, outlet } = await chooser.connect(host, port, exclude, need));
+      ({ socket, outlet } = await chooser.connect(host, port, exclude, need, keep ?? null));
+      if (keep === undefined) keep = outlet.country;
     } catch (error) {
       fail(errorText(error));
       return;
@@ -163,6 +166,7 @@ function serveForward(req: http.IncomingMessage, res: http.ServerResponse, who: 
     let answered = false;
     const out = http.request({ createConnection: () => socket, host, port, method: req.method, path: `${target.pathname}${target.search}`, headers }, (answer) => {
       answered = true;
+      chooser.confirm(host, outlet, need);
       answer.on('data', (chunk: Buffer) => { down += chunk.length; meter?.add(who, outlet.name, host, 0, chunk.length); });
       res.writeHead(answer.statusCode ?? 502, answer.headers);
       answer.pipe(res);
