@@ -201,6 +201,49 @@ test('ссылка на правила: по токену включённого
   book.stop();
 });
 
+test('профиль mihomo (Clash Verge Rev): серверы и те же правила одной ссылкой; наборы — в записи mihomo «+.»', () => {
+  const dns = tmp('contour-dns-');
+  writeFileSync(path.join(dns, 'blocked-domains.lst'), 'instagram.com\n');
+  const store = new ShareStore(tmp('contour-share-'));
+  const book = bookOn(dns, { own: ['youtube.com'], subnets: ['91.108.4.0/22'], countries: ['RU'], country: ['gosuslugi.ru'] });
+  const opts = { store, rules: () => book.rules(), allowed: null };
+  const d = store.add('Windows');
+  const url = `/list/${d.list}/mihomo.yaml`;
+  assert.equal(answer(url, opts), null, 'адреса нет — нечего дать');
+  store.setDomain('c.example.ru');
+  store.setCountry(d.id, 'RU', true);
+  const a = answer(url, opts);
+  const conf = parse(a?.body ?? '');
+  assert.deepEqual(conf.proxies[0], {
+    name: 'Contour', type: 'vless', server: 'c.example.ru', port: 443, uuid: d.uuid, udp: true,
+    tls: true, servername: 'c.example.ru', alpn: ['http/1.1'], network: 'ws', 'ws-opts': { path: store.settings().path, headers: { Host: 'c.example.ru' } },
+  }, 'тот же сервер, что в подписке Shadowrocket');
+  assert.deepEqual(conf.proxies.map((p: { name: string; uuid: string }) => [p.name, p.uuid]), [['Contour', d.uuid], ['Contour-RU', store.devices()[0]?.exits.RU]]);
+  assert.deepEqual(conf['proxy-groups'], [{ name: 'Россия', type: 'select', proxies: ['DIRECT', 'Contour-RU'] }]);
+  assert.deepEqual(conf.rules, [
+    'DOMAIN-KEYWORD,netseer-ipaddr-assoc,REJECT',
+    'AND,((NETWORK,UDP),(DST-PORT,443),(RULE-SET,contour)),REJECT',
+    'RULE-SET,contour,Contour',
+    'IP-CIDR,91.108.4.0/22,Contour,no-resolve',
+    'RULE-SET,country-ru,Россия',
+    'GEOIP,RU,Россия',
+    'MATCH,DIRECT',
+  ], 'порядок — как у Shadowrocket; QUIC к сайтам «через Contour» — отказ; пустые наборы не зовём');
+  const plan = phonePlan(book.rules(), ['RU']);
+  assert.deepEqual(conf['rule-providers'].contour, { type: 'http', behavior: 'domain', format: 'text', url: `https://c.example.ru/list/${d.list}/mihomo/domains.list?v=${setVersion(plan.tunnel)}`, interval: 43200 });
+  assert.equal(conf.dns['enhanced-mode'], 'fake-ip');
+  assert.equal(answer(`/list/${d.list}/mihomo/domains.list`, opts)?.body, '# Contour: сайты через VPN, 2\n+.instagram.com\n+.youtube.com\n', 'у mihomo «.x» — только поддомены, сам сайт — «+.x»');
+  assert.equal(answer(`/list/${d.list}/domains.list`, opts)?.body, '# Contour: сайты через VPN, 2\n.instagram.com\n.youtube.com\n', 'у Shadowrocket — как было');
+  assert.equal(answer(`/list/${d.list}/mihomo/country-ru.list?v=0123456789`, opts)?.body, '# Contour: сайты только с адресом RU, 1\n+.gosuslugi.ru\n');
+  assert.equal(answer(`/list/${d.list}/mihomo/country-de.list`, opts), null, 'страна не открыта — списка нет');
+  assert.equal(answer(`/list/${d.list}/mihomo/contour.conf`, opts), null);
+  assert.equal(a?.headers?.['profile-update-interval'], '12');
+  assert.equal(a?.headers?.['Content-Disposition'], "attachment; filename*=UTF-8''Contour", 'имя профиля в Clash Verge');
+  store.setEnabled(d.id, false);
+  assert.equal(answer(url, opts), null);
+  book.stop();
+});
+
 test('подписка: серверы телефона в base64 — Contour и открытые страны; название в заголовке', () => {
   const store = new ShareStore(tmp('contour-share-'));
   const rules = (): RuleSet => new RuleSet([]);
@@ -239,6 +282,8 @@ test('ссылки для телефона: подписка одним QR; vles
   assert.equal(u.host, 'c.example.ru:443');
   assert.deepEqual(Object.fromEntries(u.searchParams), { encryption: 'none', security: 'tls', sni: 'c.example.ru', alpn: 'http/1.1', type: 'ws', host: 'c.example.ru', path: store.settings().path });
   assert.equal(links?.open, `shadowrocket://config/add/https://c.example.ru/list/${d.list}/contour.conf`);
+  const mihomo = `https://c.example.ru/list/${d.list}/mihomo.yaml`;
+  assert.deepEqual(links?.mihomo, { url: mihomo, open: `clash://install-config?url=${encodeURIComponent(mihomo)}&name=Contour` });
   const svg = Buffer.from((links?.nodes[0]?.qr ?? '').replace(/^data:image\/svg\+xml;base64,/, ''), 'base64').toString();
   assert.match(svg, /^<svg[^>]*><rect width="100%" height="100%" fill="#fff"\/>/);
 });

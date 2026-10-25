@@ -1,7 +1,8 @@
 import http from 'node:http';
 import type { Logger } from '../log.ts';
 import type { RuleSet } from '../rules/engine.ts';
-import { shareServers, SUBSCRIPTION_NAME, subscriptionBody } from './links.ts';
+import { shareKeys, shareServers, SUBSCRIPTION_NAME, subscriptionBody } from './links.ts';
+import { mihomoConf, mihomoSetText } from './mihomo-conf.ts';
 import { phonePlan } from './plan.ts';
 import { domainSetText, shadowrocketConf } from './rules.ts';
 import { deviceCountries, type ShareStore } from './store.ts';
@@ -14,11 +15,13 @@ import { deviceCountries, type ShareStore } from './store.ts';
  * `/list/<токен>/servers` — подписка (серверы телефона), `/list/<токен>/contour.conf` —
  * конфиг Shadowrocket, к нему наборы: `domains.list` — через Contour,
  * `direct.list` — напрямую, `reject.list` — отказ, `country-xx.list` — в группу
- * страны (страна должна быть открыта телефону). Чужой токен, выключенное устройство, адрес не
+ * страны (страна должна быть открыта телефону). `/list/<токен>/mihomo.yaml` — профиль
+ * Clash Verge Rev (серверы и правила вместе), его наборы — те же под `mihomo/`, в
+ * записи mihomo (`mihomo-conf.ts`). Чужой токен, выключенное устройство, адрес не
  * задан — один и тот же 404: по ответу не понять, есть ли такой токен.
  */
 
-const ROUTE = /^\/list\/([A-Za-z0-9_-]{16,64})\/(servers|contour\.conf|domains\.list|direct\.list|reject\.list|country-([a-z]{2})\.list)$/;
+const ROUTE = /^\/list\/([A-Za-z0-9_-]{16,64})\/(servers|contour\.conf|mihomo\.yaml|(mihomo\/)?(domains|direct|reject|country-([a-z]{2}))\.list)$/;
 /** Как часто клиенту перечитывать подписку, часов (заголовок клиентов Clash и v2ray; Shadowrocket — своя настройка). */
 const SUBSCRIPTION_HOURS = 12;
 
@@ -51,16 +54,22 @@ export function answer(url: string, opts: Pick<ShareServerOptions, 'store' | 'ru
     return { body: subscriptionBody(servers), device: device.name, file: 'подписку', headers: { 'profile-title': title, 'profile-update-interval': String(SUBSCRIPTION_HOURS) } };
   }
   const plan = phonePlan(opts.rules(), countries);
-  const file = (names: string[], what: string, title: string): Answer => ({ body: domainSetText(names, what), device: device.name, file: title });
-  if (m[2] === 'domains.list') return file(plan.tunnel, 'сайты через VPN', 'список сайтов');
-  if (m[2] === 'direct.list') return file(plan.direct, 'сайты напрямую', 'список «напрямую»');
-  if (m[2] === 'reject.list') return file(plan.reject, 'отказ', 'список отказов');
-  if (m[3]) {
-    const code = m[3].toUpperCase();
+  const base = `https://${settings.domain}/list/${device.list}`;
+  if (m[2] === 'mihomo.yaml') {
+    const body = mihomoConf({ base, device: device.name, plan, countries, domain: settings.domain, path: settings.path, keys: shareKeys(device, opts.allowed) });
+    // Имя профиля в Clash Verge — из имени файла в Content-Disposition, как обновлять — из profile-update-interval.
+    return { body, device: device.name, file: 'профиль mihomo', headers: { 'Content-Disposition': "attachment; filename*=UTF-8''Contour", 'profile-update-interval': String(SUBSCRIPTION_HOURS) } };
+  }
+  const text = m[3] ? mihomoSetText : domainSetText;
+  const file = (names: string[], what: string, title: string): Answer => ({ body: text(names, what), device: device.name, file: m[3] ? `${title} (mihomo)` : title });
+  if (m[4] === 'domains') return file(plan.tunnel, 'сайты через VPN', 'список сайтов');
+  if (m[4] === 'direct') return file(plan.direct, 'сайты напрямую', 'список «напрямую»');
+  if (m[4] === 'reject') return file(plan.reject, 'отказ', 'список отказов');
+  if (m[5]) {
+    const code = m[5].toUpperCase();
     if (!countries.includes(code)) return null;
     return file(plan.country[code] ?? [], `сайты только с адресом ${code}`, `список ${code}`);
   }
-  const base = `https://${settings.domain}/list/${device.list}`;
   return { body: shadowrocketConf({ base, device: device.name, plan, countries }), device: device.name, file: 'конфиг' };
 }
 

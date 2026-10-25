@@ -1,6 +1,7 @@
 // Окно «Подключить телефон»: подписка (один QR — все серверы телефона) или
 // серверы по одному запасным путём, правила — ссылка и «открыть в Shadowrocket»,
-// и как включить, с группами открытых телефону стран. Ключи приходят отдельным
+// и как включить, с группами открытых телефону стран; для компьютера — профиль
+// Clash Verge Rev, серверы и правила одной ссылкой. Ключи приходят отдельным
 // запросом на открытие окна и в разделе не хранятся.
 import { api, toast } from '../../utils/api.js';
 import { API } from '../../utils/constants.js';
@@ -13,7 +14,7 @@ const HINT = {
   plain: 'Запасной путь, без подписки. Обычный сервер: заблокированное — через Contour и его выходы, остальное телефон открывает сам.',
   country: (title) => `Запасной путь, без подписки. Всё, что телефон пошлёт сюда, выйдет в интернет в стране «${title}».`,
 };
-const COPIED = { server: 'Ссылка скопирована — открой Shadowrocket', config: 'Ссылка на правила скопирована' };
+const COPIED = { server: 'Ссылка скопирована — открой Shadowrocket', config: 'Ссылка на правила скопирована', mihomo: 'Ссылка на профиль скопирована — вставь в «Профили» Clash Verge' };
 
 export class ConnectDialog {
   #dlg;
@@ -45,6 +46,8 @@ export class ConnectDialog {
     this.#q('title').textContent = `Подключить «${l.name}»`;
     this.#q('config').textContent = l.config;
     this.#q('open').href = l.open;
+    this.#q('mihomo').textContent = l.mihomo.url;
+    this.#q('mihomo-open').href = l.mihomo.open;
     // Переключатель — каждый раз заново: у телефона может прибавиться страна.
     const options = [[SUBSCRIPTION, 'Подписка'], ...l.nodes.map((n, i) => [i, n.name])];
     this.#q('nodes').replaceChildren(h('div', { class: 'segmented segmented_wide segmented_scroll', role: 'radiogroup', 'aria-label': 'Что добавить' },
@@ -95,7 +98,7 @@ export class ConnectDialog {
   }
 
   async #copy(what) {
-    const text = what === 'server' ? this.#current()?.link : this.#links?.config;
+    const text = what === 'server' ? this.#current()?.link : what === 'mihomo' ? this.#links?.mihomo.url : this.#links?.config;
     if (!text) return;
     if (await copyText(text)) toast(COPIED[what], 'ok');
     else toast('Не скопировалось — выдели ссылку и скопируй вручную', 'danger');

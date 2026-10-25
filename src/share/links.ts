@@ -27,17 +27,23 @@ import { deviceCountries, type ShareDevice, type ShareSettings } from './store.t
  */
 export const SUBSCRIPTION_NAME = 'Серверы Contour';
 
+/** Ключ устройства: обычный сервер и по одному на открытую ему страну. */
+export type ShareKey = { name: string; country: string | null; uuid: string };
 export type ShareServer = { name: string; country: string | null; server: string };
 /** `group` — группа страны в правилах (её название по-русски); у обычного сервера — null. */
 export type ShareNode = ShareServer & { group: string | null; qr: string; open: string };
-export type ShareLinks = { subscription: { url: string; qr: string; open: string }; nodes: ShareNode[]; config: string; open: string };
+/** `mihomo` — профиль для Clash Verge Rev и других клиентов на mihomo: серверы и правила одной ссылкой. */
+export type ShareLinks = { subscription: { url: string; qr: string; open: string }; nodes: ShareNode[]; config: string; open: string; mihomo: { url: string; open: string } };
+
+export function shareKeys(d: ShareDevice, allowed: readonly string[] | null): ShareKey[] {
+  return [{ name: SHARE_NODE, country: null, uuid: d.uuid }, ...deviceCountries(d, allowed).map((c) => ({ name: countryNode(c), country: c, uuid: d.exits[c] as string }))];
+}
 
 /** Серверы устройства строками `vless://` — для подписки и для окна «Подключить»; адреса нет — null. */
 export function shareServers(d: ShareDevice, s: ShareSettings, allowed: readonly string[] | null): ShareServer[] | null {
   if (!s.domain) return null;
   const q = new URLSearchParams({ encryption: 'none', security: 'tls', sni: s.domain, alpn: 'http/1.1', type: 'ws', host: s.domain, path: s.path }).toString();
-  const node = (name: string, country: string | null, uuid: string): ShareServer => ({ name, country, server: `vless://${uuid}@${s.domain}:443?${q}#${encodeURIComponent(name)}` });
-  return [node(SHARE_NODE, null, d.uuid), ...deviceCountries(d, allowed).map((c) => node(countryNode(c), c, d.exits[c] as string))];
+  return shareKeys(d, allowed).map((k) => ({ name: k.name, country: k.country, server: `vless://${k.uuid}@${s.domain}:443?${q}#${encodeURIComponent(k.name)}` }));
 }
 
 /** Тело подписки: строки серверов в base64 — так её читают Shadowrocket и прочие клиенты. */
@@ -52,11 +58,14 @@ export function shareLinks(d: ShareDevice, s: ShareSettings, allowed: readonly s
   // `#…` — имя подписки в Shadowrocket (справка: «#name» или заголовок profile-title).
   const subscription = `${base}/servers#${encodeURIComponent(SUBSCRIPTION_NAME)}`;
   const config = `${base}/contour.conf`;
+  const mihomo = `${base}/mihomo.yaml`;
   return {
     subscription: { url: subscription, qr: qrDataUri(subscription), open: `shadowrocket://add/${subscription}` },
     nodes: servers.map((x) => ({ ...x, group: x.country ? countryGroup(x.country) : null, qr: qrDataUri(x.server), open: `shadowrocket://add/${x.server}` })),
     config,
     open: `shadowrocket://config/add/${config}`,
+    // `clash://install-config` — так профиль по ссылке открывают Clash Verge Rev, FlClash и другие.
+    mihomo: { url: mihomo, open: `clash://install-config?url=${encodeURIComponent(mihomo)}&name=Contour` },
   };
 }
 

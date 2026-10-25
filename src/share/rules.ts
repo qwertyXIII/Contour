@@ -32,7 +32,7 @@ import type { ShareStore } from './store.ts';
  * 177 пар за две минуты). Instagram от отказа не страдает: он его и так получал,
  * только по таймауту.
  */
-const REJECT_KEYWORDS = ['netseer-ipaddr-assoc'];
+export const REJECT_KEYWORDS = ['netseer-ipaddr-assoc'];
 
 /** Без поддоменов того, что уже в списке: `.example.com` в наборе и так берёт их. */
 export function collapse(names: Iterable<string>): string[] {
@@ -72,7 +72,6 @@ export function setVersion(names: readonly string[]): string {
   return createHash('sha256').update(names.join('\n')).digest('hex').slice(0, 10);
 }
 
-/** Имя политики в конфиге: узел Contour, DIRECT, REJECT или группа страны. */
 /**
  * Частные подсети правил, которым нужен Contour (корпоративная сеть «только через
  * выход»), — маршрутами в туннель. Shadowrocket по умолчанию выпускает все частные
@@ -94,7 +93,8 @@ function includedRoutes(plan: PhonePlan): string[] {
   return nets.length > 0 ? [`tun-included-routes = ${['0.0.0.0/0', ...nets].join(', ')}`] : [];
 }
 
-function policyName(p: Policy): string {
+/** Имя политики в конфиге: узел Contour, DIRECT, REJECT или группа страны — у Shadowrocket и mihomo одно. */
+export function policyName(p: Policy): string {
   if (p.kind === 'contour') return SHARE_NODE;
   if (p.kind === 'country') return countryGroup(p.code);
   return p.kind === 'reject' ? 'REJECT' : 'DIRECT';
