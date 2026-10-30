@@ -1,7 +1,11 @@
 import assert from 'node:assert/strict';
+import { mkdtempSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
 import test from 'node:test';
 import { newOutlet, type Outlet } from '../src/outlets/outlet.ts';
 import { Chooser } from '../src/select/chooser.ts';
+import { StickyBook } from '../src/select/sticky.ts';
 import { createLogger } from '../src/vendor/logger.js';
 
 const quiet = createLogger({ enabled: false });
@@ -34,8 +38,8 @@ test('прилипание: сайт идёт первым через свой �
   const a = outlet('a', 10, 'alive');
   const b = outlet('b', 20, 'alive');
   const chooser = new Chooser([a, b], opts);
-  // Прилипание ставится при успешном соединении; здесь — напрямую в карту.
-  (chooser as unknown as { sticky: Map<string, { name: string; until: number }> }).sticky.set('x.com', { name: 'b', until: Date.now() + 1000 });
+  // Сайт ответил через b — срок прилипания истекает через секунду.
+  chooser.confirm('x.com', b, {}, Date.now() - opts.stickyMs + 1000);
   assert.deepEqual(chooser.order('x.com').map((o) => o.name), ['b', 'a']);
   assert.deepEqual(chooser.order('y.com').map((o) => o.name), ['a', 'b']);
   b.state = 'dead';
@@ -88,6 +92,40 @@ test('страна сервиса — замок: прилипает по отв
   assert.deepEqual(chooser.order('chatgpt.com').map((o) => o.name), ['de1', 'de2'], 'мёртвые своей страны — но не живая чужая');
   await assert.rejects(chooser.connect('chatgpt.com', 443, new Set(['de1', 'de2'])), /в стране DE \(другую страну не берём\)/);
   assert.deepEqual(chooser.order('example.org').map((o) => o.name), ['nl'], 'чужой сервис не прилип');
+});
+
+test('выходов страны сервиса нет вовсе — отказ, а не другая страна: ждёт в запасе, страну ещё не узнали', async () => {
+  const de: Outlet = Object.assign(outlet('de', 10, 'alive'), { country: 'DE' });
+  const ch = Object.assign(outlet('ch', 20, 'alive'), { country: 'CH' });
+  const chooser = new Chooser([de, ch], opts);
+  chooser.confirm('chatgpt.com', de);
+  de.state = 'standby';
+  assert.deepEqual(chooser.order('chatgpt.com'), [], 'немецкий ждёт в запасе — не повод уехать в Швейцарию');
+  await assert.rejects(chooser.connect('chatgpt.com', 443), /нет выхода в стране DE \(другую страну не берём\)/);
+  de.state = 'alive';
+  de.country = null;
+  assert.deepEqual(chooser.order('chatgpt.com'), [], 'после запуска страну выхода ещё не узнали — ждём, а не берём чужую');
+  de.country = 'DE';
+  assert.deepEqual(chooser.order('chatgpt.com').map((o) => o.name), ['de']);
+  assert.deepEqual(chooser.order('example.org').map((o) => o.name), ['de', 'ch'], 'не прилипший сервис — как обычно');
+});
+
+test('прилипание на диске: перезапуск с выключенными выходами страны его не стирает; снимают срок и «не через»', () => {
+  const file = path.join(mkdtempSync(path.join(tmpdir(), 'contour-sticky-')), 'outlet-sticky.json');
+  const de = Object.assign(outlet('de', 10, 'alive'), { country: 'DE' });
+  const ch = Object.assign(outlet('ch', 20, 'alive'), { country: 'CH' });
+  const before = new Chooser([de, ch], { ...opts, sticky: new StickyBook({ file, log: quiet }) });
+  before.confirm('chatgpt.com', de);
+  before.confirm('old.example', ch, {}, Date.now() - opts.stickyMs - 1);
+  before.stop();
+  // Перезапуск, немецкие выключены в панели: Contour их больше не видит.
+  const after = new Chooser([ch], { ...opts, sticky: new StickyBook({ file, log: quiet }) });
+  assert.equal(after.stickyCount(), 1, 'истёкшее с диска не читается');
+  assert.deepEqual(after.order('chatgpt.com'), [], 'страна сервиса — с диска: в Швейцарию не уезжает');
+  assert.deepEqual(after.order('chatgpt.com', undefined, Date.now(), { avoid: ['DE'] }).map((o) => o.name), ['ch'], 'правило «не через» эту страну — страну выбрало правило');
+  assert.deepEqual(after.order('chatgpt.com', undefined, Date.now() + opts.stickyMs + 1).map((o) => o.name), ['ch'], 'срок вышел — сервис свободен');
+  writeFileSync(file, '{битый');
+  assert.equal(new StickyBook({ file, log: quiet }).count(), 0, 'битый файл — пусто, не падение');
 });
 
 test('повтор соединения держит страну своего первого выхода, даже пока сервис не прилип', async () => {

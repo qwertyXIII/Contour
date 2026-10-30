@@ -6,6 +6,7 @@ import type { Outlet } from '../outlets/outlet.ts';
 import { portRank } from '../outlets/ports.ts';
 import { failureKind, type Outcome, type OutcomeBook } from './outcomes.ts';
 import type { SpeedBook } from './speed.ts';
+import { StickyBook } from './sticky.ts';
 
 /**
  * Выбор выхода — вся ценность Contour в одном месте.
@@ -27,7 +28,11 @@ import type { SpeedBook } from './speed.ts';
  *   `stickyMs` от последнего ответа; первым идёт тот же выход, за ним — другие
  *   выходы той же страны, **другие страны — никогда**: в стране сервиса не
  *   открылось — отказ. Повтор внутри соединения тоже держит страну первого
- *   выхода (`keep`), даже когда сервис ещё не прилип. Замок только у свободного
+ *   выхода (`keep`), даже когда сервис ещё не прилип. Выходов страны сервиса
+ *   нет вовсе (выключены, ждут в запасе, после запуска страну ещё не узнали) —
+ *   тоже отказ, а не другая страна (владелец 2026-10-30); снимают замок только
+ *   срок и правило «не через» эту страну. Прилипание — на диске (`sticky.ts`):
+ *   перезапуск его не стирает. Замок только у свободного
  *   выбора: «только эти выходы», страна из правила или заголовка и «напрямую» —
  *   решение правила, они замок не трогают и не ставят. Выход без страны (её ещё
  *   не узнали) замком не служит — только первым в очереди.
@@ -81,6 +86,8 @@ export type ChooserOptions = {
   outcomes?: OutcomeBook;
   /** Замеры скорости для правил «самый быстрый» (`speed.ts`). */
   speed?: SpeedBook;
+  /** Страна сервиса на диске (`sticky.ts`); нет — только в памяти. */
+  sticky?: StickyBook;
 };
 
 export class NoOutletError extends Error {
@@ -101,13 +108,14 @@ type Plan = { list: Outlet[]; locked: string | null };
 
 export class Chooser {
   /** Сервис → выход, где открылся, и его страна. */
-  private readonly sticky = new Map<string, { name: string; country: string | null; until: number }>();
+  private readonly sticky: StickyBook;
   private readonly outlets: Outlet[];
   private readonly opts: ChooserOptions;
 
   constructor(outlets: Outlet[], opts: ChooserOptions) {
     this.outlets = outlets;
     this.opts = opts;
+    this.sticky = opts.sticky ?? new StickyBook({ file: null, log: opts.log });
   }
 
   /**
@@ -130,12 +138,11 @@ export class Chooser {
     const sure = need.avoid ? byPriority.filter((o) => o.country !== null) : byPriority;
     const up = (sure.length > 0 ? sure : byPriority).filter((o) => o.state !== 'standby');
 
-    let stuck = free(need) ? this.sticky.get(key) ?? null : null;
-    if (stuck && stuck.until <= now) { this.sticky.delete(key); stuck = null; }
-    // Замок страны: только выходы страны сервиса (или первого выхода соединения), живые — раньше мёртвых.
-    // Правило больше не пускает в эту страну ни одного выхода («не через» её) — замок не держит: страну выбрало правило.
+    const stuck = free(need) ? this.sticky.get(key, now) : null;
+    // Замок страны: только выходы страны сервиса (или первого выхода соединения), живые — раньше мёртвых;
+    // выходов этой страны нет — пустой список, отказ. Правило «не через» эту страну — замок не держит: страну выбрало правило.
     const wanted = keep ?? stuck?.country ?? null;
-    const locked = wanted && up.some((o) => o.country === wanted) ? wanted : null;
+    const locked = wanted && !need.avoid?.includes(wanted) ? wanted : null;
     const pool = locked ? up.filter((o) => o.country === locked) : up;
     const usable = pool.filter((o) => o.state !== 'dead');
     const list = usable.length > 0 ? usable : pool;
@@ -185,6 +192,11 @@ export class Chooser {
     if (this.opts.stickyMs > 0 && free(need)) this.sticky.set(this.service(host), { name: outlet.name, country: outlet.country, until: now + this.opts.stickyMs });
   }
 
+  /** Записать прилипание на диск сейчас — при остановке. */
+  stop(): void {
+    this.sticky.stop();
+  }
+
   /** Исход соединения сайта через выход — самообучению, по сервису сайта. */
   noteOutcome(host: string, outlet: Outlet, outcome: Outcome): void {
     this.opts.outcomes?.record(this.service(host), outlet, outcome);
@@ -213,8 +225,6 @@ export class Chooser {
 
   /** Сколько сайтов сейчас прилипло — для экрана и логов. */
   stickyCount(now = Date.now()): number {
-    let n = 0;
-    for (const s of this.sticky.values()) if (s.until > now) n += 1;
-    return n;
+    return this.sticky.count(now);
   }
 }

@@ -32,6 +32,7 @@ import { startRules } from './rules/index.ts';
 import { siteOf } from './rules/service-index.ts';
 import { OutcomeBook } from './select/outcomes.ts';
 import { SpeedBook } from './select/speed.ts';
+import { StickyBook } from './select/sticky.ts';
 import { SpeedProbe } from './select/speed-probe.ts';
 import { startShare, type Share } from './share/index.ts';
 import { Meter } from './stats/meter.ts';
@@ -165,6 +166,8 @@ async function main(): Promise<void> {
     serviceOf: (host) => serviceOf(host),
     outcomes,
     speed,
+    // Страна сервиса переживает перезапуск: без неё после него выбор шёл заново по приоритету — в другую страну.
+    sticky: new StickyBook({ file: path.join(STATE_DIR, 'outlet-sticky.json'), log }),
   });
   const speedProbe = new SpeedProbe(speed, {
     log,
@@ -234,6 +237,7 @@ async function main(): Promise<void> {
     meter.stop();
     rules.stop();
     outcomes.stop();
+    chooser.stop();
     speedProbe.stop();
     speed.stop();
     panel?.server.close();
